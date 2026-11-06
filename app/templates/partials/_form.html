@@ -1,0 +1,9 @@
+{% macro field(f) %}
+<label for="{{ f.id }}">{{ f.label.text }}{% if f.flags.required %} *{% endif %}</label>
+{% if f.errors %}
+  {{ f(**dict(kwargs, **{"aria-invalid": "true", "aria-describedby": f.id ~ "-err"})) }}
+  <small id="{{ f.id }}-err" class="error">{{ f.errors | join(" ") }}</small>
+{% else %}
+  {{ f(**kwargs) }}
+{% endif %}
+{% endmacro %}

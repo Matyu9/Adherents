@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}État de l'installation{% endblock %}
+{% set LABELS = {"ok": "OK", "warn": "À surveiller", "error": "Problème"} %}
+{% block content %}
+<p><a href="{{ url_for('settings.index') }}">← Paramètres</a></p>
+<h1>État de l'installation <span class="badge health-{{ result.status }}">{{ LABELS[result.status] }}</span></h1>
+<p class="muted">Version {{ result.version }} · vérifié le {{ result.time | replace("T", " à ") }}.
+  La même chose en JSON : <a href="{{ url_for('health.as_json') }}"><code>/health</code></a>.</p>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Contrôle</th><th>État</th><th>Détail</th></tr></thead>
+  <tbody>
+  {% for check in result.checks %}
+    <tr>
+      <th scope="row">{{ check.label }}</th>
+      <td><span class="badge health-{{ check.status }}">{{ LABELS[check.status] }}</span></td>
+      <td>{{ check.message }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

@@ -1,0 +1,9 @@
+Bonjour {{ user.first_name }},
+
+{{ intro }}
+{% if url %}
+{{ button }} : {{ url }}
+{% endif %}
+--
+{{ asso_name }}
+Toutes vos notifications : {{ config.BASE_URL }}/notifications

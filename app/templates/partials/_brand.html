@@ -1,0 +1,9 @@
+{% from "partials/_icons.html" import icon %}
+{#- Logo de l'association s'il y en a un, sinon la pastille à la note de musique. -#}
+{% macro brand_mark() -%}
+  {%- if branding.logo -%}
+  <img class="brand-logo" src="{{ branding.logo_url }}" alt="" width="34" height="34">
+  {%- else -%}
+  <span class="brand-mark">{{ icon("music", 18) }}</span>
+  {%- endif -%}
+{%- endmacro %}

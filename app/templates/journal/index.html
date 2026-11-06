@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Journal{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Journal</h1>
+</div>
+<p class="muted">Toutes les actions récentes : connexions, comptes, rôles, paramètres…</p>
+<form method="get" class="filters">
+  <input type="search" name="q" value="{{ q }}" placeholder="Rechercher dans le journal…" aria-label="Recherche">
+  <select name="type" aria-label="Type d'action" data-autosubmit>
+    <option value="">Toutes les actions</option>
+    {% for key, (label, _) in families.items() %}<option value="{{ key }}" {{ "selected" if family == key }}>{{ label }}</option>{% endfor %}
+  </select>
+  {% if person %}<input type="hidden" name="personne" value="{{ person.id }}">{% endif %}
+  <noscript><button type="submit">Filtrer</button></noscript>
+</form>
+{% if person %}
+<p>Actions de ou concernant {{ person.full_name }}
+  · <a href="{{ url_for('journal.index', **everyone) }}">voir tout le monde</a></p>
+{% endif %}
+
+{% if entries %}
+<p class="muted"><small>{{ total }} action{{ "s" if total > 1 }}</small></p>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Quand</th><th>Qui</th><th>Action</th></tr></thead>
+  <tbody>
+  {% for a in entries %}
+    <tr>
+      <td data-label="Quand"><small>{{ a.created_at | datetime_fr }}</small></td>
+      <td data-label="Qui">{% if a.account %}<a href="{{ url_for('journal.index', personne=a.account_id, **everyone) }}">{{ a.account.full_name }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td data-label="Action">{{ a.message }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if pages > 1 %}
+<nav class="pagination">
+  {% if page > 1 %}<a href="{{ url_for('journal.index', page=page-1, **args) }}">← Plus récent</a>{% endif %}
+  <span>Page {{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a href="{{ url_for('journal.index', page=page+1, **args) }}">Plus ancien →</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<p class="empty">Aucune action ne correspond.</p>
+{% endif %}
+{% endblock %}

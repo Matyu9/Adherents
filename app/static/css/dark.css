@@ -1,0 +1,49 @@
+/* ==========================================================================
+   Thème sombre : mêmes jetons que app.css, chargé après lui (voir base.html).
+   ========================================================================== */
+html:root[lang] {
+  --brand: #d0547a;
+  --brand-strong: #e06a8e;
+  --brand-soft: #3a1b26;
+  --bg: #141312;
+  --surface: #1c1b19;
+  --surface-2: #232220;
+  --border: #2f2d2a;
+  --border-strong: #3d3a36;
+  --text: #f0eeea;
+  --text-2: #c2bdb5;
+  --text-3: #8f8a82;
+  --ok: #7fd3a1;      --ok-bg: #16301f;
+  --warn: #f2c66d;    --warn-bg: #352812;
+  --danger: #f4908a;  --danger-bg: #3a1716;
+  --info: #92b8f5;    --info-bg: #17243b;
+  --series-1: #3987e5;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, .5);
+  --pico-primary-inverse: #141312;
+  --pico-primary-focus: color-mix(in srgb, var(--brand) 30%, transparent);
+  --pico-background-color: var(--bg);
+  --pico-color: var(--text);
+  --pico-muted-color: var(--text-3);
+  --pico-muted-border-color: var(--border);
+  --pico-form-element-background-color: var(--surface);
+  --pico-form-element-border-color: var(--border-strong);
+  --pico-card-background-color: var(--surface);
+  --pico-card-sectioning-background-color: var(--surface-2);
+  --pico-table-border-color: var(--border);
+  --pico-primary: var(--brand);
+  --pico-primary-background: var(--brand);
+  --pico-primary-border: var(--brand);
+  --pico-primary-hover: var(--brand-strong);
+  --pico-primary-hover-background: var(--brand-strong);
+  --pico-primary-hover-border: var(--brand-strong);
+}
+
+/* Palettes (Paramètres → Apparence) */
+html:root[data-palette="bordeaux"], .swatch[data-palette="bordeaux"] .swatch[data-palette="bordeaux"] { --brand: #d0547a; --brand-strong: #e06a8e; --brand-soft: #3a1b26; }
+html:root[data-palette="bleu"], .swatch[data-palette="bleu"] .swatch[data-palette="bleu"] { --brand: #6b9be0; --brand-strong: #85aeea; --brand-soft: #172538; }
+html:root[data-palette="sarcelle"], .swatch[data-palette="sarcelle"] .swatch[data-palette="sarcelle"] { --brand: #4fbcc4; --brand-strong: #6dcad1; --brand-soft: #102a2c; }
+html:root[data-palette="vert"], .swatch[data-palette="vert"] .swatch[data-palette="vert"] { --brand: #5fbf8f; --brand-strong: #77cda1; --brand-soft: #14291f; }
+html:root[data-palette="violet"], .swatch[data-palette="violet"] .swatch[data-palette="violet"] { --brand: #a58ae0; --brand-strong: #b7a0e8; --brand-soft: #241b38; }
+html:root[data-palette="terracotta"], .swatch[data-palette="terracotta"] .swatch[data-palette="terracotta"] { --brand: #e08a63; --brand-strong: #e9a07e; --brand-soft: #38200f; }
+html:root[data-palette="ardoise"], .swatch[data-palette="ardoise"] .swatch[data-palette="ardoise"] { --brand: #9aa8bb; --brand-strong: #afbbcb; --brand-soft: #1f242b; }

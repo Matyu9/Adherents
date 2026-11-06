@@ -1,0 +1,32 @@
+services:
+  app:
+    build: .
+    image: adherents
+    env_file: .env
+    ports:
+      # Écoute en local par défaut : exposez l'appli via un reverse proxy HTTPS.
+      # BIND_ADDR (dans .env) : IP privée du serveur si le proxy est sur une autre machine.
+      - "${BIND_ADDR:-127.0.0.1}:8001:8000"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/connexion', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  scheduler:
+    image: adherents
+    # Image construite localement par le service app : ne pas la chercher sur Docker Hub.
+    pull_policy: never
+    env_file: .env
+    environment:
+      SKIP_MIGRATIONS: "1"
+    volumes:
+      - ./data:/data
+    command: ["sh", "-c", "while true; do flask run-tasks || true; sleep 900; done"]
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped

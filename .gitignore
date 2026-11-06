@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Configuration locale (contient SECRET_KEY et les mots de passe)
+.env
+
+# Données : base SQLite, photos, sauvegardes
+data/
+demo/
+instance/
+uploads/
+*.db
+*.db-shm
+*.db-wal
+
+# Outils
+.pytest_cache/
+.hypothesis/
+.claude/
+.DS_Store

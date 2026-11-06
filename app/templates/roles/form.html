@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ "Rôle « " ~ role.name ~ " »" if role else "Nouveau rôle" }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('roles.index') }}">← Rôles</a></p>
+<h1>{{ role.name if role else "Nouveau rôle" }}</h1>
+<form method="post" novalidate>
+  {{ form.hidden_tag() }}
+  <div class="grid"><div>{{ field(form.name) }}</div><div>{{ field(form.description) }}</div></div>
+
+  <h2>Droits</h2>
+  {% if role and role.key == "admin" %}
+  <p class="muted">L'administrateur a toujours tous les droits, y compris la gestion des rôles : on ne peut pas les lui retirer.</p>
+  {% endif %}
+  <div class="mapping-grid perm-grid">
+  {% for group, perms in groups %}
+    <fieldset>
+      <legend><strong>{{ group }}</strong></legend>
+      {% for key, label in perms %}
+      <label><input type="checkbox" name="permissions" value="{{ key }}" {{ "checked" if key in checked }}
+                    {{ "disabled" if role and role.key == "admin" }}> {{ label }}</label>
+      {% endfor %}
+    </fieldset>
+  {% endfor %}
+  </div>
+  <button type="submit">Enregistrer</button>
+</form>
+{% endblock %}

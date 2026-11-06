@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Notifications</h1>
+  {% if notifications %}
+  <form method="post" action="{{ url_for('notifications.mark_all_read') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="secondary">Tout marquer comme lu</button>
+  </form>
+  {% endif %}
+</div>
+{% if notifications %}
+<ul class="notifications">
+  {% for n in notifications %}
+  <li class="{{ 'unread' if not n.read }}">
+    <small class="muted">{{ n.created_at | datetime_fr }}</small><br>
+    {% if n.link %}<a href="{{ n.link }}">{{ n.message }}</a>{% else %}{{ n.message }}{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty">Aucune notification.</p>
+{% endif %}
+{% endblock %}

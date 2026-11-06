@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "partials/_icons.html" import icon %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<article class="error-card">
+  <span class="error-icon">{{ icon(icon_name, 28) }}</span>
+  <p class="error-code">Erreur {{ code }}</p>
+  <h1>{{ title }}</h1>
+  <p>{{ message }}</p>
+  <div class="actions">
+    {% if current_user.is_authenticated %}
+    <a role="button" href="{{ url_for('dashboard.index') }}">{{ icon("home", 18) }} Tableau de bord</a>
+    {% else %}
+    <a role="button" href="{{ url_for('auth.login') }}">Se connecter</a>
+    {% endif %}
+    {% if back %}<a role="button" class="secondary" href="{{ back }}">Page précédente</a>{% endif %}
+  </div>
+</article>
+{% endblock %}

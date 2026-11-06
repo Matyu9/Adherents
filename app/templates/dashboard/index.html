@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "partials/_icons.html" import icon %}
+{% block title %}Tableau de bord{% endblock %}
+{% block content %}
+<div class="hello">
+  <h1>Bonjour {{ current_user.first_name }}</h1>
+  <p>Bienvenue sur l'espace adhérents de {{ asso_name }}.</p>
+</div>
+{% if stats %}
+<div class="stats">
+  <div class="stat card">{{ icon("users") }}<span class="stat-value">{{ stats.connected }}</span><span class="stat-label">Personnes connectées</span></div>
+  <div class="stat card">{{ icon("key") }}<span class="stat-value">{{ stats.sessions }}</span><span class="stat-label">Sessions ouvertes</span></div>
+</div>
+{% endif %}
+<section class="card">
+  <h2>{{ icon("clipboard", 18) }} Inscriptions</h2>
+  <p class="empty">Aucune campagne d'inscription ouverte pour le moment.</p>
+</section>
+{% endblock %}

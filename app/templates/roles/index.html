@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Rôles{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Rôles</h1>
+    <p class="muted">Chaque compte a un rôle, qui détermine ce qu'il permet de voir et de faire dans l'appli.
+      L'administrateur a toujours tous les droits.</p>
+  </div>
+  <a href="{{ url_for('roles.create') }}" role="button">+ Nouveau rôle</a>
+</div>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Rôle</th><th>Droits</th><th>Comptes</th><th></th></tr></thead>
+  <tbody>
+  {% for r in roles %}
+  {% set members = counts.get(r.key, 0) %}
+  <tr>
+    <td data-label="Rôle"><span><strong>{{ r.name }}</strong>{% if r.builtin %} <small class="muted">(de base)</small>{% endif %}
+      {% if r.description %}<br><small class="muted">{{ r.description }}</small>{% endif %}</span></td>
+    <td data-label="Droits">{{ "Tous" if r.key == "admin" else (r.permissions | length) ~ " / " ~ total }}</td>
+    <td data-label="Comptes">{{ members }}</td>
+    <td data-label="" class="actions">
+      <a href="{{ url_for('roles.edit', key=r.key) }}">Modifier</a>
+      {% if r.key != "admin" %}<a href="{{ url_for('roles.create', depuis=r.key) }}">Dupliquer</a>{% endif %}
+      {% if not r.builtin %}
+      <form method="post" action="{{ url_for('roles.delete', key=r.key) }}"
+            data-confirm="Supprimer le rôle « {{ r.name }} » ?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link-button" {% if members %}disabled title="Attribué à des personnes"{% endif %}>Supprimer</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

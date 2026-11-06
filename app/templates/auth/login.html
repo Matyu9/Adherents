@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "partials/_brand.html" import brand_mark with context %}
+{% from "partials/_form.html" import field %}
+{% block title %}Connexion{% endblock %}
+{% block content %}
+<article class="login-card">
+  <div class="brand">
+    {{ brand_mark() }}
+    <span class="brand-text"><strong>{{ asso_name }}</strong><small>{{ branding.subtitle }}</small></span>
+  </div>
+  <h1>Connexion</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.email, autocomplete="username", autofocus=true) }}
+    {{ field(form.password, autocomplete="current-password") }}
+    <label>{{ form.remember() }} {{ form.remember.label.text }}</label>
+    <button type="submit" class="wide">Se connecter</button>
+  </form>
+  <p class="muted small">Pas encore d'accès ? Demandez-le à un responsable de l'association.</p>
+</article>
+{% endblock %}

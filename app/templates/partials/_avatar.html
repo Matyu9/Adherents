@@ -1,0 +1,4 @@
+{#- Initiales du compte. Tailles : "" (34 px), "small" (32 px), "tiny" (24 px), "large" (96 px). -#}
+{% macro avatar(user, size="") -%}
+<span class="avatar{{ ' ' ~ size if size }}" aria-hidden="true">{{ user.initials }}</span>
+{%- endmacro %}

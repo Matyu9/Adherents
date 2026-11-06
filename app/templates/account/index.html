@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% from "partials/_avatar.html" import avatar %}
+{% block title %}Mon compte{% endblock %}
+{% block content %}
+<div class="person profile-head">
+  {{ avatar(current_user, "large") }}
+  <div>
+    <h1>Mon compte</h1>
+    <p class="muted">{{ current_user.role_label }}</p>
+  </div>
+</div>
+
+<div class="detail-grid">
+  <section class="card">
+    <h2>Profil</h2>
+    <form method="post" action="{{ url_for('account.index') }}" novalidate>
+      {{ profile.hidden_tag() }}
+      <div class="grid"><div>{{ field(profile.first_name, autocomplete="given-name") }}</div><div>{{ field(profile.last_name, autocomplete="family-name") }}</div></div>
+      <button type="submit">Enregistrer</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Connexion</h2>
+    <dl class="props">
+      <dt>Email</dt><dd>{{ current_user.email }}</dd>
+      <dt>Mot de passe</dt><dd><a href="{{ url_for('auth.password') }}">Changer mon mot de passe</a></dd>
+    </dl>
+    <p class="muted small">Pour changer d'adresse email, demandez à un responsable de l'association.</p>
+  </section>
+</div>
+
+<section class="card settings-block" id="affichage">
+  <h2>Affichage</h2>
+  <form method="post" action="{{ url_for('account.display') }}">
+    {{ display.hidden_tag() }}
+    <fieldset class="choices">
+      <legend>{{ display.theme.label.text }}</legend>
+      {% for option in display.theme %}
+      <label class="choice">{{ option() }}{{ option.label.text }}</label>
+      {% endfor %}
+    </fieldset>
+    <small class="muted">« Comme l'appareil » suit le réglage clair ou sombre de votre téléphone ou ordinateur.</small>
+    <fieldset class="choices">
+      <legend>{{ display.text_size.label.text }}</legend>
+      {% for option in display.text_size %}
+      <label class="choice text-sample-{{ option.data }}">{{ option() }}{{ option.label.text }}</label>
+      {% endfor %}
+    </fieldset>
+    <small class="muted">Ces choix valent pour tous vos appareils.</small>
+    <button type="submit" class="secondary">Enregistrer</button>
+  </form>
+</section>
+
+<h2 id="sessions">Mes appareils connectés</h2>
+<p class="muted">Un appareil que vous ne reconnaissez pas ? Déconnectez-le, puis changez votre mot de passe.</p>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Appareil</th><th>Adresse IP</th><th>Connecté le</th><th>Dernière activité</th><th></th></tr></thead>
+  <tbody>
+  {% for s in sessions %}
+  <tr>
+    <td data-label="Appareil"><span>{{ device_label(s.user_agent) }}{% if s.id == current_user.session_token %} <span class="badge badge-ok">cet appareil</span>{% endif %}</span></td>
+    <td data-label="Adresse IP"><small>{{ s.ip or "—" }}</small></td>
+    <td data-label="Connecté le"><small>{{ s.created_at | datetime_fr }}</small></td>
+    <td data-label="Dernière activité"><small>{{ (s.last_seen_at or s.created_at) | datetime_fr }}</small></td>
+    <td data-label="" class="actions">{% if s.id != current_user.session_token %}
+      <form method="post" action="{{ url_for('account.revoke_session', session_id=s.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link-button">Déconnecter</button>
+      </form>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if sessions | length > 1 %}
+<div class="actions">
+  <form method="post" action="{{ url_for('account.revoke_others') }}" data-confirm="Déconnecter tous vos autres appareils ?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="secondary outline">Déconnecter mes autres appareils</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

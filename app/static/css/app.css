@@ -386,3 +386,9 @@ progress { height: .6rem; border-radius: 999px; }
   details { display: block; }
   .content { padding: 0; max-width: none; }
 }
+
+/* Double authentification */
+.totp-qr { display: block; width: 14rem; max-width: 100%; height: auto; margin: 0 0 1rem; border-radius: var(--pico-border-radius, .25rem); }
+.totp-secret { overflow-wrap: anywhere; }
+.recovery-codes { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .4rem; padding: 0; margin: 0 0 1rem; list-style: none; }
+.recovery-codes li { list-style: none; }

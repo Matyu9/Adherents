@@ -8,7 +8,7 @@ Le nom, le sous-titre, la couleur et le logo se règlent directement dans **Para
 
 | Variable | Défaut | Rôle |
 |---|---|---|
-| `SECRET_KEY` | aucun | Signe les cookies et les empreintes de la limitation des tentatives. **Obligatoire en production** : l'appli refuse de démarrer sans elle, ou avec la valeur d'exemple. |
+| `SECRET_KEY` | aucun | Signe les cookies et les empreintes de la limitation des tentatives, et chiffre les secrets de double authentification. **Obligatoire en production** : l'appli refuse de démarrer sans elle, ou avec la valeur d'exemple. **La changer rend inutilisables toutes les doubles authentifications et tous les codes de secours** : chaque personne devra la reconfigurer après une réinitialisation par un responsable, et le premier administrateur passera par `flask create-admin`. Sauvegardez-la à part de la base. |
 | `BASE_URL` | `http://localhost:8001` | Adresse publique, utilisée dans les emails. En `https://`, elle active aussi les cookies `Secure`. |
 | `ASSO_NAME` | `Mon association` | Nom par défaut, tant qu'aucun n'est défini dans Paramètres → Apparence. |
 | `DATA_DIR` | `./data` (`/data` dans Docker) | Dossier de la base et des fichiers envoyés. |
@@ -35,6 +35,8 @@ Tous facultatifs. L'envoi est actif dès que `SMTP_HOST` et une adresse d'expéd
 | `SMTP_PASSWORD` | vide | Mot de passe. |
 | `SMTP_FROM` | vide | Adresse d'expédition, sinon `SMTP_USER`. |
 | `SMTP_TLS` | `true` | Utilise STARTTLS. |
+
+Sans SMTP, le mot de passe oublié et le changement d'adresse par soi-même sont indisponibles, et une invitation affiche un lien à transmettre à la main. Une adresse confirmée de cette façon reste « non vérifiée ».
 
 Le bouton **Paramètres → M'envoyer un email de test** vérifie les réglages. Une notification de plus de 2 jours n'est plus envoyée, ce qui évite un envoi massif quand le SMTP est configuré après coup.
 

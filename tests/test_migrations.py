@@ -127,3 +127,37 @@ def test_deleting_an_account_keeps_the_journal_but_not_its_sessions(migrated):
         "SELECT account_id, target_account_id FROM activity")
     assert sessions == [(0,)] and notifications == [(1,)]
     assert activity == [(None, 2)]
+
+
+def test_new_columns_default_safely_on_existing_accounts(migrated):
+    """Un compte d'avant la phase 2 n'a ni adresse vérifiée, ni double authentification."""
+    steps = revisions()
+    upgrade(MIGRATIONS, revision=steps[0])
+    run_sql(migrated, *SEED)
+    upgrade(MIGRATIONS)
+    (rows,) = run_sql(migrated, "SELECT email_verified, totp_secret, totp_enabled_at FROM account")
+    assert rows == [(0, None, None), (0, None, None)]
+
+
+def test_deleting_an_account_removes_its_links_codes_and_memberships(migrated):
+    upgrade(MIGRATIONS)
+    run_sql(migrated, *SEED,
+            "INSERT INTO account_token (id, account_id, purpose, proves_email, created_at, expires_at) "
+            "VALUES ('h', 2, 'reset', 0, '2026-09-01', '2026-09-02')",
+            "INSERT INTO recovery_code (id, account_id) VALUES ('c', 2)",
+            "INSERT INTO access_group (id, key, name) VALUES (1, 'regie', 'Régie')",
+            "INSERT INTO account_access_group (account_id, group_id) VALUES (2, 1)")
+    run_sql(migrated, "DELETE FROM account WHERE id = 2")
+    tokens, codes, members, kept = run_sql(
+        migrated, "SELECT count(*) FROM account_token", "SELECT count(*) FROM recovery_code",
+        "SELECT count(*) FROM account_access_group", "SELECT count(*) FROM access_group")
+    assert (tokens, codes, members, kept) == ([(0,)], [(0,)], [(0,)], [(1,)])
+
+
+def test_group_key_and_name_are_unique(migrated):
+    upgrade(MIGRATIONS)
+    run_sql(migrated, "INSERT INTO access_group (key, name) VALUES ('a', 'A')")
+    for statement in ("INSERT INTO access_group (key, name) VALUES ('a', 'B')",
+                      "INSERT INTO access_group (key, name) VALUES ('b', 'A')"):
+        with pytest.raises(sqlite3.IntegrityError):
+            run_sql(migrated, statement)

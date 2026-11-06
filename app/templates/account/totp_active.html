@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}Double authentification{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('account.index') }}">← Mon compte</a></p>
+<article class="narrow">
+  <h1>Double authentification</h1>
+  <dl class="props">
+    <dt>État</dt><dd><span class="badge badge-ok">activée</span> le {{ current_user.totp_enabled_at | date_fr }}</dd>
+    <dt>Codes de secours</dt><dd>{{ remaining }} restant(s)</dd>
+  </dl>
+  <h2>Confirmer une action</h2>
+  <form method="post" action="{{ url_for('account.totp_codes') }}" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.password, autocomplete="current-password") }}
+    {{ field(form.code, autocomplete="one-time-code", inputmode="numeric") }}
+    <div class="actions">
+      <button type="submit">Générer de nouveaux codes de secours</button>
+      {% if not required %}
+      <button type="submit" formaction="{{ url_for('account.totp_disable') }}" class="secondary outline">Désactiver</button>
+      {% endif %}
+    </div>
+  </form>
+  {% if required %}<p class="muted small">Elle est obligatoire pour votre rôle et ne peut pas être désactivée.</p>{% endif %}
+</article>
+{% endblock %}

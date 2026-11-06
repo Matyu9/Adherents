@@ -1,6 +1,8 @@
 import os
+from datetime import datetime
 from functools import partial
 
+import pyotp
 import pytest
 from flask import g
 from flask.testing import FlaskClient
@@ -13,6 +15,7 @@ from app import create_app
 from app.config import TestConfig
 from app.extensions import db
 from app.models import Account, Role
+from app.services import totp
 
 # HYPOTHESIS_PROFILE=deep pytest tests/test_properties.py : 1000 cas par propriété.
 settings.register_profile("deep", max_examples=1000, deadline=None)
@@ -20,6 +23,7 @@ settings.register_profile("default", max_examples=60, deadline=None)
 settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "default"))
 
 PASSWORD = "motdepasse"
+TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 _HEADS = []
 
 
@@ -77,17 +81,36 @@ def client(app):
     return app.test_client()
 
 
+def enroll_totp(account, secret=TOTP_SECRET):
+    account.totp_secret = totp.encrypt(secret)
+    account.totp_enabled_at = datetime.now()
+    db.session.commit()
+
+
+def totp_code(secret=TOTP_SECRET):
+    return pyotp.TOTP(secret).now()
+
+
 def make_account(role=Role.ADHERENT, email=None, active=True, password=PASSWORD, first_name=None, **fields):
     account = Account(first_name=first_name or role.capitalize(), last_name="Test",
                       email=email or f"{role}@asso.test", role=role, active=active, **fields)
     account.set_password(password)
     db.session.add(account)
     db.session.commit()
+    if role == Role.ADMIN:  # comme en vrai : un administrateur n'entre pas sans double authentification
+        enroll_totp(account)
     return account
 
 
 def login(client, account, password=PASSWORD, **kwargs):
-    return client.post("/connexion", data={"email": account.email, "password": password}, **kwargs)
+    """Connexion complète, code de double authentification compris si le compte en a un."""
+    follow = kwargs.pop("follow_redirects", False)
+    response = client.post("/connexion", data={"email": account.email, "password": password}, **kwargs)
+    if response.status_code == 302 and response.location.endswith("/connexion/verification"):
+        account.totp_last_counter = None  # plusieurs connexions dans les mêmes 30 secondes : pas un rejeu à tester ici
+        db.session.commit()
+        response = client.post("/connexion/verification", data={"code": totp_code()})
+    return client.get(response.location, follow_redirects=True) if follow and response.status_code == 302 else response
 
 
 @pytest.fixture

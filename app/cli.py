@@ -2,7 +2,7 @@ import click
 
 from .extensions import db
 from .models import Account, Role
-from .services import sessions
+from .services import accounts, sessions, totp
 
 
 def register_cli(app):
@@ -23,6 +23,8 @@ def register_cli(app):
         account.set_password(password)
         if account.id:
             sessions.revoke(account)
+            accounts.revoke(account)
+            totp.disable(account)  # téléphone perdu : le secours doit rouvrir l'accès, le TOTP se reconfigure ensuite
         db.session.commit()
         click.echo(f"Administrateur prêt : {account.full_name} <{email}>")
 

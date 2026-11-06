@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}{{ account.full_name }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('accounts.index') }}">← Comptes</a></p>
+<div class="page-head">
+  <div>
+    <h1>{{ account.full_name }}</h1>
+    <p class="muted">{{ account.role_label }} <span class="badge{{ ' badge-ok' if status == 'actif' }}">{{ statuses[status] }}</span></p>
+  </div>
+  {% if manage %}<a href="{{ url_for('accounts.edit', account_id=account.id) }}" role="button" class="secondary">Modifier</a>{% endif %}
+</div>
+{% if not manage %}<p class="muted">Ce compte a plus de droits que le vôtre : vous pouvez le consulter, pas le modifier.</p>{% endif %}
+
+<div class="detail-grid">
+  <section class="card">
+    <h2>Connexion</h2>
+    <dl class="props">
+      <dt>Email</dt><dd>{{ account.email }} {% if account.email_verified %}<span class="badge badge-ok">vérifiée</span>{% else %}<span class="badge">non vérifiée</span>{% endif %}</dd>
+      <dt>Mot de passe</dt><dd>{{ "Choisi" if account.password_hash else "Pas encore choisi" }}</dd>
+      <dt>Double authentification</dt><dd>{% if account.totp_enabled %}Activée ({{ recovery_left }} code(s) de secours){% else %}Non{% endif %}</dd>
+      <dt>Dernière connexion</dt><dd>{{ account.last_login_at | datetime_fr if account.last_login_at else "jamais" }}</dd>
+      <dt>Créé le</dt><dd>{{ account.created_at | date_fr }}</dd>
+    </dl>
+  </section>
+  {% if manage %}
+  <section class="card">
+    <h2>Accès</h2>
+    <div class="actions">
+      {% if account.active %}
+      <form method="post" action="{{ url_for('accounts.invite', account_id=account.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="secondary outline small">{{ "Envoyer un lien de réinitialisation" if account.password_hash else "Renvoyer l'invitation" }}</button>
+      </form>
+      {% if account.id != current_user.id %}
+      <form method="post" action="{{ url_for('accounts.cut', account_id=account.id) }}" data-confirm="Couper le compte de {{ account.full_name }} ? La personne est déconnectée tout de suite.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="contrast outline small">Couper le compte</button>
+      </form>
+      {% endif %}
+      {% else %}
+      <form method="post" action="{{ url_for('accounts.restore', account_id=account.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="secondary small">Rétablir le compte</button>
+      </form>
+      {% endif %}
+      {% if account.totp_enabled and account.id != current_user.id %}
+      <form method="post" action="{{ url_for('accounts.reset_totp', account_id=account.id) }}" data-confirm="Réinitialiser la double authentification de {{ account.full_name }} ? Vérifiez d'abord qu'il s'agit bien de cette personne.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="secondary outline small">Réinitialiser la double authentification</button>
+      </form>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+
+<h2>Groupes</h2>
+{% if manage and all_groups %}
+<form method="post" action="{{ url_for('accounts.set_groups', account_id=account.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <fieldset class="choices">
+    <legend>Groupes de ce compte</legend>
+    {% for g in all_groups %}
+    <label class="choice"><input type="checkbox" name="groups" value="{{ g.id }}" {{ "checked" if g in account.groups }}>{{ g.name }}</label>
+    {% endfor %}
+  </fieldset>
+  <button type="submit" class="secondary">Enregistrer les groupes</button>
+</form>
+{% elif account.groups %}
+<p>{% for g in account.groups %}<span class="badge">{{ g.name }}</span> {% endfor %}</p>
+{% else %}
+<p class="muted">Aucun groupe.</p>
+{% endif %}
+
+<h2 id="sessions">Appareils connectés</h2>
+{% if sessions %}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Appareil</th><th>Adresse IP</th><th>Connecté le</th><th>Dernière activité</th><th></th></tr></thead>
+  <tbody>
+  {% for s in sessions %}
+  <tr>
+    <td data-label="Appareil"><span>{{ device_label(s.user_agent) }}{% if s.id == current_user.session_token %} <span class="badge badge-ok">cet appareil</span>{% endif %}</span></td>
+    <td data-label="Adresse IP"><small>{{ s.ip or "—" }}</small></td>
+    <td data-label="Connecté le"><small>{{ s.created_at | datetime_fr }}</small></td>
+    <td data-label="Dernière activité"><small>{{ (s.last_seen_at or s.created_at) | datetime_fr }}</small></td>
+    <td data-label="" class="actions">{% if manage and s.id != current_user.session_token %}
+      <form method="post" action="{{ url_for('accounts.revoke_session', account_id=account.id, session_id=s.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link-button">Déconnecter</button>
+      </form>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if manage %}
+<div class="actions">
+  <form method="post" action="{{ url_for('accounts.revoke_sessions', account_id=account.id) }}" data-confirm="Déconnecter ces appareils ?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="secondary outline small">Déconnecter {{ "mes autres appareils" if account.id == current_user.id else "tous les appareils" }}</button>
+  </form>
+</div>
+{% endif %}
+{% else %}
+<p class="muted">Aucune session ouverte.</p>
+{% endif %}
+
+<h2>Journal</h2>
+{% if activities %}
+<ul class="timeline">
+  {% for a in activities %}
+  <li><small class="muted">{{ a.created_at | datetime_fr }}{% if a.account and a.account_id != account.id %} · par {{ a.account.full_name }}{% endif %}</small><br>{{ a.message }}</li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="muted">Rien pour l'instant.</p>
+{% endif %}
+{% endblock %}

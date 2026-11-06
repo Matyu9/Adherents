@@ -9,14 +9,16 @@ from .errors import register_error_handlers
 from .extensions import csrf, db, login_manager, migrate
 from .services import branding
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # Aucun script ni style en ligne : les comportements passent par app.js (data-confirm, data-autosubmit…).
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
        "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; "
        "frame-ancestors 'none'; report-uri /csp-report; report-to csp-endpoint")
 # Pages qui affichent ou reçoivent des données de compte : jamais gardées par le navigateur ou un proxy.
-NO_STORE = ("auth.login", "auth.password", "account.index")
+NO_STORE = ("auth.login", "auth.password", "auth.two_factor", "auth.forgot", "auth.token_link", "account.index",
+            "account.change_email", "account.totp", "account.totp_codes", "account.totp_disable", "accounts.create",
+            "accounts.invite", "accounts.detail")
 
 
 def create_app(config_class=Config):
@@ -38,9 +40,11 @@ def create_app(config_class=Config):
 
     from . import models  # noqa: F401  (enregistre les modèles pour Alembic)
     from .blueprints.account import bp as account_bp
+    from .blueprints.accounts import bp as accounts_bp
     from .blueprints.auth import bp as auth_bp
     from .blueprints.csp import bp as csp_bp
     from .blueprints.dashboard import bp as dashboard_bp
+    from .blueprints.groups import bp as groups_bp
     from .blueprints.health import bp as health_bp
     from .blueprints.journal import bp as journal_bp
     from .blueprints.notifications import bp as notifications_bp
@@ -54,6 +58,8 @@ def create_app(config_class=Config):
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(account_bp)
+    app.register_blueprint(accounts_bp)
+    app.register_blueprint(groups_bp)
     app.register_blueprint(notifications_bp)
     app.register_blueprint(journal_bp)
     app.register_blueprint(roles_bp)

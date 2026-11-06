@@ -34,8 +34,10 @@
       <p class="nav-title">Au quotidien</p>
       {{ navlink("dashboard.index", "Tableau de bord", "home") }}
       {{ navlink("notifications.index", "Notifications", "bell", ["notifications"]) }}
-      {% if current_user.is_admin or can(current_user, "settings.manage") or can(current_user, "activity.view") %}
+      {% if current_user.is_admin or can(current_user, "account.manage") or can(current_user, "group.manage") or can(current_user, "settings.manage") or can(current_user, "activity.view") %}
       <p class="nav-title">Administration</p>
+      {% if can(current_user, "account.manage") %}{{ navlink("accounts.index", "Comptes", "users", ["accounts"]) }}{% endif %}
+      {% if can(current_user, "group.manage") %}{{ navlink("groups.index", "Groupes", "layers", ["groups"]) }}{% endif %}
       {% if current_user.is_admin %}{{ navlink("roles.index", "Rôles", "key", ["roles"]) }}{% endif %}
       {% if can(current_user, "settings.manage") %}{{ navlink("settings.index", "Paramètres", "settings", ["settings", "health"]) }}{% endif %}
       {% if can(current_user, "activity.view") %}{{ navlink("journal.index", "Journal", "clock", ["journal"]) }}{% endif %}

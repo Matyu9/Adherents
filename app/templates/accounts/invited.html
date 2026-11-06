@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Accès de {{ account.full_name }}{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>Accès de {{ account.full_name }}</h1>
+  {% if sent %}
+  <p>{{ "Une invitation" if invited else "Un lien de réinitialisation" }} vient d'être envoyé{{ "e" if invited }} à
+    <strong>{{ account.email }}</strong>. Le lien est valable {{ ttl }} et ne sert qu'une fois.</p>
+  {% else %}
+  <p>{% if smtp %}L'email n'a pas pu partir.{% else %}L'envoi d'emails n'est pas configuré.{% endif %}
+    Transmettez ce lien à {{ account.first_name }}, par un moyen sûr. Il est valable {{ ttl }} et ne sert qu'une fois.</p>
+  <label for="invite-link">Lien</label>
+  <input id="invite-link" type="text" value="{{ link }}" readonly>
+  <p class="muted small">Il ne sera plus affiché : en générer un nouveau annule celui-ci. Transmis à la main, il ne vérifie pas l'adresse email, qui restera à confirmer.</p>
+  {% endif %}
+  <div class="actions">
+    <a href="{{ url_for('accounts.detail', account_id=account.id) }}" role="button">Voir le compte</a>
+    <a href="{{ url_for('accounts.index') }}" role="button" class="secondary outline">Tous les comptes</a>
+  </div>
+</article>
+{% endblock %}

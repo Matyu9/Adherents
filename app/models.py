@@ -44,6 +44,26 @@ class Role(db.Model):
         return f"<Role {self.key}>"
 
 
+account_access_group = db.Table(
+    "account_access_group",
+    db.Column("account_id", db.ForeignKey("account.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("group_id", db.ForeignKey("access_group.id", ondelete="CASCADE"), primary_key=True, index=True),
+)
+
+
+class AccessGroup(db.Model):
+    """Groupe de comptes : décidera qui peut entrer dans quelle appli, et sera transmis aux applis (OIDC).
+
+    `key` est la valeur transmise aux applis : elle ne change jamais, même si le groupe est renommé.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(40), nullable=False, unique=True)
+    name = db.Column(db.String(80), nullable=False, unique=True)
+    description = db.Column(db.String(255))
+
+    members = db.relationship("Account", secondary=account_access_group, back_populates="groups")
+
+
 class Account(UserMixin, TimestampMixin, db.Model):
     """Compte de connexion : ce qui permet d'entrer dans l'appli, et plus tard dans les applis clientes (OIDC)."""
     id = db.Column(db.Integer, primary_key=True)
@@ -52,14 +72,23 @@ class Account(UserMixin, TimestampMixin, db.Model):
     first_name = db.Column(db.String(80), nullable=False)
     last_name = db.Column(db.String(80), nullable=False)
     email = db.Column(db.String(255), nullable=False, unique=True)
+    # Vrai seulement après un clic sur un lien reçu à cette adresse : une appli cliente pourra s'y fier.
+    email_verified = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
     password_hash = db.Column(db.String(255))
     role = db.Column(db.String(20), nullable=False, default=Role.ADHERENT)
     # Un compte inactif ne peut pas se connecter.
     active = db.Column(db.Boolean, nullable=False, default=False)
     must_change_password = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
     last_login_at = db.Column(db.DateTime)
+    # Double authentification : secret chiffré (cf. services/totp.py), actif seulement une fois `totp_enabled_at` posé.
+    totp_secret = db.Column(db.String(255))
+    totp_enabled_at = db.Column(db.DateTime)
+    totp_last_counter = db.Column(db.Integer)  # dernier code accepté : un code ne sert qu'une fois
     theme = db.Column(db.String(10))  # "light", "dark" ou None (celui du système)
     text_size = db.Column(db.String(10))  # "large", "xlarge" ou None (normale)
+
+    groups = db.relationship("AccessGroup", secondary=account_access_group, back_populates="members",
+                             order_by="AccessGroup.name")
 
     @property
     def full_name(self):
@@ -76,6 +105,10 @@ class Account(UserMixin, TimestampMixin, db.Model):
     @property
     def is_admin(self):
         return self.role == Role.ADMIN
+
+    @property
+    def totp_enabled(self):
+        return self.totp_enabled_at is not None
 
     @property
     def role_label(self):
@@ -108,6 +141,33 @@ class LoginSession(db.Model):
     ip = db.Column(db.String(45))
 
     account = db.relationship("Account")
+
+
+class AccountToken(db.Model):
+    """Lien à usage unique envoyé par email : invitation, mot de passe oublié, changement d'email.
+
+    Seule l'empreinte du jeton est stockée : une fuite de la base ne donne aucun lien valable.
+    """
+    INVITE = "invite"
+    RESET = "reset"
+    EMAIL = "email"
+
+    id = db.Column(db.String(64), primary_key=True)  # empreinte du jeton
+    account_id = db.Column(db.ForeignKey("account.id", ondelete="CASCADE"), nullable=False, index=True)
+    purpose = db.Column(db.String(20), nullable=False)
+    email = db.Column(db.String(255))  # adresse à confirmer
+    # Vrai si le lien n'a circulé que par email : un lien transmis à la main ne prouve pas que l'adresse est la bonne.
+    proves_email = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    expires_at = db.Column(db.DateTime, nullable=False)
+
+    account = db.relationship("Account")
+
+
+class RecoveryCode(db.Model):
+    """Code de secours à usage unique, pour un téléphone perdu. Seule son empreinte est stockée."""
+    id = db.Column(db.String(64), primary_key=True)  # empreinte du code
+    account_id = db.Column(db.ForeignKey("account.id", ondelete="CASCADE"), nullable=False, index=True)
 
 
 @login_manager.user_loader

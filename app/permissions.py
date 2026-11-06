@@ -16,6 +16,10 @@ A, G, H = Role.ADMIN, Role.GESTIONNAIRE, Role.ADHERENT
 
 # Catalogue des droits, regroupés comme dans l'écran « Rôles ».
 PERMISSION_GROUPS = [
+    ("Comptes", [
+        ("account.manage", "Gérer les comptes : créer, inviter, couper, fermer les sessions"),
+        ("group.manage", "Gérer les groupes, qui donneront accès aux applis de l'association"),
+    ]),
     ("Administration", [
         ("settings.manage", "Paramètres de l'appli"),
         ("activity.view", "Voir le journal de toutes les actions (connexions comprises)"),

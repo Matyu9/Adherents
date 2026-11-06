@@ -33,6 +33,9 @@ Il n'y a aucune étape de build. Pico et HTMX sont copiés dans `static/vendor/`
 | Table | Rôle |
 |---|---|
 | `account` | Compte de connexion : email, mot de passe haché, rôle, `active`, préférences, et `sub` (UUID opaque, futur identifiant OIDC) |
+| `account_token` | Lien à usage unique (invitation, mot de passe oublié, confirmation d'adresse). Seule son empreinte est stockée. |
+| `recovery_code` | Code de secours de la double authentification. Seule son empreinte est stockée. |
+| `access_group`, `account_access_group` | Groupes et leurs membres. `key` est la valeur transmise aux applis : elle ne change jamais. |
 | `login_session` | Une connexion ouverte sur un appareil. La supprimer invalide ses cookies, même copiés ailleurs. |
 | `role` | Droits d'un rôle. Les rôles de base n'y figurent qu'une fois modifiés. |
 | `activity` | Journal : auteur, compte concerné, action, message |
@@ -40,7 +43,7 @@ Il n'y a aucune étape de build. Pico et HTMX sont copiés dans `static/vendor/`
 | `app_setting` | Réglages modifiables dans l'appli (nom, logo, couleur) |
 | `throttle_event` | Tentatives comptées pour la limitation de débit |
 
-`Person` et `Household` arrivent en phase 1. `Account` ne doit pas devenir la fiche d'une personne : voir le [plan](plan.md).
+`Person` et `Household` arrivent avec l'annuaire (phase 1). `Account` ne doit pas devenir la fiche d'une personne : voir le [plan](plan.md).
 
 ## Rôles et droits
 
@@ -52,6 +55,8 @@ Il n'y a aucune étape de build. Pico et HTMX sont copiés dans `static/vendor/`
 
 Les rôles se modifient et se créent dans **Administration → Rôles**. Ajouter un droit se fait dans `PERMISSION_GROUPS` (`permissions.py`).
 
+Gérer un compte permet d'en prendre le contrôle, car un lien d'invitation s'affiche quand l'email ne part pas. `accounts.can_manage()` limite donc un non-administrateur aux comptes qui n'ont ni plus de droits ni d'autres groupes que lui, et il ne peut attribuer aucun rôle plus riche que le sien. Personne n'agit sur son propre rôle, son propre accès ou sa propre double authentification depuis cet écran : il reste donc toujours au moins un administrateur actif.
+
 ## Sécurité
 
 | Protection | Fonctionnement |
@@ -61,6 +66,10 @@ Les rôles se modifient et se créent dans **Administration → Rôles**. Ajoute
 | **Sessions révocables** | Le cookie porte un jeton vérifié en base à chaque requête : déconnexion, changement de mot de passe ou désactivation du compte agissent immédiatement. |
 | **Limitation des tentatives** | 8 échecs en 15 minutes par email ou par adresse IP. Le compte est en base, donc commun à tous les workers. Seule une empreinte HMAC de la clé est stockée. |
 | **Comptes inconnus** | Même message et même calcul de hachage qu'un mauvais mot de passe. Le texte saisi n'est conservé au journal que s'il correspond à un compte. |
+| **Liens par email** | Usage unique, 7 jours pour une invitation, 24 heures pour une adresse, 1 heure pour un mot de passe. Ouvrir le lien ne consomme rien, car les antivirus de messagerie les suivent : il faut envoyer le formulaire. Limite connue : le lien figure dans les journaux d'accès de gunicorn et du proxy tant qu'il n'a pas servi. |
+| **`email_verified`** | Vrai seulement après un clic sur un lien parti par email. Un lien transmis à la main ne prouve rien, et un changement d'adresse par un responsable remet la valeur à faux. Les applis clientes s'y fieront. |
+| **Mot de passe oublié** | Même réponse et même durée que le compte existe ou non : l'envoi se fait hors de la requête. Avec la double authentification, le lien change le mot de passe sans ouvrir de session : une boîte mail piratée ne suffit pas. |
+| **Double authentification** | Secret chiffré avec une clé dérivée de `SECRET_KEY`, tolérance de ±30 secondes, un code ne sert qu'une fois, 5 essais en 15 minutes. Obligatoire pour les administrateurs et tout rôle qui gère les comptes ou les groupes. L'activer, la désactiver ou changer d'adresse demande à nouveau le mot de passe. |
 | **CSRF** | Sur tous les formulaires et requêtes HTMX. Le jeton vit aussi longtemps que la session, pour qu'un long formulaire ouvert sur un téléphone n'échoue pas à l'envoi. |
 | **Journal** | Les champs de `SENSITIVE_FIELDS` (`password_hash`, `iban`, `bic`) sont masqués. Les connexions sont effacées au bout d'un an, car elles contiennent des adresses IP. |
 | **Logo** | Réencodé en PNG, ce qui retire les métadonnées, et servi sous un nom aléatoire. |
@@ -68,8 +77,8 @@ Les rôles se modifient et se créent dans **Administration → Rôles**. Ajoute
 
 ## Tâches périodiques
 
-`flask run-tasks`, lancée par le service `scheduler`, efface les connexions trop anciennes et les tentatives périmées, puis envoie les emails en attente. Elle écrit aussi `data/scheduler.last`, que `/sante` utilise pour vérifier que le planificateur tourne.
+`flask run-tasks`, lancée par le service `scheduler`, efface les connexions trop anciennes, les tentatives périmées et les liens expirés, puis envoie les emails en attente. Elle écrit aussi `data/scheduler.last`, que `/sante` utilise pour vérifier que le planificateur tourne.
 
 ## Différences avec l'Inventaire
 
-Le socle vient de l'Inventaire, mais les deux applis évoluent séparément. Les corrections apportées sont listées dans le [journal des versions](../CHANGELOG.md). N'ont pas été repris, car sans objet ou prévus plus tard : le client OIDC, l'API, les jetons personnels, les avatars, les textes d'emails modifiables, le tableau de bord à la carte et la corbeille.
+Le socle vient de l'Inventaire, mais les deux applis évoluent séparément. Les corrections apportées sont listées dans le [journal des versions](../CHANGELOG.md). N'ont pas été repris, car sans objet ou prévus plus tard : le client OIDC (Adhérents est le serveur), l'API, les jetons personnels, les avatars, les mots de passe provisoires, la fusion et l'archivage de fiches, les textes d'emails modifiables, le tableau de bord à la carte et la corbeille.

@@ -2,6 +2,25 @@
 
 Les changements notables du projet sont consignés ici. Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## 0.2.0 - 2026-11-06 : phase 2, les comptes
+
+### Ajouté
+
+- **Invitation par lien** : un compte créé n'a pas de mot de passe, la personne le choisit. Sans SMTP ou si l'envoi échoue, le lien s'affiche pour être transmis à la main.
+- **Mot de passe oublié**, avec la même réponse et la même durée que le compte existe ou non.
+- **Changement d'adresse confirmé par lien**, avec le mot de passe actuel et un avis à l'ancienne adresse.
+- **`email_verified`** : vrai seulement après un clic sur un lien reçu par email.
+- **Double authentification (TOTP)** avec 10 codes de secours, obligatoire pour les administrateurs et les rôles qui gèrent les comptes ou les groupes.
+- **Écran Comptes** : recherche, filtres, invitation, coupure immédiate, sessions, réinitialisation de la double authentification, journal.
+- **Écran Groupes**, dont la clé reste fixe pour les futures applis clientes.
+- **Droits `account.manage` et `group.manage`** : on ne gère que des comptes qui n'ont ni plus de droits ni d'autres groupes que soi.
+
+### Modifié
+
+- **`flask create-admin`** réinitialise aussi la double authentification, pour rester un vrai accès de secours après la perte d'un téléphone.
+- **`flask run-tasks`** efface aussi les liens expirés.
+- **Ordre des phases** : les comptes et l'OIDC passent avant l'annuaire, en attendant les exports du logiciel de gestion.
+
 ## 0.1.0 - 2026-11-05 : phase 0, le socle
 
 ### Ajouté

@@ -24,10 +24,29 @@
   <section class="card">
     <h2>Connexion</h2>
     <dl class="props">
-      <dt>Email</dt><dd>{{ current_user.email }}</dd>
+      <dt>Email</dt><dd>{{ current_user.email }} {% if current_user.email_verified %}<span class="badge badge-ok">vérifiée</span>{% else %}<span class="badge">non vérifiée</span>{% endif %}</dd>
       <dt>Mot de passe</dt><dd><a href="{{ url_for('auth.password') }}">Changer mon mot de passe</a></dd>
+      <dt>Double authentification</dt><dd><a href="{{ url_for('account.totp') }}">{{ "Activée" if current_user.totp_enabled else "Configurer" }}</a></dd>
     </dl>
+    {% if smtp %}
+    {% if not current_user.email_verified %}
+    <form method="post" action="{{ url_for('account.verify_email') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="secondary outline small">Vérifier mon adresse</button>
+    </form>
+    {% endif %}
+    <details{% if email_form.errors %} open{% endif %}>
+      <summary>Changer d'adresse email</summary>
+      <form method="post" action="{{ url_for('account.change_email') }}" novalidate>
+        {{ email_form.hidden_tag() }}
+        {{ field(email_form.email, autocomplete="email") }}
+        {{ field(email_form.password, autocomplete="current-password") }}
+        <button type="submit" class="secondary">Recevoir un lien de confirmation</button>
+      </form>
+    </details>
+    {% else %}
     <p class="muted small">Pour changer d'adresse email, demandez à un responsable de l'association.</p>
+    {% endif %}
   </section>
 </div>
 

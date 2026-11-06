@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}Double authentification{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>Double authentification</h1>
+  <p class="muted">{% if required %}Elle est obligatoire pour votre rôle, car ce compte ouvrira toutes les applis de l'association.
+    {% else %}En plus du mot de passe, un code à usage unique sera demandé à chaque connexion.{% endif %}</p>
+  <h2>1. Scannez ce QR code</h2>
+  <p>Avec une application d'authentification sur votre téléphone.</p>
+  <img src="{{ qr }}" alt="QR code à scanner avec votre application d'authentification" class="totp-qr">
+  <details>
+    <summary>Saisir la clé à la main</summary>
+    <code class="totp-secret">{{ secret }}</code>
+  </details>
+  <h2>2. Confirmez</h2>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.password, autocomplete="current-password") }}
+    {{ field(form.code, autocomplete="one-time-code", inputmode="numeric") }}
+    <button type="submit">Activer</button>
+  </form>
+  <form method="post" action="{{ url_for('auth.logout') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="link-button">Se déconnecter</button>
+  </form>
+</article>
+{% endblock %}

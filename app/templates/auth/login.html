@@ -16,6 +16,7 @@
     <label>{{ form.remember() }} {{ form.remember.label.text }}</label>
     <button type="submit" class="wide">Se connecter</button>
   </form>
+  <p class="small"><a href="{{ url_for('auth.forgot') }}">Mot de passe oublié ?</a></p>
   <p class="muted small">Pas encore d'accès ? Demandez-le à un responsable de l'association.</p>
 </article>
 {% endblock %}

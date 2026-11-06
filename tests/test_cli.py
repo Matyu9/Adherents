@@ -34,5 +34,5 @@ def test_create_admin_is_the_rescue_access(app, client):
 def test_run_tasks_records_its_passage(app):
     assert health.last_scheduler_run() is None
     result = app.test_cli_runner().invoke(args=["run-tasks"])
-    assert result.exit_code == 0 and "effacée(s)" in result.output
+    assert result.exit_code == 0 and "effacé(s)" in result.output
     assert health.last_scheduler_run() is not None

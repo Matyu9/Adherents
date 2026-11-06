@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Comptes{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Comptes</h1>
+    <p class="muted">{{ total }} compte{{ "s" if total > 1 }}. Un compte permet de se connecter ici, et plus tard aux applis de l'association.</p>
+  </div>
+  <a href="{{ url_for('accounts.create') }}" role="button">+ Nouveau compte</a>
+</div>
+<form method="get" class="filters">
+  <input type="search" name="q" value="{{ q }}" placeholder="Nom ou email" aria-label="Recherche">
+  <select name="role" aria-label="Rôle" data-autosubmit>
+    <option value="">Tous les rôles</option>
+    {% for key, label in labels.items() %}<option value="{{ key }}" {{ "selected" if role == key }}>{{ label }}</option>{% endfor %}
+  </select>
+  <select name="statut" aria-label="Statut" data-autosubmit>
+    <option value="">Tous les statuts</option>
+    {% for key, label in statuses.items() %}<option value="{{ key }}" {{ "selected" if status == key }}>{{ label }}</option>{% endfor %}
+  </select>
+  {% if all_groups %}
+  <select name="groupe" aria-label="Groupe" data-autosubmit>
+    <option value="">Tous les groupes</option>
+    {% for g in all_groups %}<option value="{{ g.id }}" {{ "selected" if group and group.id == g.id }}>{{ g.name }}</option>{% endfor %}
+  </select>
+  {% endif %}
+  <noscript><button type="submit">Filtrer</button></noscript>
+</form>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Nom</th><th>Email</th><th>Rôle</th><th>Statut</th><th>Dernière connexion</th></tr></thead>
+  <tbody>
+  {% for a in items %}
+  {% set st = status_of(a) %}
+  <tr>
+    <td data-label="Nom"><a href="{{ url_for('accounts.detail', account_id=a.id) }}">{{ a.last_name | upper }} {{ a.first_name }}</a></td>
+    <td data-label="Email"><small>{{ a.email }}</small></td>
+    <td data-label="Rôle">{{ labels.get(a.role, a.role) }}</td>
+    <td data-label="Statut"><span class="badge{{ ' badge-ok' if st == 'actif' }}">{{ statuses[st] }}</span></td>
+    <td data-label="Dernière connexion"><small>{{ a.last_login_at | datetime_fr if a.last_login_at else "—" }}</small></td>
+  </tr>
+  {% else %}
+  <tr><td colspan="5" class="muted">Aucun compte ne correspond.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if pages > 1 %}
+<div class="actions">
+  {% if page > 1 %}<a href="{{ url_for('accounts.index', page=page - 1, **args) }}">← Précédents</a>{% endif %}
+  <span class="muted small">Page {{ page }} sur {{ pages }}</span>
+  {% if page < pages %}<a href="{{ url_for('accounts.index', page=page + 1, **args) }}">Suivants →</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

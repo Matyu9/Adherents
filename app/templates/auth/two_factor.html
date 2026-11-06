@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}Vérification{% endblock %}
+{% block content %}
+<article class="login-card">
+  <h1>Vérification</h1>
+  <p class="muted">Saisissez le code à 6 chiffres de votre application. Téléphone perdu ? Saisissez l'un de vos codes de secours.</p>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.code, autocomplete="one-time-code", autofocus=true) }}
+    <button type="submit" class="wide">Vérifier</button>
+  </form>
+  <p class="small"><a href="{{ url_for('auth.login') }}">← Retour à la connexion</a></p>
+</article>
+{% endblock %}

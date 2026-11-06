@@ -14,12 +14,14 @@ from app import create_app  # noqa: E402
 from app.extensions import db  # noqa: E402
 from app.models import Account, Notification, Role  # noqa: E402
 
-from .conftest import config_for, stamp_head  # noqa: E402
+from .conftest import TOTP_SECRET, config_for, enroll_totp, stamp_head, totp_code  # noqa: E402
 
 pytestmark = pytest.mark.e2e
 PASSWORD = "motdepasse-e2e"
-PAGES = ["/", "/mon-compte", "/mot-de-passe", "/notifications", "/journal", "/roles", "/roles/nouveau",
-         f"/roles/{Role.ADHERENT}/modifier", "/parametres", "/sante", "/nexiste-pas"]
+PAGES = ["/", "/mon-compte", "/mon-compte/double-authentification", "/mot-de-passe", "/notifications", "/journal",
+         "/comptes", "/comptes/nouveau", "/comptes/1", "/comptes/1/modifier", "/groupes", "/groupes/nouveau",
+         "/roles", "/roles/nouveau", f"/roles/{Role.ADHERENT}/modifier", "/parametres", "/sante", "/nexiste-pas"]
+_app = {}
 
 
 @pytest.fixture(scope="module")
@@ -39,6 +41,8 @@ def server(tmp_path_factory):
         db.session.flush()
         db.session.add(Notification(account_id=accounts[0].id, message="Une notification", link="/mon-compte"))
         db.session.commit()
+        enroll_totp(accounts[0])
+    _app["app"] = app
     httpd = make_server("127.0.0.1", 0, app, threaded=True)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{httpd.server_port}"
@@ -77,6 +81,13 @@ class Page:
         self.page.fill("#email", f"{role}@e2e.test")
         self.page.fill("#password", PASSWORD)
         self.page.click("button[type=submit]")
+        if role == Role.ADMIN:
+            self.page.wait_for_url("**/connexion/verification")
+            with _app["app"].app_context():  # plusieurs connexions dans les mêmes 30 secondes : pas un rejeu à tester ici
+                db.session.scalar(db.select(Account).filter_by(role=Role.ADMIN)).totp_last_counter = None
+                db.session.commit()
+            self.page.fill("#code", totp_code(TOTP_SECRET))
+            self.page.click("button[type=submit]")
         self.page.wait_for_url("**/")
         return self.page
 
@@ -204,3 +215,38 @@ def test_htmx_error_banner(session):
     page.evaluate("htmx.ajax('GET', '/nexiste-pas', {target: 'main'}).catch(() => {})")
     page.wait_for_selector(".htmx-error")
     assert "introuvable" in page.locator(".htmx-error").inner_text()
+
+
+def test_invitation_then_mandatory_totp_in_a_real_browser(session):
+    """Le parcours complet d'un nouvel administrateur : lien, mot de passe, QR code sous la CSP, code, codes de secours."""
+    admin_page = session()
+    page = admin_page.login()
+    page.goto("/comptes/nouveau")
+    page.fill("#first_name", "Inès")
+    page.fill("#last_name", "Nouvelle")
+    page.fill("#email", "ines@e2e.test")
+    page.select_option("#role", Role.ADMIN)
+    page.click("main button[type=submit]")
+    link = page.input_value("#invite-link")
+    assert admin_page.problems == []
+
+    invited = session()
+    guest = invited.page
+    guest.goto(link[link.index("/lien/"):])  # BASE_URL ne connaît pas le port aléatoire du serveur de test
+    guest.fill("#new", "un-mot-de-passe-solide")
+    guest.fill("#confirm", "un-mot-de-passe-solide")
+    guest.click("button[type=submit]")
+    guest.wait_for_url("**/mon-compte/double-authentification")
+
+    assert guest.evaluate("document.querySelector('.totp-qr').naturalWidth") > 0, "QR code bloqué par la CSP"
+    secret = guest.locator(".totp-secret").text_content()  # dans un <details> replié : pas de texte « visible »
+    guest.goto("/")  # tant que ce n'est pas configuré, aucune autre page
+    assert guest.url.endswith("/mon-compte/double-authentification")
+    guest.fill("#password", "un-mot-de-passe-solide")
+    guest.fill("#code", totp_code(secret))
+    guest.click("main form:not([action]) button[type=submit]")
+    guest.wait_for_selector(".recovery-codes")
+    assert guest.locator(".recovery-codes li").count() == 10
+    guest.goto("/comptes")
+    assert guest.url.endswith("/comptes")
+    assert invited.problems == []

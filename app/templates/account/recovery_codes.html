@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Codes de secours{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>Vos codes de secours</h1>
+  <p><strong>Conservez-les maintenant, ils ne seront plus affichés.</strong> Chacun remplace une seule fois le code du téléphone, si vous le perdez.</p>
+  <ul class="recovery-codes">
+    {% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}
+  </ul>
+  <a href="{{ url_for('account.index') }}" role="button">Je les ai conservés</a>
+</article>
+{% endblock %}

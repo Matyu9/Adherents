@@ -2,6 +2,7 @@
 import logging
 import re
 import smtplib
+import threading
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 from email.utils import formataddr
@@ -39,6 +40,23 @@ def send(to, subject, text, html=None):
         if cfg["SMTP_USER"]:
             smtp.login(cfg["SMTP_USER"], cfg["SMTP_PASSWORD"])
         smtp.send_message(message)
+
+
+def send_in_background(to, subject, text, html=None):
+    """Envoie sans faire attendre la requête. Un échec est seulement noté dans les journaux."""
+    app = current_app._get_current_object()
+
+    def deliver():
+        with app.app_context():
+            try:
+                send(to, subject, text, html)
+            except (OSError, smtplib.SMTPException):
+                logger.exception("Échec d'envoi d'un email de compte")
+
+    if app.config["MAIL_IN_BACKGROUND"]:
+        threading.Thread(target=deliver, daemon=True).start()
+    else:
+        deliver()
 
 
 def compose(notification):

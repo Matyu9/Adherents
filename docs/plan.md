@@ -47,6 +47,7 @@ Ces principes ont été proposés mais pas formellement validés. Ils guident le
 | Exports du logiciel de gestion : comment se présentent-ils ? | Voir [ci-dessous](#exports-attendus-pour-la-phase-1) | Phase 1, décalée après la phase 5 |
 | Quel fichier sert à l'import initial, et le logiciel de gestion sait-il importer ? | Dépend des exports | Phase 1 |
 | Base de l'appli ou OpenLDAP pour les comptes ? | Base de l'appli, retenue par défaut pour la phase 2 : OpenLDAP ajoute un service sans remplacer ni le serveur OIDC ni le reste | Phase 2 |
+| Longueur minimale des mots de passe : 8 caractères suffisent-ils pour un compte qui ouvrira toutes les applis ? | À relever avant d'inviter les adhérents | Phase 3 |
 | Combien de chiffres de l'IBAN garder (4 à 8) ? | 4 : ils suffisent à reconnaître le compte | Phase 6 |
 | Où va le mandat SEPA signé : logiciel de gestion, papier, banque ? | À préciser par l'association | Phase 6 |
 | Adresse définitive du serveur OIDC ? | Par exemple `https://compte.<domaine>` | Mise en production de la phase 3 |
@@ -91,12 +92,14 @@ Les comptes et l'OIDC passent avant les inscriptions, car celles-ci s'appuient s
 - **Invitation des adhérents :** les comptes sont créés à partir de l'import, déjà rattachés à leur fiche.
 - **Prérequis :** les exports du logiciel de gestion.
 
-### Phase 2 : comptes
+### Phase 2 : comptes (terminée le 6 novembre 2026)
 
 - Invitation, mot de passe oublié, changement d'email confirmé par lien.
 - Écran de gestion des comptes, groupes, sessions révocables et journal.
-- TOTP obligatoire pour les administrateurs : ce compte ouvrira toutes les applis.
+- TOTP obligatoire pour les administrateurs : ce compte ouvrira toutes les applis. Il l'est aussi pour tout rôle qui gère les comptes ou les groupes.
 - **Tests :** limitation des tentatives, révocation, `email_verified` vrai uniquement après un clic sur le lien.
+- **Repris de l'Inventaire :** seulement le mécanisme des liens à usage unique. Adhérents est le serveur d'identité : rien de ce qui concerne le client OIDC, les prêts, les mots de passe provisoires, les photos, les jetons d'API, la fusion ou l'archivage n'a été repris.
+- **Reporté :** la suppression d'un compte, avec l'anonymisation de la phase 6 ; en attendant, un compte se coupe. L'import d'une liste d'adresses n'a pas été fait : les comptes des adhérents viendront de l'annuaire.
 
 ### Phase 3 : serveur OIDC
 

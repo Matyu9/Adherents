@@ -35,8 +35,13 @@ HYPOTHESIS_PROFILE=deep .venv/bin/python -m pytest tests/test_properties.py   # 
 | `test_e2e.py` | Vrai navigateur, CSP et CSRF actifs : aucune violation, confirmations, envoi automatique, thèmes, menu mobile, pas de défilement horizontal |
 | `test_security.py` | En-têtes, CSP, CSRF, refus d'un secret connu, proxy, feuilles de style |
 | `test_auth.py`, `test_throttle.py` | Connexion, sessions, mot de passe, limitation des tentatives |
+| `test_totp.py` | Double authentification : connexion, rejeu, codes de secours, obligation par rôle, accès de secours |
+| `test_links.py` | Liens à usage unique, mot de passe oublié, changement d'adresse, `email_verified` |
+| `test_accounts_admin.py`, `test_groups.py` | Gestion des comptes et des groupes, et qui peut gérer qui |
 | `test_properties.py` | Propriétés sur des données générées, avec Hypothesis |
 | Les autres | Un fichier par domaine : rôles, compte, journal, paramètres, emails, santé, erreurs, rapports CSP, CLI |
+
+Dans les tests comme en production, un administrateur a la double authentification : `make_account` la configure et `login` saisit le code. Elle n'a pas de réglage pour la désactiver.
 
 Le client de test (`conftest.py`) oublie l'utilisateur en cache et annule toute écriture non validée après chaque requête. Sans ça, une session révoquée resterait connectée dans les tests et un `commit` oublié passerait inaperçu.
 

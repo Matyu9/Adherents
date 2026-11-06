@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ "Modifier " ~ group.name if group else "Nouveau groupe" }}{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>{{ "Modifier " ~ group.name if group else "Nouveau groupe" }}</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.name) }}
+    {{ field(form.description) }}
+    {% if group %}<p class="muted small">Valeur transmise aux applis : <code>{{ group.key }}</code>. Elle ne change pas si vous renommez le groupe.</p>
+    {% else %}<p class="muted small">La valeur transmise aux applis sera tirée du nom, et ne changera plus ensuite.</p>{% endif %}
+    <button type="submit">Enregistrer</button>
+  </form>
+</article>
+{% endblock %}

@@ -13,7 +13,7 @@ PER_PAGE = 100
 # Familles d'actions proposées dans le filtre : libellé et préfixes des codes `Activity.action`.
 FAMILIES = {
     "connexions": ("Connexions", ("auth.",)),
-    "comptes": ("Comptes et rôles", ("account.", "role.", "sessions.")),
+    "comptes": ("Comptes, groupes et rôles", ("account.", "group.", "role.", "sessions.")),
     "parametres": ("Paramètres", ("settings.",)),
 }
 

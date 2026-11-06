@@ -39,6 +39,9 @@ class Config:
     SMTP_FROM = os.environ.get("SMTP_FROM", "")
     SMTP_TLS = os.environ.get("SMTP_TLS", "true").lower() == "true"
 
+    # Envoi hors de la requête, là où sa durée révélerait si un compte existe (mot de passe oublié).
+    MAIL_IN_BACKGROUND = True
+
     # Content-Security-Policy : appliquée par défaut. « 1 » = Report-Only, pour diagnostiquer sans rien bloquer.
     CSP_REPORT_ONLY = os.environ.get("CSP_REPORT_ONLY", "0") == "1"
 
@@ -57,3 +60,4 @@ class TestConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     WTF_CSRF_ENABLED = False
+    MAIL_IN_BACKGROUND = False

@@ -6,7 +6,7 @@ from urllib.parse import urljoin, urlsplit
 import pytest
 
 from app.extensions import db
-from app.models import Notification, Role
+from app.models import AccessGroup, Notification, Role
 from app.services.activity import log
 
 from .conftest import login, make_account
@@ -17,20 +17,30 @@ ANONYMOUS = "anonyme"
 # Qui a accès à quoi. Une route absente de ce tableau fait échouer les tests : tout nouvel écran doit se déclarer ici.
 PUBLIC, LOGGED_IN, ADMIN_ONLY = "public", "connecté", "admin"
 SETTINGS, JOURNAL, HIDDEN = "settings.manage", "activity.view", "caché"  # caché : 404 pour qui n'a pas settings.manage
+ACCOUNTS, GROUPS = "account.manage", "group.manage"
 ACCESS = {
     "static": PUBLIC, "auth.login": PUBLIC, "csp.report": PUBLIC, "settings.logo_file": PUBLIC,
+    "auth.two_factor": PUBLIC, "auth.forgot": PUBLIC, "auth.token_link": PUBLIC,
     "auth.logout": LOGGED_IN, "auth.password": LOGGED_IN, "dashboard.index": LOGGED_IN,
     "account.index": LOGGED_IN, "account.display": LOGGED_IN, "account.revoke_session": LOGGED_IN,
-    "account.revoke_others": LOGGED_IN, "notifications.index": LOGGED_IN, "notifications.mark_all_read": LOGGED_IN,
+    "account.revoke_others": LOGGED_IN, "account.change_email": LOGGED_IN, "account.verify_email": LOGGED_IN,
+    "account.totp": LOGGED_IN, "account.totp_codes": LOGGED_IN, "account.totp_disable": LOGGED_IN,
+    "notifications.index": LOGGED_IN, "notifications.mark_all_read": LOGGED_IN,
     "journal.index": JOURNAL,
+    **{f"accounts.{name}": ACCOUNTS for name in ("index", "create", "detail", "edit", "invite", "cut", "restore",
+                                                  "set_groups", "reset_totp", "revoke_session", "revoke_sessions")},
+    **{f"groups.{name}": GROUPS for name in ("index", "create", "edit", "delete")},
     "roles.index": ADMIN_ONLY, "roles.create": ADMIN_ONLY, "roles.edit": ADMIN_ONLY, "roles.delete": ADMIN_ONLY,
     "settings.index": SETTINGS, "settings.save_branding": SETTINGS, "settings.set_logo": SETTINGS,
     "settings.remove_logo": SETTINGS, "settings.test_email": SETTINGS, "settings.run_tasks": SETTINGS,
     "settings.revoke_sessions": SETTINGS,
     "health.as_json": HIDDEN, "health.page": HIDDEN,
 }
-HOLDERS = {SETTINGS: {A}, JOURNAL: {A, G}, ADMIN_ONLY: {A}, HIDDEN: {A}}
-ARGUMENTS = {"filename": "css/app.css", "key": "adherent", "session_id": "inconnue", "name": "absent"}
+HOLDERS = {SETTINGS: {A}, JOURNAL: {A, G}, ADMIN_ONLY: {A}, HIDDEN: {A}, ACCOUNTS: {A}, GROUPS: {A}}
+ARGUMENTS = {"filename": "css/app.css", "key": "adherent", "session_id": "inconnue", "name": "absent",
+             "account_id": 1, "group_id": 999, "token": "inconnu"}
+# Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
+SENDS_TO_LOGIN = {"auth.logout", "auth.two_factor", "auth.token_link"}
 
 
 def url_of(app, rule):
@@ -48,7 +58,7 @@ def test_every_route_is_declared(app):
 
 def test_every_declared_permission_exists():
     from app.permissions import PERMISSIONS
-    assert {SETTINGS, JOURNAL} <= set(PERMISSIONS)
+    assert {SETTINGS, JOURNAL, ACCOUNTS, GROUPS} <= set(PERMISSIONS)
 
 
 @pytest.mark.parametrize("who", [ANONYMOUS, H, G, A])
@@ -66,7 +76,7 @@ def test_access_matrix(app, accounts, who):
             allowed = who in HOLDERS.get(policy, ()) or policy == PUBLIC or (policy == LOGGED_IN and who != ANONYMOUS)
             if code >= 500:
                 problems.append(f"{label} : erreur serveur")
-            elif allowed and (code == 403 or is_login_redirect(response) and rule.endpoint != "auth.logout"):
+            elif allowed and (code == 403 or is_login_redirect(response) and rule.endpoint not in SENDS_TO_LOGIN):
                 problems.append(f"{label} : devrait être autorisé")
             elif not allowed and policy == HIDDEN and code != 404:
                 problems.append(f"{label} : devrait répondre 404")
@@ -89,7 +99,9 @@ def test_forbidden_post_changes_nothing(client, accounts):
 
 @pytest.fixture
 def rich(app, accounts):
-    """Une base représentative : du HTML dans les noms, un rôle sur mesure, un journal et des notifications."""
+    """Une base représentative : du HTML dans les noms, un rôle sur mesure, un groupe, un journal et des notifications."""
+    db.session.add(AccessGroup(key="regie", name="Groupe <u>régie</u>", description="<i>accès</i>",
+                               members=[accounts[H]]))
     db.session.add(Role(key="regie", name="Régie <b>", description="Rôle sur <i>mesure</i>",
                         permissions=["activity.view"]))
     make_account("regie", email="regie@asso.test", first_name="Léa <script>")
@@ -129,13 +141,15 @@ def test_crawl_every_link(app, rich, who):
             problems.append(f"{path} : une donnée n'a pas été échappée")
         for link in LINK.findall(html):
             target = urlsplit(urljoin(path, link.replace("&amp;", "&")))
-            if not target.netloc:
+            if not target.netloc and target.scheme != "data":  # QR code intégré à la page
                 queue.append(target.path + (f"?{target.query}" if target.query else ""))
     assert not problems, "\n".join(problems)
     assert "/mon-compte" in seen and any(p.startswith("/static/css/app.css") for p in seen)
     assert ("/roles" in seen) == (who == A)
     assert ("/parametres" in seen) == (who == A)
     assert ("/journal" in seen) == (who in (A, G))
+    assert ("/comptes" in seen) == (who == A)
+    assert ("/groupes" in seen) == (who == A)
 
 
 def test_custom_role_gets_exactly_its_rights(app, rich):

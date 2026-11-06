@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ "Modifier " ~ account.full_name if account else "Nouveau compte" }}{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>{{ "Modifier " ~ account.full_name if account else "Nouveau compte" }}</h1>
+  {% if not account %}<p class="muted">Un lien sera envoyé à cette adresse pour choisir un mot de passe.</p>{% endif %}
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="grid"><div>{{ field(form.first_name) }}</div><div>{{ field(form.last_name) }}</div></div>
+    {{ field(form.email) }}
+    {% if account %}<small class="muted">Changer l'adresse annule les liens en cours : elle devra être vérifiée à nouveau.</small>{% endif %}
+    {{ field(form.role) }}
+    <button type="submit">Enregistrer</button>
+  </form>
+</article>
+{% endblock %}

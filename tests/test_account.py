@@ -74,19 +74,33 @@ def test_close_another_device(app, accounts):
 
 
 def test_current_session_cannot_be_closed_by_this_route(client, member):
-    token = db.session.scalar(db.select(LoginSession.id))
-    html = client.post(f"/mon-compte/sessions/{token}/fermer", follow_redirects=True).get_data(as_text=True)
+    sid = db.session.scalar(db.select(LoginSession.sid))
+    html = client.post(f"/mon-compte/sessions/{sid}/fermer", follow_redirects=True).get_data(as_text=True)
     assert "utilisez « Déconnexion »" in html and client.get("/").status_code == 200
+
+
+def test_another_device_is_closed_by_its_public_sid(app, accounts):
+    mine, other = app.test_client(), app.test_client()
+    login(mine, accounts["adherent"])
+    login(other, accounts["adherent"])
+    theirs = db.session.scalars(db.select(LoginSession).order_by(LoginSession.created_at)).all()[-1]
+    html = mine.get("/mon-compte").get_data(as_text=True)
+    assert theirs.sid in html
+    assert all(row.id not in html for row in db.session.scalars(db.select(LoginSession)))  # jamais le jeton secret
+    mine.post(f"/mon-compte/sessions/{theirs.id}/fermer")  # l'ancienne forme, par le jeton, ne ferme plus rien
+    assert other.get("/").status_code == 200
+    mine.post(f"/mon-compte/sessions/{theirs.sid}/fermer")
+    assert other.get("/").status_code == 302 and mine.get("/").status_code == 200
 
 
 def test_session_of_someone_else_cannot_be_closed(app, accounts):
     other = app.test_client()
     login(other, accounts["admin"])
-    theirs = db.session.scalar(db.select(LoginSession.id).filter_by(account_id=accounts["admin"].id))
+    theirs = db.session.scalar(db.select(LoginSession).filter_by(account_id=accounts["admin"].id))
     client = app.test_client()
     login(client, accounts["adherent"])
-    assert client.post(f"/mon-compte/sessions/{theirs}/fermer").status_code == 302
-    assert db.session.get(LoginSession, theirs) is not None and other.get("/").status_code == 200
+    assert client.post(f"/mon-compte/sessions/{theirs.sid}/fermer").status_code == 302
+    assert db.session.get(LoginSession, theirs.id) is not None and other.get("/").status_code == 200
 
 
 @pytest.mark.parametrize("agent, label", [

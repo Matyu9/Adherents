@@ -107,17 +107,28 @@ def jwks():
     return {"keys": [row.public_jwk for row in keys]}
 
 
-def subject_of_hint(raw):
-    """`sub` d'un `id_token_hint` que ce serveur a bien signé (même expiré, comme le permet la norme), sinon None."""
+def hint_claims(raw):
+    """Contenu d'un `id_token_hint` que ce serveur a bien signé (même expiré, comme le permet la norme), sinon None.
+
+    Un jeton de déconnexion, signé avec la même clé, n'est pas un jeton d'identité : il est refusé.
+    """
     try:
-        kid = jws.extract_compact(raw.encode()).protected.get("kid")
+        header = jws.extract_compact(raw.encode()).protected
+        kid = header.get("kid")
         row = db.session.get(OidcKey, kid) if kid and isinstance(kid, str) else None
-        if row is None or row not in published_keys():
+        if row is None or row not in published_keys() or header.get("typ") not in (None, "JWT"):
             return None
         claims = jwt.decode(raw, RSAKey.import_key(row.public_jwk), algorithms=["RS256"]).claims
     except (JoseError, ValueError, TypeError, AttributeError):
         return None
-    return claims.get("sub") if claims.get("iss") == issuer() else None
+    if claims.get("iss") != issuer() or "events" in claims or not isinstance(claims.get("sub"), str):
+        return None
+    return claims
+
+
+def subject_of_hint(raw):
+    claims = hint_claims(raw)
+    return claims["sub"] if claims else None
 
 
 # ---------------------------------------------------------------------------
@@ -183,10 +194,24 @@ def find_client(client_id):
 # Connexion en cours
 # ---------------------------------------------------------------------------
 
+def _login_of(account):
+    return db.session.get(LoginSession, account.session_token) if account.session_token else None
+
+
 def auth_time(account):
     """Moment où la personne a vraiment saisi son mot de passe : l'ouverture de la session, « rester connecté » compris."""
-    login = db.session.get(LoginSession, account.session_token) if account.session_token else None
+    login = _login_of(account)
     return int((login.created_at if login else datetime.now()).timestamp())
+
+
+def sid_of(account):
+    """`sid` de la session de la requête en cours, celle qui ouvre l'appli."""
+    login = _login_of(account)
+    return login.sid if login else None
+
+
+def session_alive(sid):
+    return db.session.scalar(db.select(LoginSession.sid).filter_by(sid=sid)) is not None
 
 
 def remember_resume(query):

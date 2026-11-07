@@ -22,7 +22,7 @@ ACCESS = {
     "static": PUBLIC, "auth.login": PUBLIC, "csp.report": PUBLIC, "settings.logo_file": PUBLIC,
     "auth.two_factor": PUBLIC, "auth.forgot": PUBLIC, "auth.token_link": PUBLIC,
     "oidc.discovery": PUBLIC, "oidc.jwks": PUBLIC, "oidc.authorize": PUBLIC, "oidc.resume": PUBLIC, "oidc.token": PUBLIC,
-    "oidc.userinfo": PUBLIC, "oidc.consent": LOGGED_IN,
+    "oidc.userinfo": PUBLIC, "oidc.consent": LOGGED_IN, "oidc.end_session": PUBLIC, "oidc.end_session_confirm": PUBLIC,
     **{f"applications.{name}": CLIENTS for name in ("index", "create", "detail", "edit", "new_secret", "toggle", "delete",
                                                     "rotate_key")},
     "account.revoke_consent": LOGGED_IN,
@@ -42,10 +42,10 @@ ACCESS = {
     "health.as_json": HIDDEN, "health.page": HIDDEN,
 }
 HOLDERS = {SETTINGS: {A}, JOURNAL: {A, G}, ADMIN_ONLY: {A}, HIDDEN: {A}, ACCOUNTS: {A}, GROUPS: {A}, CLIENTS: {A}}
-ARGUMENTS = {"filename": "css/app.css", "key": "adherent", "session_id": "inconnue", "name": "absent",
+ARGUMENTS = {"filename": "css/app.css", "key": "adherent", "sid": "inconnue", "name": "absent",
              "account_id": 1, "group_id": 999, "token": "inconnu", "client_pk": 999}
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
-SENDS_TO_LOGIN = {"auth.logout", "auth.two_factor", "auth.token_link"}
+SENDS_TO_LOGIN = {"auth.logout", "auth.two_factor", "auth.token_link", "oidc.end_session"}
 
 
 def url_of(app, rule):

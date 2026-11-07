@@ -145,7 +145,9 @@ def test_discovery_announces_only_what_is_supported(client):
     assert meta["code_challenge_methods_supported"] == ["S256"]
     assert meta["id_token_signing_alg_values_supported"] == ["RS256"]
     assert "none" not in meta["token_endpoint_auth_methods_supported"]
-    assert "end_session_endpoint" not in meta  # phase 4
+    assert meta["end_session_endpoint"] == "http://localhost:8001/oidc/deconnexion"
+    assert meta["backchannel_logout_supported"] is True and meta["backchannel_logout_session_supported"] is True
+    assert meta["frontchannel_logout_supported"] is False and "sid" in meta["claims_supported"]
 
 
 def test_discovery_ignores_the_host_header(client):
@@ -1003,6 +1005,11 @@ def test_toggle_and_delete(manager, http, client_app):
     assert db.session.get(OidcClient, pk).active is True
     flow = Flow(client_app)
     exchange(http, flow, signed_in_code(http, flow))
+    response = manager.post(f"/applications/{pk}/supprimer", follow_redirects=True)
+    assert "Fermez d'abord" in html.unescape(response.get_data(as_text=True)) and db.session.get(OidcClient, pk) is not None
+    assert "/supprimer" not in manager.get(f"/applications/{pk}").get_data(as_text=True)
+    manager.post(f"/applications/{pk}/activer")
+    assert "/supprimer" in manager.get(f"/applications/{pk}").get_data(as_text=True)
     manager.post(f"/applications/{pk}/supprimer")
     assert db.session.get(OidcClient, pk) is None
     assert db.session.scalar(db.select(db.func.count(OidcToken.id))) == 0

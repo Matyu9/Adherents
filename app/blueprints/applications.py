@@ -2,12 +2,12 @@
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_wtf import FlaskForm
 from wtforms import BooleanField, StringField, TextAreaField
-from wtforms.validators import DataRequired, Length, ValidationError
+from wtforms.validators import DataRequired, Length, Optional, ValidationError
 
 from ..extensions import db, fold
 from ..models import AccessGroup, OidcClient
 from ..permissions import require
-from ..services import groups, oidc
+from ..services import groups, logout, oidc
 from ..services.activity import log
 
 bp = Blueprint("applications", __name__, url_prefix="/applications")
@@ -16,6 +16,10 @@ bp = Blueprint("applications", __name__, url_prefix="/applications")
 class ApplicationForm(FlaskForm):
     name = StringField("Nom", validators=[DataRequired(), Length(max=80)])
     redirect_uris = TextAreaField("Adresses de retour (une par ligne)", validators=[DataRequired()])
+    post_logout_redirect_uris = TextAreaField("Adresses après déconnexion (une par ligne, facultatif)",
+                                              validators=[Optional()])
+    backchannel_logout_uri = StringField("Adresse des avis de déconnexion (Back-Channel Logout, facultatif)",
+                                         validators=[Optional(), Length(max=oidc.MAX_REDIRECT_URI)])
     first_party = BooleanField("Appli de l'association : ne pas demander de consentement")
 
     def __init__(self, *args, current=None, **kwargs):
@@ -29,9 +33,22 @@ class ApplicationForm(FlaskForm):
                 raise ValidationError("Une application porte déjà ce nom.")
 
     def validate_redirect_uris(self, field):
-        for uri in field.data.split():
-            if problem := oidc.redirect_uri_problem(uri):
-                raise ValidationError(f"{uri} : {problem}.")
+        _check_uris(field.data.split())
+
+    def validate_post_logout_redirect_uris(self, field):
+        _check_uris((field.data or "").split())
+
+    def validate_backchannel_logout_uri(self, field):
+        uri = (field.data or "").strip()
+        if len(uri.split()) > 1:
+            raise ValidationError("Une seule adresse.")
+        _check_uris([uri] if uri else [])
+
+
+def _check_uris(uris):
+    for uri in uris:
+        if problem := oidc.redirect_uri_problem(uri):
+            raise ValidationError(f"{uri} : {problem}.")
 
 
 def _checked_groups(name):
@@ -42,6 +59,8 @@ def _checked_groups(name):
 def _apply(form, client):
     client.name = " ".join(form.name.data.split())
     client.redirect_uris = list(dict.fromkeys(form.redirect_uris.data.split()))
+    client.post_logout_redirect_uris = list(dict.fromkeys((form.post_logout_redirect_uris.data or "").split()))
+    client.backchannel_logout_uri = (form.backchannel_logout_uri.data or "").strip() or None
     client.first_party = form.first_party.data
     client.allowed_groups = _checked_groups("allowed_groups")
     client.shared_groups = _checked_groups("shared_groups")
@@ -57,7 +76,8 @@ def _discovery():
 
 def _snapshot(client):
     """Ce que le journal compare quand une application est modifiée."""
-    return {"nom": client.name, "adresses": client.redirect_uris, "association": client.first_party,
+    return {"nom": client.name, "adresses": client.redirect_uris, "après déconnexion": client.post_logout_redirect_uris,
+            "avis de déconnexion": client.backchannel_logout_uri, "association": client.first_party,
             "autorisés": sorted(g.key for g in client.allowed_groups),
             "transmis": sorted(g.key for g in client.shared_groups)}
 
@@ -99,20 +119,24 @@ def create():
 @bp.route("/<int:client_pk>")
 @require("client.manage")
 def detail(client_pk):
-    return render_template("applications/detail.html", client=_get(client_pk), form=FlaskForm(),
-                           discovery=_discovery())
+    client = _get(client_pk)
+    return render_template("applications/detail.html", client=client, form=FlaskForm(), discovery=_discovery(),
+                           pending_logouts=logout.pending_for(client))
 
 
 @bp.route("/<int:client_pk>/modifier", methods=["GET", "POST"])
 @require("client.manage")
 def edit(client_pk):
     client = _get(client_pk)
-    form = ApplicationForm(current=client, data={"name": client.name, "redirect_uris": "\n".join(client.redirect_uris),
-                                                 "first_party": client.first_party})
+    form = ApplicationForm(current=client, data={
+        "name": client.name, "redirect_uris": "\n".join(client.redirect_uris),
+        "post_logout_redirect_uris": "\n".join(client.post_logout_redirect_uris),
+        "backchannel_logout_uri": client.backchannel_logout_uri or "", "first_party": client.first_party})
     if form.validate_on_submit():
         before = _snapshot(client)
         _apply(form, client)
         after = _snapshot(client)
+        logout.review_access(clients=[client])  # groupes autorisés ou transmis changés : les applis sont prévenues
         log("client.update", f"Application modifiée : {client.name}",
             changes={key: [before[key], after[key]] for key in before if before[key] != after[key]})
         db.session.commit()
@@ -139,6 +163,7 @@ def toggle(client_pk):
     client.active = not client.active
     if not client.active:
         oidc.revoke_tokens(client=client)
+        logout.review_access(clients=[client])  # chacun y est déconnecté
     log("client.toggle", f"Application {'rouverte' if client.active else 'fermée'} : {client.name}")
     db.session.commit()
     flash(f"« {client.name} » est {'ouverte' if client.active else 'fermée'}.", "success")
@@ -148,7 +173,11 @@ def toggle(client_pk):
 @bp.route("/<int:client_pk>/supprimer", methods=["POST"])
 @require("client.manage")
 def delete(client_pk):
+    """Seulement une appli fermée : la fermeture a prévenu chacun qu'il en était déconnecté."""
     client = _get(client_pk)
+    if client.active:
+        flash("Fermez d'abord l'application : ses utilisateurs en seront déconnectés.", "error")
+        return redirect(url_for(".detail", client_pk=client.id))
     name = client.name
     db.session.delete(client)
     log("client.delete", f"Application supprimée : {name}")

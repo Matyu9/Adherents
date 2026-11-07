@@ -56,3 +56,16 @@ Si `SECRET_KEY` change, la clé de signature devient illisible. Une nouvelle cl�
 `flask oidc-rotate-key` met une nouvelle clé en service, comme le bouton de l'écran « Applications ».
 
 Pour brancher une appli : créer ses groupes, la déclarer dans « Applications », puis copier dans sa configuration l'identifiant, le secret (affiché une seule fois) et l'adresse de découverte. Elle doit envoyer PKCE avec S256, et demander le scope `groups` si elle lit les groupes.
+
+### Déconnexion
+
+Deux adresses facultatives, à déclarer pour chaque appli dans « Applications » :
+
+| Adresse | Rôle |
+|---|---|
+| Adresses après déconnexion | Où l'appli peut renvoyer la personne après l'avoir déconnectée (`post_logout_redirect_uri`), comparées à l'identique. |
+| Adresse des avis de déconnexion | Point d'accès Back-Channel Logout de l'appli. Ce serveur l'appelle quand une session se ferme, quand un compte est coupé, quand la personne perd l'accès ou quand les groupes transmis changent. |
+
+Une appli sans adresse d'avis n'est pas prévenue : elle garde ses sessions jusqu'à leur fin normale.
+
+Un avis non reçu est renvoyé par `flask run-tasks` pendant 3 jours, puis abandonné et noté au journal. L'écran de l'appli affiche les avis en attente. Le serveur doit pouvoir joindre ces adresses : depuis Docker, `localhost` désigne le conteneur, pas la machine.

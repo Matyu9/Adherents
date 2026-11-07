@@ -9,14 +9,14 @@ from urllib.parse import parse_qsl, urlencode
 
 from authlib.common.urls import add_params_to_uri
 from authlib.oauth2.rfc6749 import InsecureTransportError, OAuth2Error
-from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user
 from flask_wtf import FlaskForm
 from werkzeug.datastructures import MultiDict
 
 from ..extensions import csrf, db
 from ..models import OidcClient
-from ..services import oidc, totp
+from ..services import oidc, sessions, totp
 from ..services.activity import log
 
 bp = Blueprint("oidc", __name__)
@@ -39,6 +39,7 @@ def discovery():
         token_endpoint=_endpoint(".token"),
         userinfo_endpoint=_endpoint(".userinfo"),
         jwks_uri=_endpoint(".jwks"),
+        end_session_endpoint=_endpoint(".end_session"),
         scopes_supported=list(OidcClient.SCOPES),
         response_types_supported=["code"],
         response_modes_supported=["query"],
@@ -48,11 +49,14 @@ def discovery():
         token_endpoint_auth_methods_supported=list(OidcClient.AUTH_METHODS),
         code_challenge_methods_supported=["S256"],
         claims_supported=["iss", "sub", "aud", "exp", "iat", "auth_time", "nonce", "at_hash", "name", "given_name",
-                          "family_name", "updated_at", "email", "email_verified", "groups"],
+                          "family_name", "updated_at", "email", "email_verified", "groups", "sid"],
         prompt_values_supported=["none", "login", "consent"],
         claims_parameter_supported=False,
         request_parameter_supported=False,
         request_uri_parameter_supported=False,
+        backchannel_logout_supported=True,
+        backchannel_logout_session_supported=True,
+        frontchannel_logout_supported=False,
     )
     response.headers["Cache-Control"] = "public, max-age=3600"
     return response
@@ -105,8 +109,8 @@ INVALID_REQUEST = ("Cette demande de connexion n'est pas valable\u00a0: l'applic
                    "ou son adresse de retour n'est pas celle qui a été déclarée.")
 
 
-def _refused_page(message, status):
-    return render_template("oidc/error.html", message=message), status
+def _refused_page(message, status, title=None):
+    return render_template("oidc/error.html", message=message, title=title), status
 
 
 def _oauth_error(error):
@@ -259,3 +263,81 @@ def userinfo():
     response = jsonify(oidc.claims_for(found.account, found.client, found.scope))
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+# ---------------------------------------------------------------------------
+# Déconnexion demandée par une appli (OpenID Connect RP-Initiated Logout 1.0)
+# ---------------------------------------------------------------------------
+
+LOGOUT_INVALID = ("Cette demande de déconnexion n'est pas valable\u00a0: l'application n'est pas reconnue, "
+                  "ou son adresse de retour n'est pas celle qui a été déclarée.")
+
+
+def _logout_request(args):
+    """(appli, adresse où revenir, contenu du `id_token_hint`), ou None si la demande est refusée.
+
+    L'adresse de retour n'est suivie que si elle a été déclarée par l'appli, désignée par `client_id` ou par le jeton.
+    """
+    if any(len(args.getlist(name)) > 1 for name in ("id_token_hint", "client_id", "post_logout_redirect_uri", "state")):
+        return None
+    hint = args.get("id_token_hint")
+    claims = oidc.hint_claims(hint) if hint else None
+    audience = claims.get("aud") if claims else None
+    if isinstance(audience, list):
+        audience = audience[0] if len(audience) == 1 else None
+    client_id = args.get("client_id") or None
+    if client_id and audience and client_id != audience:
+        return None
+    client = oidc.find_client(client_id or audience) if (client_id or audience) else None
+    target = None
+    if uri := args.get("post_logout_redirect_uri"):
+        if client is None or uri not in client.post_logout_redirect_uris:
+            return None
+        state = args.get("state")
+        target = add_params_to_uri(uri, [("state", state)]) if state else uri
+    return client, target, claims
+
+
+def _logged_out(target, after_form=False):
+    if target is None:
+        flash("Vous êtes déconnecté.", "info")
+        return redirect(url_for("auth.login"))
+    # Après un formulaire, la page intermédiaire : voir le haut de ce fichier.
+    return render_template("oidc/continue.html", target=target) if after_form else redirect(target)
+
+
+@bp.route("/oidc/deconnexion", methods=["GET", "POST"])
+@csrf.exempt
+def end_session():
+    """Sans confirmation seulement si l'appli prouve, par son jeton, qu'elle déconnecte cette personne et cette session.
+
+    Sinon un simple lien, posé n'importe où, déconnecterait qui le suit : la personne confirme.
+    """
+    args = request.values
+    parsed = _logout_request(args)
+    if parsed is None:
+        return _refused_page(LOGOUT_INVALID, 400, title="Déconnexion impossible")
+    client, target, claims = parsed
+    if not current_user.is_authenticated:
+        return _logged_out(target)
+    if claims and claims["sub"] == current_user.sub and claims.get("sid", sessions.current_sid()) == sessions.current_sid():
+        sessions.end(via=client.name if client else None)
+        return _logged_out(target)
+    return render_template("oidc/logout.html", client=client, form=FlaskForm(), query=_query(args))
+
+
+@bp.route("/oidc/deconnexion/confirmer", methods=["POST"])
+def end_session_confirm():
+    form = FlaskForm()
+    if not form.validate_on_submit():
+        abort(400)
+    parsed = _logout_request(MultiDict(parse_qsl(request.form.get("query", ""), keep_blank_values=True)))
+    if parsed is None:
+        return _refused_page(LOGOUT_INVALID, 400, title="Déconnexion impossible")
+    client, target, _ = parsed
+    if request.form.get("decision") == "logout":
+        sessions.end(via=client.name if client else None)
+        return _logged_out(target, after_form=True)
+    if target is None:
+        return redirect(url_for("dashboard.index"))
+    return render_template("oidc/continue.html", target=target)

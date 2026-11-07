@@ -12,6 +12,11 @@
 <p>Identifiant : <code>{{ client.client_id }}</code><br>Adresse de découverte : <code>{{ discovery }}</code></p>
 <p>Adresses de retour :</p>
 <ul>{% for uri in client.redirect_uris %}<li><code>{{ uri }}</code></li>{% endfor %}</ul>
+<h2>Déconnexion</h2>
+<p>Adresses après déconnexion :</p>
+<ul>{% for uri in client.post_logout_redirect_uris %}<li><code>{{ uri }}</code></li>{% else %}<li class="muted">aucune : la personne reste sur ce serveur</li>{% endfor %}</ul>
+<p>Avis de déconnexion : {% if client.backchannel_logout_uri %}<code>{{ client.backchannel_logout_uri }}</code>{% else %}<span class="muted">aucune adresse, l'application n'est pas prévenue</span>{% endif %}</p>
+{% if pending_logouts %}<p class="flash flash-warning">{{ pending_logouts }} avis de déconnexion en attente : l'application ne les a pas encore reçus. Ils seront renvoyés automatiquement pendant 3 jours.</p>{% endif %}
 <h2>Accès</h2>
 <p>Groupes autorisés : {% for g in client.allowed_groups %}<span class="badge">{{ g.name }}</span> {% else %}<span class="muted">aucun, personne n'y entre</span>{% endfor %}</p>
 <p>Groupes transmis : {% for g in client.shared_groups %}<span class="badge">{{ g.name }}</span> {% else %}<span class="muted">aucun</span>{% endfor %}</p>
@@ -24,8 +29,11 @@
   <form method="post" action="{{ url_for('applications.toggle', client_pk=client.id) }}"{% if client.active %} data-confirm="Fermer cette application ? Plus personne ne pourra s'y connecter."{% endif %}>
     {{ form.hidden_tag() }}<button type="submit" class="secondary">{{ "Fermer" if client.active else "Rouvrir" }}</button>
   </form>
+  {% if client.active %}<p class="muted small">Pour supprimer l'application, fermez-la d'abord.</p>{% endif %}
+  {% if not client.active %}
   <form method="post" action="{{ url_for('applications.delete', client_pk=client.id) }}" data-confirm="Supprimer « {{ client.name }} » ? C'est définitif.">
     {{ form.hidden_tag() }}<button type="submit" class="secondary outline">Supprimer</button>
   </form>
+  {% endif %}
 </div>
 {% endblock %}

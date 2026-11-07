@@ -115,12 +115,14 @@ Les comptes et l'OIDC passent avant les inscriptions, car celles-ci s'appuient s
 - **Tests :** code rejoué, mauvais `redirect_uri`, PKCE absent ou faux, compte coupé, personne hors groupe autorisé. La suite de conformité de l'OpenID Foundation (profil Basic OP) sert de critère de réussite.
 - **Suite de conformité, pas encore passée :** Basic OP n'envoie pas PKCE, sauf dans un test. Comme PKCE est obligatoire ici, presque tous ses tests échoueraient tels quels. À trancher : la lancer avec un point d'entrée de test sans PKCE, hors de l'appli, et un émetteur joignable par la suite.
 
-### Phase 4 : déconnexion
+### Phase 4 : déconnexion (écrite le 7 novembre 2026, sur la branche `phase-4-deconnexion`)
 
 - Déconnexion initiée par l'appli (`end_session_endpoint`).
 - Back-Channel Logout, avec une file d'envoi réessayée par le `scheduler` si une appli est injoignable.
 - Déconnexion envoyée quand un compte est coupé, ou quand les groupes transmis à une appli changent.
 - **Tests :** coupure propagée, appli en panne puis rétablie, jeton de déconnexion invalide.
+- **Fait aussi :** `sid` public sur chaque session, mis dans le jeton d'identité ; avis quand une autorisation est retirée ; filet de sécurité dans `flask run-tasks` pour une session disparue sans prévenir ; suppression d'une appli seulement une fois fermée.
+- **Non fait :** Front-Channel Logout (des iframes vers chaque appli), plus fragile et inutile si chaque appli reçoit les avis.
 
 ### Phase 5 : branchement de l'Inventaire
 

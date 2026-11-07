@@ -9,7 +9,7 @@ from wtforms.validators import DataRequired, Length, Regexp, ValidationError
 from ..extensions import db, fold_contains
 from ..models import AccessGroup, Account, AccountToken, Activity, Role
 from ..permissions import can, require
-from ..services import accounts, groups, mailer, oidc, roles, sessions, totp
+from ..services import accounts, groups, logout, mailer, oidc, roles, sessions, totp
 from ..services.activity import diff, log
 
 bp = Blueprint("accounts", __name__, url_prefix="/comptes")
@@ -198,6 +198,7 @@ def set_groups(account_id):
     wanted = db.session.scalars(db.select(AccessGroup).where(AccessGroup.id.in_(ids))).all() if ids else []
     added, removed = groups.set_members_of(account, wanted)
     if added or removed:
+        logout.review_access(accounts=[account])  # une appli qu'il quitte, ou dont les groupes transmis changent
         log("account.groups", f"Groupes de {account.full_name} modifiés",
             changes={"groupes": [sorted(g.key for g in removed), sorted(g.key for g in added)]}, target=account)
     db.session.commit()
@@ -222,11 +223,11 @@ def reset_totp(account_id):
     return redirect(url_for(".detail", account_id=account.id))
 
 
-@bp.route("/<int:account_id>/sessions/<session_id>/fermer", methods=["POST"])
+@bp.route("/<int:account_id>/sessions/<sid>/fermer", methods=["POST"])
 @require("account.manage")
-def revoke_session(account_id, session_id):
+def revoke_session(account_id, sid):
     account = _managed(account_id)
-    if session_id != current_user.session_token and sessions.revoke_one(account, session_id):
+    if sessions.revoke_one(account, sid):  # jamais celle de la requête en cours
         log("account.session", f"Session de {account.full_name} fermée", target=account)
         db.session.commit()
         flash("Appareil déconnecté.", "success")

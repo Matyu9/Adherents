@@ -55,8 +55,10 @@ def _sqlite_begin(conn):
 
 
 def _is_write_request():
-    from flask import has_request_context, request
+    from flask import g, has_app_context, has_request_context, request
 
-    # Deux GET écrivent aussi : le code d'autorisation et le journal, la première clé de signature.
+    if has_app_context() and g.get("sqlite_immediate"):  # travail hors requête qui écrit (avis de déconnexion)
+        return True
+    # Trois GET écrivent aussi : le code d'autorisation et le journal, la première clé de signature, la déconnexion.
     return has_request_context() and (request.method in ("POST", "PUT", "PATCH", "DELETE")
-                                      or request.endpoint in ("oidc.authorize", "oidc.jwks"))
+                                      or request.endpoint in ("oidc.authorize", "oidc.jwks", "oidc.end_session"))

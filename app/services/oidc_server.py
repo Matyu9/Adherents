@@ -16,7 +16,7 @@ from joserfc.jwk import RSAKey
 
 from ..extensions import db
 from ..models import OidcClient, OidcCode, OidcToken
-from . import oidc
+from . import logout, oidc
 from .activity import log
 
 
@@ -50,6 +50,12 @@ class OpenID(OpenIDCode):
 
     def get_client_claims(self, client):
         return {"iss": oidc.issuer(), "aud": client.client_id}
+
+    def get_authorization_code_claims(self, authorization_code):
+        claims = super().get_authorization_code_claims(authorization_code)
+        if authorization_code.sid:  # l'appli le retrouvera dans l'avis de déconnexion de cette session
+            claims["sid"] = authorization_code.sid
+        return claims
 
     def encode_id_token(self, token, request):
         g.oidc_client = request.client  # generate_user_info ne reçoit pas l'appli, dont dépendent les groupes transmis
@@ -85,7 +91,7 @@ class CodeGrant(grants.AuthorizationCodeGrant):
             id=oidc.digest(code), client_id=request.client.id, account_id=request.user.id,
             redirect_uri=request.payload.redirect_uri, scope=request.scope, nonce=data.get("nonce"),
             code_challenge=data["code_challenge"], code_challenge_method=data["code_challenge_method"],
-            auth_time=oidc.auth_time(request.user), expires_at=oidc.utcnow() + oidc.CODE_LIFETIME))
+            auth_time=oidc.auth_time(request.user), sid=oidc.sid_of(request.user), expires_at=oidc.utcnow() + oidc.CODE_LIFETIME))
 
     def query_authorization_code(self, code, client):
         row = db.session.get(OidcCode, oidc.digest(code))
@@ -106,7 +112,12 @@ class CodeGrant(grants.AuthorizationCodeGrant):
 
     def authenticate_user(self, authorization_code):
         account = authorization_code.account
-        return account if oidc.may_access(authorization_code.client, account) else None
+        if not oidc.may_access(authorization_code.client, account):
+            return None
+        # Session fermée entre le code et son échange (déconnexion, appareil retiré) : l'appli n'en ouvre pas d'autre.
+        if authorization_code.sid and not oidc.session_alive(authorization_code.sid):
+            return None
+        return account
 
 
 def _on_replay(code):
@@ -119,6 +130,7 @@ def _on_replay(code):
 
 
 def _save_token(token, request):
+    logout.remember(request.authorization_code, request.user, request.client)
     db.session.add(OidcToken(id=oidc.digest(token["access_token"]), client_id=request.client.id,
                              account_id=request.user.id, code_id=request.authorization_code.id, scope=token["scope"],
                              expires_at=oidc.utcnow() + timedelta(seconds=token["expires_in"])))

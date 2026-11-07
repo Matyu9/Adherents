@@ -45,6 +45,8 @@ class Config:
 
     # Envoi hors de la requête, là où sa durée révélerait si un compte existe (mot de passe oublié).
     MAIL_IN_BACKGROUND = True
+    # Avis de déconnexion aux applis : envoyés juste après la requête, sans la faire attendre.
+    BACKCHANNEL_IN_BACKGROUND = True
 
     # Content-Security-Policy : appliquée par défaut. « 1 » = Report-Only, pour diagnostiquer sans rien bloquer.
     CSP_REPORT_ONLY = os.environ.get("CSP_REPORT_ONLY", "0") == "1"
@@ -70,3 +72,4 @@ class TestConfig(Config):
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     WTF_CSRF_ENABLED = False
     MAIL_IN_BACKGROUND = False
+    BACKCHANNEL_IN_BACKGROUND = False

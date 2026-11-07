@@ -7,7 +7,7 @@ from wtforms.validators import DataRequired, Length, Regexp
 
 from ..extensions import db
 from ..models import Account, AccountToken
-from ..services import accounts, mailer, oidc, preferences, sessions, throttle
+from ..services import accounts, logout, mailer, oidc, preferences, sessions, throttle
 from ..services import totp as totp_service
 from ..services.activity import log
 
@@ -228,11 +228,11 @@ def display():
     return redirect(url_for(".index") + "#affichage")
 
 
-@bp.route("/sessions/<session_id>/fermer", methods=["POST"])
-def revoke_session(session_id):
-    if session_id == current_user.session_token:
+@bp.route("/sessions/<sid>/fermer", methods=["POST"])
+def revoke_session(sid):
+    if sid == sessions.current_sid():
         flash("Pour fermer cette session, utilisez « Déconnexion ».", "info")
-    elif sessions.revoke_one(current_user, session_id):
+    elif sessions.revoke_one(current_user, sid):
         db.session.commit()
         flash("Appareil déconnecté.", "success")
     return redirect(url_for(".index") + "#sessions")
@@ -241,6 +241,7 @@ def revoke_session(session_id):
 @bp.route("/applications/<int:client_pk>/retirer", methods=["POST"])
 def revoke_consent(client_pk):
     if oidc.revoke_consent(current_user, client_pk):
+        logout.end_client_sessions(current_user, client_pk)
         log("oidc.consent_revoked", f"{current_user.full_name} a retiré une autorisation", target=current_user)
         db.session.commit()
         flash("Autorisation retirée.", "success")

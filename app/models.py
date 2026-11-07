@@ -137,6 +137,9 @@ class Account(UserMixin, TimestampMixin, db.Model):
 class LoginSession(db.Model):
     """Connexion ouverte sur un appareil. La supprimer invalide ses cookies, même copiés ailleurs."""
     id = db.Column(db.String(64), primary_key=True)  # jeton secret
+    # Identifiant public de la session (claim OIDC « sid »), qui peut circuler sans rien donner : jamais `id`.
+    sid = db.Column(db.String(36), nullable=False, unique=True, default=lambda: str(uuid.uuid4()),
+                    server_default=db.text("(lower(hex(randomblob(16))))"))
     account_id = db.Column(db.ForeignKey("account.id", ondelete="CASCADE"), nullable=False, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
     last_seen_at = db.Column(db.DateTime)
@@ -221,6 +224,10 @@ class OidcClient(TimestampMixin, ClientMixin, db.Model):
     secret_hash = db.Column(db.String(64), nullable=False)  # empreinte : le secret n'est affiché qu'une fois
     name = db.Column(db.String(80), nullable=False, unique=True)
     redirect_uris = db.Column(db.JSON, nullable=False, default=list)
+    # Adresses où renvoyer la personne après une déconnexion demandée par l'appli, comparées à l'identique.
+    post_logout_redirect_uris = db.Column(db.JSON, nullable=False, default=list, server_default="[]")
+    # Adresse où l'appli reçoit les avis de déconnexion (Back-Channel Logout). Sans elle, elle n'est pas prévenue.
+    backchannel_logout_uri = db.Column(db.Text)
     # Appli de l'association : la personne n'a pas à confirmer ce que l'association lui transmet déjà.
     first_party = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
     active = db.Column(db.Boolean, nullable=False, default=True, server_default="1")
@@ -265,6 +272,7 @@ class OidcCode(db.Model):
     code_challenge = db.Column(db.String(128), nullable=False)
     code_challenge_method = db.Column(db.String(10), nullable=False)
     auth_time = db.Column(db.Integer, nullable=False)
+    sid = db.Column(db.String(36))  # session de connexion qui a obtenu le code (LoginSession.sid)
     expires_at = db.Column(db.DateTime, nullable=False, index=True)
     used_at = db.Column(db.DateTime)
 
@@ -309,6 +317,42 @@ class OidcConsent(db.Model):
     client_id = db.Column(db.ForeignKey("oidc_client.id", ondelete="CASCADE"), primary_key=True, index=True)
     scope = db.Column(db.String(255), nullable=False)
     granted_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    client = db.relationship("OidcClient")
+
+
+class OidcSession(db.Model):
+    """Appli où une session de connexion a servi : elle sera prévenue quand cette session se fermera.
+
+    Pas de clé étrangère vers LoginSession : la ligne doit survivre à la session, le temps de prévenir l'appli.
+    """
+    __table_args__ = (db.UniqueConstraint("sid", "client_id"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    sid = db.Column(db.String(36), nullable=False, index=True)
+    client_id = db.Column(db.ForeignKey("oidc_client.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_id = db.Column(db.ForeignKey("account.id", ondelete="CASCADE"), nullable=False, index=True)
+    # Groupes transmis à la connexion, None si l'appli ne les a pas demandés : s'ils changent, l'appli est prévenue.
+    groups = db.Column(db.JSON)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    account = db.relationship("Account")
+    client = db.relationship("OidcClient")
+
+
+class OidcLogout(db.Model):
+    """Avis de déconnexion à envoyer à une appli (Back-Channel Logout), réessayé tant qu'elle ne l'a pas reçu.
+
+    `sub` et `sid` sont recopiés : l'avis doit pouvoir partir même si la session ou le compte n'existent plus.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.ForeignKey("oidc_client.id", ondelete="CASCADE"), nullable=False, index=True)
+    sub = db.Column(db.String(36), nullable=False)
+    sid = db.Column(db.String(36))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    next_attempt_at = db.Column(db.DateTime, nullable=False, default=datetime.now, index=True)
+    attempts = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    last_error = db.Column(db.String(255))
 
     client = db.relationship("OidcClient")
 

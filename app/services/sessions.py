@@ -8,16 +8,26 @@ from flask_login import current_user, login_user, logout_user
 
 from ..extensions import db
 from ..models import LoginSession
+from . import logout
 from .activity import log
+
+
+def _close(*where):
+    """Ferme les sessions qui répondent à `where`, et prévient les applis où elles ont servi. Renvoie leur nombre."""
+    sids = db.session.scalars(db.select(LoginSession.sid).where(*where)).all()
+    if not sids:
+        return 0
+    closed = db.session.execute(db.delete(LoginSession).where(LoginSession.sid.in_(sids))).rowcount
+    logout.sessions_ended(sids)
+    return closed
 
 
 def start(user, remember=False, via=None):
     """Ouvre une session pour `user` sur cet appareil (à la place de login_user) et la note au journal."""
-    lifetime = current_app.config.get("REMEMBER_COOKIE_DURATION", timedelta(days=365))
     if current_user.is_authenticated:  # nouvelle connexion demandée par une appli : elle remplace la session en cours
-        db.session.execute(db.delete(LoginSession).where(LoginSession.id == current_user.session_token))
+        _close(LoginSession.id == current_user.session_token)
     session.pop("oidc_resume", None)  # une demande en attente ne passe pas à la personne qui se connecte ensuite
-    db.session.execute(db.delete(LoginSession).where(LoginSession.created_at < datetime.now() - lifetime))
+    purge_expired()
     user.session_token = secrets.token_urlsafe(32)
     now = datetime.now()
     db.session.add(LoginSession(id=user.session_token, account_id=user.id, created_at=now, last_seen_at=now,
@@ -30,11 +40,17 @@ def start(user, remember=False, via=None):
     login_user(user, remember=remember)
 
 
-def end():
-    """Déconnecte cet appareil : son cookie, même rejoué, ne donne plus accès."""
+def purge_expired(now=None):
+    """Ferme les sessions plus vieilles que « rester connecté » : leur cookie ne vaut plus rien. Sans commit."""
+    lifetime = current_app.config.get("REMEMBER_COOKIE_DURATION", timedelta(days=365))
+    return _close(LoginSession.created_at < (now or datetime.now()) - lifetime)
+
+
+def end(via=None):
+    """Déconnecte cet appareil : son cookie, même rejoué, ne donne plus accès. `via` : l'appli qui l'a demandé."""
     if current_user.is_authenticated:
-        log("auth.logout", f"Déconnexion de {current_user.full_name}")
-        db.session.execute(db.delete(LoginSession).where(LoginSession.id == current_user.session_token))
+        log("auth.logout", f"Déconnexion de {current_user.full_name}" + (f" depuis {via}" if via else ""))
+        _close(LoginSession.id == current_user.session_token)
         db.session.commit()
     session.pop("oidc_resume", None)
     logout_user()
@@ -42,16 +58,24 @@ def end():
 
 def revoke(user, keep_current=False):
     """Déconnecte les appareils de `user` (tous, ou tous sauf celui de la requête en cours). Sans commit."""
-    query = db.delete(LoginSession).where(LoginSession.account_id == user.id)
+    where = [LoginSession.account_id == user.id]
     if keep_current and current_user.is_authenticated and current_user.id == user.id:
-        query = query.where(LoginSession.id != current_user.session_token)
-    db.session.execute(query)
+        where.append(LoginSession.id != current_user.session_token)
+    _close(*where)
 
 
-def revoke_one(user, session_id):
-    """Ferme une session précise de `user`. Renvoie False si elle n'existe pas (ou est à quelqu'un d'autre). Sans commit."""
-    return db.session.execute(db.delete(LoginSession).where(
-        LoginSession.id == session_id, LoginSession.account_id == user.id)).rowcount > 0
+def revoke_one(user, sid):
+    """Ferme une session précise de `user`, désignée par son `sid` public. Renvoie False si elle n'existe pas (ou est à
+    quelqu'un d'autre), ou si c'est celle de la requête en cours. Sans commit."""
+    where = [LoginSession.sid == sid, LoginSession.account_id == user.id]
+    if current_user.is_authenticated:
+        where.append(LoginSession.id != current_user.session_token)
+    return _close(*where) > 0
+
+
+def current_sid():
+    login = db.session.get(LoginSession, current_user.session_token) if current_user.is_authenticated else None
+    return login.sid if login else None
 
 
 def of(user):
@@ -87,10 +111,8 @@ def device_label(user_agent):
 
 def revoke_all():
     """Déconnecte tout le monde sauf l'appareil de la requête en cours. Renvoie le nombre de sessions fermées. Sans commit."""
-    query = db.delete(LoginSession)
-    if current_user.is_authenticated:
-        query = query.where(LoginSession.id != current_user.session_token)
-    return db.session.execute(query).rowcount
+    where = [LoginSession.id != current_user.session_token] if current_user.is_authenticated else []
+    return _close(*where)
 
 
 def stats():

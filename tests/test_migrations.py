@@ -179,3 +179,40 @@ def test_group_key_and_name_are_unique(migrated):
                       "INSERT INTO access_group (key, name) VALUES ('b', 'A')"):
         with pytest.raises(sqlite3.IntegrityError):
             run_sql(migrated, statement)
+
+
+def test_open_sessions_get_their_own_sid_on_upgrade(migrated):
+    """Phase 4 : chaque session déjà ouverte reçoit un sid distinct, et reste ouverte."""
+    steps = revisions()
+    upgrade(MIGRATIONS, revision="a0000003oidc")
+    run_sql(migrated, *SEED, "INSERT INTO login_session (id, account_id, created_at) VALUES ('jeton-2', 2, '2026-09-02')")
+    upgrade(MIGRATIONS)
+    (rows,) = run_sql(migrated, "SELECT id, sid FROM login_session ORDER BY id")
+    assert [row[0] for row in rows] == ["jeton", "jeton-2"]
+    assert all(row[1] for row in rows) and rows[0][1] != rows[1][1]
+    assert steps[-1] == "a0000004deconnexion"
+    with pytest.raises(sqlite3.IntegrityError):
+        run_sql(migrated, f"INSERT INTO login_session (id, sid, account_id, created_at) "
+                          f"VALUES ('jeton-3', '{rows[0][1]}', 1, '2026-09-03')")
+    (clients,) = run_sql(migrated, "SELECT count(*) FROM oidc_client")
+    assert clients == [(0,)]
+
+
+def test_logout_tables_cascade_on_the_real_schema(migrated):
+    upgrade(MIGRATIONS, revision="a0000003oidc")
+    run_sql(migrated, *SEED, "INSERT INTO oidc_client (id, client_id, secret_hash, name, redirect_uris, first_party, "
+                             "active) VALUES (1, 'c', 'h', 'Appli', '[]', 0, 1)")
+    upgrade(MIGRATIONS)
+    (lists,) = run_sql(migrated, "SELECT post_logout_redirect_uris, backchannel_logout_uri FROM oidc_client")
+    assert lists == [("[]", None)]  # une appli d'avant la phase 4 n'a aucune adresse de déconnexion
+    run_sql(migrated,
+            "INSERT INTO oidc_session (sid, client_id, account_id, created_at) VALUES ('s', 1, 2, '2026-09-01')",
+            "INSERT INTO oidc_logout (client_id, sub, sid, created_at, next_attempt_at) "
+            "VALUES (1, 'sub-2', 's', '2026-09-01', '2026-09-01')")
+    with pytest.raises(sqlite3.IntegrityError):  # une seule ligne par session et par appli
+        run_sql(migrated, "INSERT INTO oidc_session (sid, client_id, account_id, created_at) "
+                          "VALUES ('s', 1, 2, '2026-09-01')")
+    run_sql(migrated, "DELETE FROM account WHERE id = 2")
+    assert run_sql(migrated, "SELECT count(*) FROM oidc_session", "SELECT count(*) FROM oidc_logout") == [[(0,)], [(1,)]]
+    run_sql(migrated, "DELETE FROM oidc_client WHERE id = 1")
+    assert run_sql(migrated, "SELECT count(*) FROM oidc_logout") == [[(0,)]]

@@ -37,6 +37,8 @@ Il n'y a aucune étape de build. Pico et HTMX sont copiés dans `static/vendor/`
 | `oidc_code`, `oidc_token` | Codes d'autorisation et jetons d'accès, en empreinte |
 | `oidc_consent` | Ce qu'une personne a accepté de transmettre à une appli |
 | `oidc_key` | Clés de signature, privée chiffrée |
+| `oidc_session` | Appli où une session a servi, avec les groupes transmis : elle sera prévenue à la fermeture |
+| `oidc_logout` | File des avis de déconnexion à envoyer aux applis |
 | `account_token` | Lien à usage unique (invitation, mot de passe oublié, confirmation d'adresse). Seule son empreinte est stockée. |
 | `recovery_code` | Code de secours de la double authentification. Seule son empreinte est stockée. |
 | `access_group`, `account_access_group` | Groupes et leurs membres. `key` est la valeur transmise aux applis : elle ne change jamais. |
@@ -81,7 +83,7 @@ Gérer un compte permet d'en prendre le contrôle, car un lien d'invitation s'af
 
 ## Tâches périodiques
 
-`flask run-tasks`, lancée par le service `scheduler`, efface les connexions trop anciennes, les tentatives périmées et les liens expirés, puis envoie les emails en attente. Elle écrit aussi `data/scheduler.last`, que `/sante` utilise pour vérifier que le planificateur tourne.
+`flask run-tasks`, lancée par le service `scheduler`, efface les connexions trop anciennes, les tentatives périmées et les liens expirés, ferme les sessions trop anciennes, renvoie les avis de déconnexion en attente, puis envoie les emails en attente. Elle écrit aussi `data/scheduler.last`, que `/sante` utilise pour vérifier que le planificateur tourne.
 
 ## Serveur OIDC
 
@@ -90,6 +92,7 @@ Gérer un compte permet d'en prendre le contrôle, car un lien d'invitation s'af
 | `app/blueprints/oidc.py` | Points d'accès : découverte, `authorize`, `token`, `userinfo`, `jwks`, consentement |
 | `app/services/oidc_server.py` | Branchement d'Authlib, et ce qui y est resserré |
 | `app/services/oidc.py` | Clés, applis, consentements, jetons, informations transmises |
+| `app/services/logout.py` | Déconnexion des applis : sessions d'appli, file des avis, envoi |
 | `app/blueprints/applications.py` | Écran « Applications » |
 
 **Ce qui est accepté :** Authorization Code avec PKCE S256 uniquement, pour des clients qui ont un secret (`client_secret_basic` ou `client_secret_post`), avec le scope `openid`. Pas de refresh token, pas de `request`, pas de `response_mode` autre que `query`.
@@ -111,6 +114,28 @@ Gérer un compte permet d'en prendre le contrôle, car un lien d'invitation s'af
 **Clés :** renouvelées tous les 90 jours par `flask run-tasks`, ou à la main. Une clé retirée perd sa partie privée et reste publiée 30 jours.
 
 **Retour vers l'appli :** après un formulaire, il passe par `/oidc/reprendre`, une page à rafraîchissement automatique. Chrome applique `form-action 'self'` à toutes les redirections qui suivent un formulaire : cette nouvelle navigation évite d'assouplir la CSP.
+
+### Déconnexion
+
+**`sid` :** chaque `LoginSession` a un identifiant public, mis dans le jeton d'identité. Son jeton secret (`id`) ne quitte jamais le cookie : les formulaires « fermer cette session » désignent aussi la session par `sid`.
+
+**Ce qui est noté :** à chaque échange de code, `oidc_session` retient la session, l'appli et les groupes transmis (si le scope `groups` a été demandé). Un code dont la session a été fermée entre-temps est refusé.
+
+**Ce qui déclenche un avis :**
+
+| Événement | Où |
+|---|---|
+| Session fermée, de quelque façon que ce soit : déconnexion, appareil retiré, mot de passe changé ou réinitialisé, compte coupé, « déconnecter tout le monde », session trop ancienne, nouvelle connexion sur le même navigateur | `services/sessions.py`, seul endroit qui supprime des `LoginSession` (`_close`) |
+| Accès perdu (groupe retiré, appli fermée ou modifiée) : jetons annulés en plus | `logout.review_access` |
+| Groupes transmis changés, accès conservé : l'appli reconnecte la personne sans rien lui demander | `logout.review_access` |
+| Autorisation retirée depuis Mon compte | `logout.end_client_sessions` |
+| Session disparue sans passer par `sessions.py` (filet de sécurité) | `logout.orphans`, dans `flask run-tasks` |
+
+**Envoi :** l'avis attend dans `oidc_logout`, puis part en tâche de fond juste après la requête. Un avis non reçu est réessayé par `flask run-tasks` (1 min, 5 min, 15 min, 1 h, 3 h, puis toutes les 6 h), et abandonné au bout de 3 jours avec une entrée au journal. Chaque essai signe un nouveau jeton (`typ: logout+jwt`, valable 2 minutes, `jti` unique, sans `nonce`). Une redirection compte comme un échec : l'avis ne va qu'à l'adresse déclarée. Un avis réservé par un worker ne part pas une seconde fois en même temps.
+
+**Déconnexion demandée par l'appli (`/oidc/deconnexion`) :** sans confirmation seulement si son `id_token_hint` désigne la personne et la session en cours ; sinon la personne confirme, pour qu'un simple lien ne déconnecte personne. Le jeton peut être expiré, mais il doit être signé par une clé encore publiée. Un jeton de déconnexion n'est jamais accepté à sa place. `post_logout_redirect_uri` n'est suivie que si elle a été déclarée par l'appli, désignée par `client_id` ou par le jeton.
+
+**Suppression d'une appli :** seulement une fois fermée, car la fermeture prévient chacun. Les avis encore en attente à ce moment sont effacés avec elle.
 
 ## Différences avec l'Inventaire
 

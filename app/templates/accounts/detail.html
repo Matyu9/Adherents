@@ -84,7 +84,7 @@
     <td data-label="Connecté le"><small>{{ s.created_at | datetime_fr }}</small></td>
     <td data-label="Dernière activité"><small>{{ (s.last_seen_at or s.created_at) | datetime_fr }}</small></td>
     <td data-label="" class="actions">{% if manage and s.id != current_user.session_token %}
-      <form method="post" action="{{ url_for('accounts.revoke_session', account_id=account.id, session_id=s.id) }}">
+      <form method="post" action="{{ url_for('accounts.revoke_session', account_id=account.id, sid=s.sid) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="link-button">Déconnecter</button>
       </form>{% endif %}</td>

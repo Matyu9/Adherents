@@ -56,7 +56,8 @@ class CodeForm(FlaskForm):
 
 # Les pages du serveur OIDC traitent elles-mêmes ces règles : elles doivent pouvoir répondre à l'appli cliente.
 ALWAYS_OPEN = ("auth.logout", "auth.token_link", "static", "csp.report", "settings.logo_file", "oidc.discovery",
-               "oidc.jwks", "oidc.authorize", "oidc.resume", "oidc.token", "oidc.userinfo")
+               "oidc.jwks", "oidc.authorize", "oidc.resume", "oidc.token", "oidc.userinfo", "oidc.end_session",
+               "oidc.end_session_confirm")
 
 
 @bp.before_app_request

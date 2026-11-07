@@ -9,6 +9,10 @@
     {{ field(form.name) }}
     {{ field(form.redirect_uris, rows=3) }}
     <p class="muted small">Comparées à l'identique. En https, ou en http sur localhost pour un essai.</p>
+    {{ field(form.post_logout_redirect_uris, rows=2) }}
+    <p class="muted small">Où l'application peut renvoyer la personne après l'avoir déconnectée. Mêmes règles.</p>
+    {{ field(form.backchannel_logout_uri) }}
+    <p class="muted small">Adresse que ce serveur appelle quand une session se ferme, quand un compte est coupé ou quand ses groupes changent. Sans elle, l'application n'est pas prévenue.</p>
     <fieldset class="choices">
       <legend>Groupes autorisés à s'y connecter</legend>
       {% for g in all_groups %}

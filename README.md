@@ -9,9 +9,13 @@ Elle ne gère pas les paiements.
 
 ## État du projet
 
-**La phase 0, le socle, est terminée.** L'appli démarre et offre la connexion, Mon compte, les notifications, le journal, les rôles, les paramètres et la page d'état de l'installation.
+Déjà en place :
 
-**Il n'y a encore aucune fonction « métier »** : ni annuaire, ni inscriptions, ni serveur OIDC. Les comptes ne se créent pour l'instant qu'en ligne de commande (`flask create-admin`). La suite est décrite dans le [plan du projet](docs/plan.md).
+- **le socle** : connexion, Mon compte, notifications, journal, rôles, paramètres, état de l'installation ;
+- **les comptes** : invitations, mot de passe oublié, groupes, sessions révocables, double authentification obligatoire pour qui administre ;
+- **le serveur OIDC** : les applis de l'association s'y connectent (Authorization Code avec PKCE), et sont prévenues quand une session se ferme (Back-Channel Logout).
+
+Pas encore : l'annuaire, qui attend les exports du logiciel de gestion, puis les inscriptions et l'espace adhérent. La suite est décrite dans le [plan du projet](docs/plan.md).
 
 ## Démarrage rapide (développement)
 

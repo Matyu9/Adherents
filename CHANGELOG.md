@@ -2,6 +2,22 @@
 
 Les changements notables du projet sont consignés ici. Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## 0.4.0 - non publiée : phase 4, la déconnexion
+
+### Ajouté
+
+- **Back-Channel Logout** : chaque appli où une session a servi reçoit un avis signé quand cette session se ferme (déconnexion, appareil retiré, mot de passe changé, compte coupé, « déconnecter tout le monde », session trop ancienne).
+- **Avis aussi quand l'accès change** : groupe autorisé retiré, appli fermée, groupes transmis modifiés, autorisation retirée depuis Mon compte.
+- **File d'envoi** : un avis non reçu est réessayé par `flask run-tasks` pendant 3 jours, puis abandonné et noté au journal. L'écran de l'appli affiche les avis en attente.
+- **`end_session_endpoint`** (`/oidc/deconnexion`) : une appli peut demander la déconnexion et y renvoyer la personne, sur une adresse déclarée. Sans `id_token_hint` qui désigne cette session, la personne confirme.
+- **`sid`** dans le jeton d'identité, et deux nouveaux champs dans « Applications » : adresses après déconnexion, adresse des avis.
+
+### Modifié
+
+- Les formulaires « fermer cette session » désignent la session par son `sid` public, et non plus par son jeton secret.
+- Une appli ne peut être supprimée qu'une fois fermée, pour que chacun en soit d'abord déconnecté.
+- Un code d'autorisation est refusé si sa session a été fermée avant son échange.
+
 ## 0.3.0 - non publiée : phase 3, le serveur OIDC
 
 ### Ajouté

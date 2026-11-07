@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Connexion impossible{% endblock %}
+{% block title %}{{ title or "Connexion impossible" }}{% endblock %}
 {% block content %}
 <article class="narrow">
-  <h1>Connexion impossible</h1>
+  <h1>{{ title or "Connexion impossible" }}</h1>
   <p>{{ message }}</p>
 </article>
 {% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Se déconnecter{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>Se déconnecter&nbsp;?</h1>
+  <p>{% if client %}<strong>{{ client.name }}</strong> demande{% else %}Une application demande{% endif %} à vous déconnecter. Vous êtes connecté avec le compte <strong>{{ current_user.email }}</strong>.</p>
+  <p>Vous serez aussi déconnecté des autres applications de l'association ouvertes depuis cet appareil.</p>
+  <form method="post" action="{{ url_for('oidc.end_session_confirm') }}">
+    {{ form.hidden_tag() }}
+    <input type="hidden" name="query" value="{{ query }}">
+    <div class="actions">
+      <button type="submit" name="decision" value="logout">Se déconnecter</button>
+      <button type="submit" name="decision" value="stay" class="secondary outline">Rester connecté</button>
+    </div>
+  </form>
+</article>
+{% endblock %}

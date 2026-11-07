@@ -284,7 +284,7 @@ def test_at_least_one_admin_always_remains(client, admin):
 def test_close_one_session_of_someone(app, client, admin, target):
     victim = app.test_client()
     login(victim, target)
-    session_id = db.session.scalar(db.select(LoginSession.id).filter_by(account_id=target.id))
+    session_id = db.session.scalar(db.select(LoginSession.sid).filter_by(account_id=target.id))
     client.post(f"/comptes/{target.id}/sessions/{session_id}/fermer")
     assert victim.get("/mon-compte").status_code == 302
 
@@ -292,7 +292,7 @@ def test_close_one_session_of_someone(app, client, admin, target):
 def test_close_session_of_another_account_via_wrong_url(app, client, admin, target):
     victim = app.test_client()
     login(victim, target)
-    session_id = db.session.scalar(db.select(LoginSession.id).filter_by(account_id=target.id))
+    session_id = db.session.scalar(db.select(LoginSession.sid).filter_by(account_id=target.id))
     other = make_account(email="autre@asso.test")
     client.post(f"/comptes/{other.id}/sessions/{session_id}/fermer")
     assert victim.get("/mon-compte").status_code == 200

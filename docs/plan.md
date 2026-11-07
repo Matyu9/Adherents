@@ -101,7 +101,7 @@ Les comptes et l'OIDC passent avant les inscriptions, car celles-ci s'appuient s
 - **Repris de l'Inventaire :** seulement le mécanisme des liens à usage unique. Adhérents est le serveur d'identité : rien de ce qui concerne le client OIDC, les prêts, les mots de passe provisoires, les photos, les jetons d'API, la fusion ou l'archivage n'a été repris.
 - **Reporté :** la suppression d'un compte, avec l'anonymisation de la phase 6 ; en attendant, un compte se coupe. L'import d'une liste d'adresses n'a pas été fait : les comptes des adhérents viendront de l'annuaire.
 
-### Phase 3 : serveur OIDC
+### Phase 3 : serveur OIDC (écrite, en cours de test sur la branche `phase-3-oidc`)
 
 - **Points d'accès :** découverte, `authorize`, `token`, `userinfo`, `jwks`, avec Authlib.
 - **Règles strictes :**
@@ -113,6 +113,7 @@ Les comptes et l'OIDC passent avant les inscriptions, car celles-ci s'appuient s
 - **Écran « Applications » :** déclarer un client, choisir les groupes autorisés à s'y connecter et ceux qui lui sont transmis, demander un consentement sauf pour les applis de l'association.
 - **`sub` :** un UUID opaque, jamais l'email ni l'identifiant interne. Le champ existe déjà.
 - **Tests :** code rejoué, mauvais `redirect_uri`, PKCE absent ou faux, compte coupé, personne hors groupe autorisé. La suite de conformité de l'OpenID Foundation (profil Basic OP) sert de critère de réussite.
+- **Suite de conformité, pas encore passée :** Basic OP n'envoie pas PKCE, sauf dans un test. Comme PKCE est obligatoire ici, presque tous ses tests échoueraient tels quels. À trancher : la lancer avec un point d'entrée de test sans PKCE, hors de l'appli, et un émetteur joignable par la suite.
 
 ### Phase 4 : déconnexion
 
@@ -161,7 +162,7 @@ Les nouvelles inscriptions passent par un formulaire public avec vérification d
 ## Pièges déjà repérés
 
 1. **Email partagé :** l'Inventaire lie les comptes par email vérifié. Si la fiche d'un enfant porte l'adresse du parent, le parent récupérerait cette fiche et ses prêts. D'où le pré-remplissage de `oidc_sub` en phase 5, avant toute connexion.
-2. **`form-action 'self'` :** Chrome applique cette règle aux redirections après un formulaire. Le login POST suivi d'une redirection vers l'appli cliente serait bloqué. Il faudra adapter la CSP du serveur OIDC en phase 3, et le vérifier avec Playwright sous Chrome.
+2. **`form-action 'self'` :** Chrome applique cette règle aux redirections après un formulaire. Le login POST suivi d'une redirection vers l'appli cliente serait bloqué. Résolu en phase 3 sans toucher à la CSP : après un formulaire, le retour passe par une page intermédiaire (`/oidc/reprendre`), vérifié avec Playwright sous Chromium.
 3. **Adresse de l'émetteur :** elle est liée aux `sub` enregistrés dans chaque appli et ne doit plus changer ensuite. Il faut la choisir avant la production.
 4. **Panne d'Adhérents :** les sessions déjà ouvertes dans l'Inventaire continuent, mais plus personne ne peut se connecter. Sa sauvegarde devient critique, clés de signature comprises.
 5. **Une seule appli pour l'OIDC et les IBAN :** une faille exposerait les deux. C'est une raison de plus de ne pas conserver les IBAN après le transfert.

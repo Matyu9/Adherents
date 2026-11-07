@@ -2,6 +2,23 @@
 
 Les changements notables du projet sont consignés ici. Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## 0.3.0 - non publiée : phase 3, le serveur OIDC
+
+### Ajouté
+
+- **Serveur OIDC avec Authlib** : découverte, `authorize`, `token`, `userinfo`, `jwks`. Uniquement Authorization Code avec PKCE S256.
+- **Écran Applications** : déclarer une appli, choisir les groupes autorisés et ceux qui lui sont transmis, secret affiché une seule fois, fermeture, suppression.
+- **Consentement** pour les applis tierces, à retirer depuis Mon compte. Les applis de l'association en sont dispensées.
+- **Clés de signature RS256** chiffrées en base, renouvelées tous les 90 jours ou à la demande (`flask oidc-rotate-key`).
+- **Droit `client.manage`**, qui impose la double authentification.
+- **`OIDC_ISSUER`** : l'identité du serveur, à choisir avant de brancher une appli.
+
+### Sécurité
+
+- Codes, jetons d'accès et secrets stockés en empreinte. Un code vaut 60 secondes, ne sert qu'une fois, et son rejeu annule ses jetons.
+- `/oidc/userinfo` revérifie à chaque appel le compte, l'appli et les groupes : couper un compte ou le retirer d'un groupe prend effet aussitôt.
+- Un groupe utilisé par une appli ne peut plus être supprimé.
+
 ## 0.2.0 - 2026-11-06 : phase 2, les comptes
 
 ### Ajouté

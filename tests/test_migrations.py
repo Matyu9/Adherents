@@ -104,6 +104,24 @@ def test_last_migration_can_be_undone_on_a_filled_database(migrated):
         assert_data_intact(migrated)
 
 
+def test_oidc_tables_cascade_on_the_real_schema(migrated):
+    """Une appli ou un compte supprimé ne laisse ni code, ni jeton, ni consentement derrière lui."""
+    upgrade(MIGRATIONS)
+    run_sql(migrated, *SEED)
+    run_sql(migrated,
+            "INSERT INTO oidc_client (id, client_id, secret_hash, name, redirect_uris, first_party, active) "
+            "VALUES (1, 'c', 'h', 'Appli', '[]', 0, 1)",
+            "INSERT INTO oidc_code (id, client_id, account_id, redirect_uri, scope, code_challenge, "
+            "code_challenge_method, auth_time, expires_at) VALUES ('code', 1, 2, 'u', 'openid', 'x', 'S256', 1, '2026-09-01')",
+            "INSERT INTO oidc_token (id, client_id, account_id, code_id, scope, expires_at) "
+            "VALUES ('jeton', 1, 2, 'code', 'openid', '2026-09-01')",
+            "INSERT INTO oidc_consent (account_id, client_id, scope, granted_at) VALUES (2, 1, 'email', '2026-09-01')")
+    run_sql(migrated, "DELETE FROM oidc_code WHERE id = 'code'")
+    assert run_sql(migrated, "SELECT code_id FROM oidc_token") == [[(None,)]]  # le jeton survit à la purge de son code
+    run_sql(migrated, "DELETE FROM oidc_client WHERE id = 1")
+    assert run_sql(migrated, "SELECT COUNT(*) FROM oidc_token", "SELECT COUNT(*) FROM oidc_consent") == [[(0,)], [(0,)]]
+
+
 def test_constraints_of_the_real_schema(migrated):
     upgrade(MIGRATIONS)
     run_sql(migrated, *SEED)

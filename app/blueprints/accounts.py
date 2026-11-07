@@ -9,7 +9,7 @@ from wtforms.validators import DataRequired, Length, Regexp, ValidationError
 from ..extensions import db, fold_contains
 from ..models import AccessGroup, Account, AccountToken, Activity, Role
 from ..permissions import can, require
-from ..services import accounts, groups, mailer, roles, sessions, totp
+from ..services import accounts, groups, mailer, oidc, roles, sessions, totp
 from ..services.activity import diff, log
 
 bp = Blueprint("accounts", __name__, url_prefix="/comptes")
@@ -168,6 +168,7 @@ def cut(account_id):
         account.active = False
         sessions.revoke(account)
         accounts.revoke(account)
+        oidc.revoke_tokens(account=account)
         log("account.cut", f"Compte coupé : {account.full_name}", target=account)
         db.session.commit()
         flash(f"Le compte de {account.full_name} est coupé.", "success")

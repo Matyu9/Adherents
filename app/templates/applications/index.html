@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Applications{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Applications connectées</h1>
+    <p class="muted">Les applis qui utilisent ce serveur pour connecter les personnes. Seuls les membres des groupes autorisés y entrent.</p>
+  </div>
+  <a href="{{ url_for('applications.create') }}" role="button">+ Nouvelle application</a>
+</div>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Application</th><th>État</th><th>Groupes autorisés</th><th>Consentement</th></tr></thead>
+  <tbody>
+  {% for c in clients %}
+  <tr>
+    <td data-label="Application"><a href="{{ url_for('applications.detail', client_pk=c.id) }}"><strong>{{ c.name }}</strong></a></td>
+    <td data-label="État">{% if c.active %}<span class="badge badge-ok">Ouverte</span>{% else %}<span class="badge">Fermée</span>{% endif %}</td>
+    <td data-label="Groupes autorisés">{% if c.allowed_groups %}<span class="badge-list">{% for g in c.allowed_groups %}<span class="badge">{{ g.name }}</span>{% endfor %}</span>{% else %}<span class="muted">Aucun : personne n'y entre</span>{% endif %}</td>
+    <td data-label="Consentement">{{ "Non demandé" if c.first_party else "Demandé" }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">Aucune application pour l'instant.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+
+<h2>Configuration des applis</h2>
+<p class="muted small">Émetteur : <code>{{ issuer }}</code><br>Adresse de découverte : <code>{{ discovery }}</code></p>
+<p class="muted small">L'émetteur ne doit plus changer une fois des applis branchées.</p>
+
+<h2>Clés de signature</h2>
+<p class="muted">Elles signent les jetons d'identité. La clé se renouvelle seule tous les 90 jours. À faire à la main en cas de doute sur sa sécurité.</p>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Identifiant</th><th>Créée le</th><th>État</th></tr></thead>
+  <tbody>
+  {% for k in keys %}
+  <tr>
+    <td data-label="Identifiant"><code>{{ k.kid[:16] }}…</code></td>
+    <td data-label="Créée le">{{ k.created_at.strftime("%d/%m/%Y") }}</td>
+    <td data-label="État">{% if k.retired_at %}Retirée le {{ k.retired_at.strftime("%d/%m/%Y") }}{% else %}<span class="badge badge-ok">En service</span>{% endif %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="3" class="muted">Aucune clé : la première sera créée à la première connexion.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+<div class="actions">
+  <form method="post" action="{{ url_for('applications.rotate_key') }}" data-confirm="Mettre une nouvelle clé en service ?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="secondary">Renouveler la clé</button>
+  </form>
+</div>
+{% endblock %}

@@ -6,7 +6,7 @@ from urllib.parse import urljoin, urlsplit
 import pytest
 
 from app.extensions import db
-from app.models import AccessGroup, Notification, Role
+from app.models import AccessGroup, Notification, OidcClient, OidcConsent, Role
 from app.services.activity import log
 
 from .conftest import login, make_account
@@ -17,10 +17,15 @@ ANONYMOUS = "anonyme"
 # Qui a accès à quoi. Une route absente de ce tableau fait échouer les tests : tout nouvel écran doit se déclarer ici.
 PUBLIC, LOGGED_IN, ADMIN_ONLY = "public", "connecté", "admin"
 SETTINGS, JOURNAL, HIDDEN = "settings.manage", "activity.view", "caché"  # caché : 404 pour qui n'a pas settings.manage
-ACCOUNTS, GROUPS = "account.manage", "group.manage"
+ACCOUNTS, GROUPS, CLIENTS = "account.manage", "group.manage", "client.manage"
 ACCESS = {
     "static": PUBLIC, "auth.login": PUBLIC, "csp.report": PUBLIC, "settings.logo_file": PUBLIC,
     "auth.two_factor": PUBLIC, "auth.forgot": PUBLIC, "auth.token_link": PUBLIC,
+    "oidc.discovery": PUBLIC, "oidc.jwks": PUBLIC, "oidc.authorize": PUBLIC, "oidc.resume": PUBLIC, "oidc.token": PUBLIC,
+    "oidc.userinfo": PUBLIC, "oidc.consent": LOGGED_IN,
+    **{f"applications.{name}": CLIENTS for name in ("index", "create", "detail", "edit", "new_secret", "toggle", "delete",
+                                                    "rotate_key")},
+    "account.revoke_consent": LOGGED_IN,
     "auth.logout": LOGGED_IN, "auth.password": LOGGED_IN, "dashboard.index": LOGGED_IN,
     "account.index": LOGGED_IN, "account.display": LOGGED_IN, "account.revoke_session": LOGGED_IN,
     "account.revoke_others": LOGGED_IN, "account.change_email": LOGGED_IN, "account.verify_email": LOGGED_IN,
@@ -36,9 +41,9 @@ ACCESS = {
     "settings.revoke_sessions": SETTINGS,
     "health.as_json": HIDDEN, "health.page": HIDDEN,
 }
-HOLDERS = {SETTINGS: {A}, JOURNAL: {A, G}, ADMIN_ONLY: {A}, HIDDEN: {A}, ACCOUNTS: {A}, GROUPS: {A}}
+HOLDERS = {SETTINGS: {A}, JOURNAL: {A, G}, ADMIN_ONLY: {A}, HIDDEN: {A}, ACCOUNTS: {A}, GROUPS: {A}, CLIENTS: {A}}
 ARGUMENTS = {"filename": "css/app.css", "key": "adherent", "session_id": "inconnue", "name": "absent",
-             "account_id": 1, "group_id": 999, "token": "inconnu"}
+             "account_id": 1, "group_id": 999, "token": "inconnu", "client_pk": 999}
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
 SENDS_TO_LOGIN = {"auth.logout", "auth.two_factor", "auth.token_link"}
 
@@ -58,7 +63,7 @@ def test_every_route_is_declared(app):
 
 def test_every_declared_permission_exists():
     from app.permissions import PERMISSIONS
-    assert {SETTINGS, JOURNAL, ACCOUNTS, GROUPS} <= set(PERMISSIONS)
+    assert {SETTINGS, JOURNAL, ACCOUNTS, GROUPS, CLIENTS} <= set(PERMISSIONS)
 
 
 @pytest.mark.parametrize("who", [ANONYMOUS, H, G, A])
@@ -105,6 +110,11 @@ def rich(app, accounts):
     db.session.add(Role(key="regie", name="Régie <b>", description="Rôle sur <i>mesure</i>",
                         permissions=["activity.view"]))
     make_account("regie", email="regie@asso.test", first_name="Léa <script>")
+    client = OidcClient(client_id="sweep", secret_hash="x", name="Appli <b>", redirect_uris=["https://a.test/cb"])
+    db.session.add(client)
+    db.session.flush()
+    for account in accounts.values():
+        db.session.add(OidcConsent(account_id=account.id, client_id=client.id, scope="email"))
     log("settings.branding", "Apparence <em>modifiée</em>", user=accounts[A], target=accounts[H])
     for account in accounts.values():
         db.session.add(Notification(account_id=account.id, message="Dossier <b>à compléter</b>", link="/mon-compte"))
@@ -150,6 +160,7 @@ def test_crawl_every_link(app, rich, who):
     assert ("/journal" in seen) == (who in (A, G))
     assert ("/comptes" in seen) == (who == A)
     assert ("/groupes" in seen) == (who == A)
+    assert ("/applications" in seen) == (who == A)
 
 
 def test_custom_role_gets_exactly_its_rights(app, rich):

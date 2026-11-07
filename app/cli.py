@@ -2,7 +2,8 @@ import click
 
 from .extensions import db
 from .models import Account, Role
-from .services import accounts, sessions, totp
+from .services import accounts, oidc, sessions, totp
+from .services.activity import log
 
 
 def register_cli(app):
@@ -27,6 +28,14 @@ def register_cli(app):
             totp.disable(account)  # téléphone perdu : le secours doit rouvrir l'accès, le TOTP se reconfigure ensuite
         db.session.commit()
         click.echo(f"Administrateur prêt : {account.full_name} <{email}>")
+
+    @app.cli.command("oidc-rotate-key")
+    def oidc_rotate_key():
+        """Met en service une nouvelle clé de signature OIDC (l'ancienne reste publiée 30 jours)."""
+        key = oidc.rotate_key()
+        log("oidc.key_rotate", "Clé de signature renouvelée en ligne de commande")
+        db.session.commit()
+        click.echo(f"Nouvelle clé en service : {key.kid}")
 
     @app.cli.command("run-tasks")
     def run_tasks():

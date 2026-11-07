@@ -7,7 +7,7 @@ from wtforms.validators import DataRequired, Length, Regexp
 
 from ..extensions import db
 from ..models import Account, AccountToken
-from ..services import accounts, mailer, preferences, sessions, throttle
+from ..services import accounts, mailer, oidc, preferences, sessions, throttle
 from ..services import totp as totp_service
 from ..services.activity import log
 
@@ -86,7 +86,7 @@ def _render_index(profile=None, email_form=None):
     return render_template("account/index.html", profile=profile or ProfileForm(obj=current_user),
                            display=_display_form(), email_form=email_form or EmailForm(formdata=None),
                            smtp=mailer.smtp_enabled(), sessions=sessions.of(current_user),
-                           device_label=sessions.device_label)
+                           device_label=sessions.device_label, consents=oidc.consents_of(current_user))
 
 
 @bp.route("", methods=["GET", "POST"])
@@ -236,6 +236,15 @@ def revoke_session(session_id):
         db.session.commit()
         flash("Appareil déconnecté.", "success")
     return redirect(url_for(".index") + "#sessions")
+
+
+@bp.route("/applications/<int:client_pk>/retirer", methods=["POST"])
+def revoke_consent(client_pk):
+    if oidc.revoke_consent(current_user, client_pk):
+        log("oidc.consent_revoked", f"{current_user.full_name} a retiré une autorisation", target=current_user)
+        db.session.commit()
+        flash("Autorisation retirée.", "success")
+    return redirect(url_for(".index") + "#applications")
 
 
 @bp.route("/sessions/fermer", methods=["POST"])

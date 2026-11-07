@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ client.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ client.name }}</h1>
+    <p>{% if client.active %}<span class="badge badge-ok">Ouverte</span>{% else %}<span class="badge">Fermée</span>{% endif %}</p>
+  </div>
+  <a href="{{ url_for('applications.edit', client_pk=client.id) }}" role="button">Modifier</a>
+</div>
+<h2>Configuration</h2>
+<p>Identifiant : <code>{{ client.client_id }}</code><br>Adresse de découverte : <code>{{ discovery }}</code></p>
+<p>Adresses de retour :</p>
+<ul>{% for uri in client.redirect_uris %}<li><code>{{ uri }}</code></li>{% endfor %}</ul>
+<h2>Accès</h2>
+<p>Groupes autorisés : {% for g in client.allowed_groups %}<span class="badge">{{ g.name }}</span> {% else %}<span class="muted">aucun, personne n'y entre</span>{% endfor %}</p>
+<p>Groupes transmis : {% for g in client.shared_groups %}<span class="badge">{{ g.name }}</span> {% else %}<span class="muted">aucun</span>{% endfor %}</p>
+<p>Consentement : {{ "non demandé (appli de l'association)" if client.first_party else "demandé à chaque personne" }}</p>
+<h2>Actions</h2>
+<div class="actions">
+  <form method="post" action="{{ url_for('applications.new_secret', client_pk=client.id) }}" data-confirm="Générer un nouveau secret ? L'ancien cessera aussitôt de fonctionner.">
+    {{ form.hidden_tag() }}<button type="submit" class="secondary">Nouveau secret</button>
+  </form>
+  <form method="post" action="{{ url_for('applications.toggle', client_pk=client.id) }}"{% if client.active %} data-confirm="Fermer cette application ? Plus personne ne pourra s'y connecter."{% endif %}>
+    {{ form.hidden_tag() }}<button type="submit" class="secondary">{{ "Fermer" if client.active else "Rouvrir" }}</button>
+  </form>
+  <form method="post" action="{{ url_for('applications.delete', client_pk=client.id) }}" data-confirm="Supprimer « {{ client.name }} » ? C'est définitif.">
+    {{ form.hidden_tag() }}<button type="submit" class="secondary outline">Supprimer</button>
+  </form>
+</div>
+{% endblock %}

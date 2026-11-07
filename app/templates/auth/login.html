@@ -9,6 +9,7 @@
     <span class="brand-text"><strong>{{ asso_name }}</strong><small>{{ branding.subtitle }}</small></span>
   </div>
   <h1>Connexion</h1>
+  {% if request.args.get("reauth") == "1" %}<p class="muted small">L'application que vous ouvrez demande de confirmer votre identité.</p>{% endif %}
   <form method="post" novalidate>
     {{ form.hidden_tag() }}
     {{ field(form.email, autocomplete="username", autofocus=true) }}

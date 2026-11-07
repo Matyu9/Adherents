@@ -95,7 +95,9 @@ small, .small { font-size: .82rem; }
 .muted { color: var(--text-3); }
 .error { color: var(--danger); }
 .icon { flex: none; vertical-align: -.2em; }
-code { background: var(--surface-2); color: var(--text); padding: .1rem .35rem; border-radius: 4px; }
+/* Une adresse longue passe à la ligne au lieu d'élargir la page sur téléphone. */
+code { display: inline; background: var(--surface-2); color: var(--text); padding: .1rem .35rem; border-radius: 4px;
+       overflow-wrap: anywhere; }
 hr { border-color: var(--border); }
 :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
@@ -183,6 +185,11 @@ button.contrast.outline:hover { background: var(--danger-bg); }
 
 article { border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.25rem; }
 .narrow { max-width: 30rem; margin: 1.5rem auto; }
+.narrow h1 { margin-bottom: 1rem; }
+.narrow .actions + .small { margin-top: 1rem; }
+.badge-list { display: flex; flex-wrap: wrap; gap: .25rem; }
+.readonly-value { font-family: var(--pico-font-family-monospace, monospace); resize: none; }
+.form-check { display: block; margin: 1rem 0; }
 
 /* Pages d'erreur (403, 404, 500…) */
 .error-card { max-width: 30rem; margin: 3rem auto; padding: 2.25rem 1.75rem; text-align: center; }
@@ -375,6 +382,9 @@ progress { height: .6rem; border-radius: 999px; }
   table.responsive td[data-label=""]::before { content: none; }
   table.responsive tbody td, table.responsive tbody tr:hover td, table.responsive.striped tbody tr:nth-child(odd) td { background: transparent; }
   table.responsive td.actions { justify-content: flex-end; padding-top: .35rem; }
+  table.responsive td > .badge-list { justify-content: flex-end; }
+  /* Doigt plutôt que souris : des actions de tableau assez hautes pour être touchées sans erreur. */
+  table.responsive td.actions .link-button, table.responsive td.actions a { padding: .35rem .25rem; }
   th, td { padding: .5rem .6rem; }
 }
 

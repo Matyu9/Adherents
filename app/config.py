@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 DEFAULT_SECRET = "dev-secret-change-me"
@@ -16,6 +17,9 @@ class Config:
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024
 
     BASE_URL = os.environ.get("BASE_URL", "http://localhost:8001").rstrip("/")
+    # Identité du serveur OIDC, inscrite dans les jetons : la changer déconnecte ce serveur de toutes les applis.
+    OIDC_ISSUER = (os.environ.get("OIDC_ISSUER") or BASE_URL).rstrip("/")
+    OAUTH2_TOKEN_EXPIRES_IN = {"authorization_code": 3600}
     # Derrière un reverse proxy (Caddy, Traefik, nginx) : faire confiance à X-Forwarded-*.
     TRUST_PROXY = os.environ.get("TRUST_PROXY", "0") == "1"
     # Noms propres à l'appli : sur localhost, les cookies ne sont pas isolés par port, et ceux de l'Inventaire
@@ -49,10 +53,15 @@ class Config:
 def startup_warnings(config):
     """Réglages incohérents qui n'empêchent pas de démarrer mais méritent d'être signalés dans les journaux."""
     warnings = []
-    if config.get("BASE_URL", "").startswith("https://") and not config.get("TRUST_PROXY"):
-        warnings.append("BASE_URL est en https:// mais TRUST_PROXY n'est pas à 1 : derrière un reverse proxy, "
+    public = (config.get("BASE_URL") or "", config.get("OIDC_ISSUER") or "")
+    if any(url.startswith("https://") for url in public) and not config.get("TRUST_PROXY"):
+        warnings.append("BASE_URL ou OIDC_ISSUER est en https:// mais TRUST_PROXY n'est pas à 1 : derrière un reverse proxy, "
                         "l'adresse des visiteurs et le protocole (cookies Secure, redirections) dépendent des "
                         "en-têtes X-Forwarded-*, ignorés sans TRUST_PROXY=1.")
+    issuer = urlsplit(config.get("OIDC_ISSUER") or "https://non-renseigne")
+    if issuer.scheme != "https" and issuer.hostname not in ("localhost", "127.0.0.1", "::1"):
+        warnings.append("OIDC_ISSUER n'est pas en https:// : les connexions OIDC seront refusées, car les applis "
+                        "clientes transmettraient leurs secrets et recevraient les jetons en clair.")
     return warnings
 
 

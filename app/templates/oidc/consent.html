@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Autoriser {{ client.name }}{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>Se connecter à {{ client.name }}</h1>
+  <p>Cette application demande à vous connecter avec votre compte <strong>{{ current_user.email }}</strong>.</p>
+  {% if lines %}
+  <p>Elle recevra&nbsp;:</p>
+  <ul>{% for line in lines %}<li>{{ line }}</li>{% endfor %}</ul>
+  {% if groups %}<p class="muted small">Groupes concernés&nbsp;:</p><p class="badge-list">{% for g in groups %}<span class="badge">{{ g }}</span>{% endfor %}</p>{% endif %}
+  {% else %}
+  <p>Elle ne recevra qu'un identifiant anonyme.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('oidc.consent') }}">
+    {{ form.hidden_tag() }}
+    <input type="hidden" name="query" value="{{ query }}">
+    <div class="actions">
+      <button type="submit" name="decision" value="allow">Autoriser</button>
+      <button type="submit" name="decision" value="deny" class="secondary outline">Refuser</button>
+    </div>
+  </form>
+  <p class="muted small">Vous pourrez retirer cette autorisation depuis Mon compte.</p>
+</article>
+{% endblock %}

@@ -7,7 +7,7 @@ from wtforms.validators import DataRequired, Length, Optional, ValidationError
 from ..extensions import db, fold
 from ..models import AccessGroup
 from ..permissions import require
-from ..services import groups
+from ..services import groups, oidc
 from ..services.activity import log
 
 bp = Blueprint("groups", __name__, url_prefix="/groupes")
@@ -72,8 +72,11 @@ def edit(group_id):
 @require("group.manage")
 def delete(group_id):
     group = db.session.get(AccessGroup, group_id) or abort(404)
+    used_by = oidc.clients_using(group)
     if group.members:
         flash(f"Ce groupe contient {len(group.members)} compte(s) : retirez-les d'abord.", "error")
+    elif used_by:
+        flash(f"Ce groupe est utilisé par {', '.join(c.name for c in used_by)} : retirez-le d'abord.", "error")
     else:
         db.session.delete(group)
         log("group.delete", f"Groupe supprimé : {group.name}")

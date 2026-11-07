@@ -14,6 +14,7 @@ PER_PAGE = 100
 FAMILIES = {
     "connexions": ("Connexions", ("auth.",)),
     "comptes": ("Comptes, groupes et rôles", ("account.", "group.", "role.", "sessions.")),
+    "applications": ("Applications connectées", ("oidc.", "client.")),
     "parametres": ("Paramètres", ("settings.",)),
 }
 

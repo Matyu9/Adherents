@@ -148,6 +148,12 @@ def test_production_starts_with_a_real_secret(tmp_path, monkeypatch):
     assert create_app(config).config["SECRET_KEY"] == "x" * 64
 
 
+def test_warning_when_issuer_is_not_https():
+    assert startup_warnings({"OIDC_ISSUER": "http://compte.asso.test", "TRUST_PROXY": True})
+    assert not startup_warnings({"OIDC_ISSUER": "https://compte.asso.test", "BASE_URL": "http://x", "TRUST_PROXY": True})
+    assert not startup_warnings({"OIDC_ISSUER": "http://localhost:8001", "BASE_URL": "http://x"})
+
+
 def test_warning_when_https_without_proxy():
     assert startup_warnings({"BASE_URL": "https://a.test", "TRUST_PROXY": False})
     assert not startup_warnings({"BASE_URL": "https://a.test", "TRUST_PROXY": True})

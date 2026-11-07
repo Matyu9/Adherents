@@ -9,7 +9,7 @@ from wtforms.validators import DataRequired, EqualTo, Length
 
 from ..extensions import db
 from ..models import Account, AccountToken
-from ..services import accounts, mailer, sessions, throttle, totp
+from ..services import accounts, mailer, oidc, sessions, throttle, totp
 from ..services.activity import log
 
 # Limitation des tentatives : au-delà de MAX_FAILURES échecs en WINDOW secondes pour un même
@@ -54,7 +54,9 @@ class CodeForm(FlaskForm):
     code = StringField("Code", validators=[DataRequired(), Length(max=40)])
 
 
-ALWAYS_OPEN = ("auth.logout", "auth.token_link", "static", "csp.report", "settings.logo_file")
+# Les pages du serveur OIDC traitent elles-mêmes ces règles : elles doivent pouvoir répondre à l'appli cliente.
+ALWAYS_OPEN = ("auth.logout", "auth.token_link", "static", "csp.report", "settings.logo_file", "oidc.discovery",
+               "oidc.jwks", "oidc.authorize", "oidc.resume", "oidc.token", "oidc.userinfo")
 
 
 @bp.before_app_request
@@ -74,6 +76,10 @@ def enforce_account_rules():
             flash("La double authentification est obligatoire pour votre rôle : configurez-la pour continuer.",
                   "warning")
         return redirect(url_for("account.totp"))
+    # « Mon compte » : c'est là que mène l'écran des codes de secours, à la fin de la double authentification.
+    if (request.method == "GET" and request.endpoint in ("dashboard.index", "account.index")
+            and (query := oidc.pop_resume()) is not None):
+        return redirect(url_for("oidc.resume") + "?" + query)  # l'étape imposée est faite : retour vers l'appli
     return None
 
 
@@ -87,8 +93,9 @@ def safe_next(target, default=None):
 
 @bp.route("/connexion", methods=["GET", "POST"])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for("dashboard.index"))
+    # `reauth` : une appli exige une nouvelle saisie. La session en cours ne change qu'une fois celle-ci réussie.
+    if current_user.is_authenticated and request.args.get("reauth") != "1":
+        return redirect(safe_next(request.args.get("next")))
     form = LoginForm()
     if form.validate_on_submit():
         email = form.email.data.strip().lower()
@@ -127,7 +134,7 @@ def _pending_account():
 
 @bp.route("/connexion/verification", methods=["GET", "POST"])
 def two_factor():
-    if current_user.is_authenticated:
+    if current_user.is_authenticated and PENDING not in session:
         return redirect(url_for("dashboard.index"))
     account = _pending_account()
     if account is None:

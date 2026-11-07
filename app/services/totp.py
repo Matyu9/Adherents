@@ -15,15 +15,13 @@ from datetime import datetime
 
 import pyotp
 import qrcode
-from cryptography.fernet import Fernet, InvalidToken
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.fernet import InvalidToken
 from flask import current_app
 
 from ..extensions import db
 from ..models import RecoveryCode
 from ..permissions import can
-from . import branding, throttle
+from . import branding, crypto, throttle
 
 PERIOD = 30
 RECOVERY_CODES = 10
@@ -33,13 +31,12 @@ failures = throttle.Limiter("totp", 5, 15 * 60)
 
 def required(account):
     """Qui peut agir sur les comptes des autres doit protéger le sien : il ouvrira toutes les applis."""
-    return account.is_admin or can(account, "account.manage") or can(account, "group.manage")
+    return (account.is_admin or can(account, "account.manage") or can(account, "group.manage")
+            or can(account, "client.manage"))
 
 
 def _fernet():
-    key = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"adherents/totp-secret").derive(
-        current_app.config["SECRET_KEY"].encode())
-    return Fernet(base64.urlsafe_b64encode(key))
+    return crypto.fernet(b"adherents/totp-secret")
 
 
 def encrypt(secret):

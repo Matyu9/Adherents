@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ "Modifier " ~ client.name if client else "Nouvelle application" }}{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>{{ "Modifier " ~ client.name if client else "Nouvelle application" }}</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.name) }}
+    {{ field(form.redirect_uris, rows=3) }}
+    <p class="muted small">Comparées à l'identique. En https, ou en http sur localhost pour un essai.</p>
+    <fieldset class="choices">
+      <legend>Groupes autorisés à s'y connecter</legend>
+      {% for g in all_groups %}
+      <label class="choice"><input type="checkbox" name="allowed_groups" value="{{ g.id }}" {{ "checked" if g in allowed }}>{{ g.name }}</label>
+      {% else %}
+      <p class="muted small">Aucun groupe : <a href="{{ url_for('groups.index') }}">créez-en un</a>, sinon personne ne pourra entrer.</p>
+      {% endfor %}
+    </fieldset>
+    <fieldset class="choices">
+      <legend>Groupes transmis à l'application</legend>
+      {% for g in all_groups %}
+      <label class="choice"><input type="checkbox" name="shared_groups" value="{{ g.id }}" {{ "checked" if g in shared }}>{{ g.name }}</label>
+      {% endfor %}
+    </fieldset>
+    <label class="form-check">{{ form.first_party() }} {{ form.first_party.label.text }}</label>
+    <button type="submit">Enregistrer</button>
+  </form>
+</article>
+{% endblock %}

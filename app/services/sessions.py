@@ -3,7 +3,7 @@ import re
 import secrets
 from datetime import datetime, timedelta
 
-from flask import current_app, request
+from flask import current_app, request, session
 from flask_login import current_user, login_user, logout_user
 
 from ..extensions import db
@@ -14,6 +14,9 @@ from .activity import log
 def start(user, remember=False, via=None):
     """Ouvre une session pour `user` sur cet appareil (à la place de login_user) et la note au journal."""
     lifetime = current_app.config.get("REMEMBER_COOKIE_DURATION", timedelta(days=365))
+    if current_user.is_authenticated:  # nouvelle connexion demandée par une appli : elle remplace la session en cours
+        db.session.execute(db.delete(LoginSession).where(LoginSession.id == current_user.session_token))
+    session.pop("oidc_resume", None)  # une demande en attente ne passe pas à la personne qui se connecte ensuite
     db.session.execute(db.delete(LoginSession).where(LoginSession.created_at < datetime.now() - lifetime))
     user.session_token = secrets.token_urlsafe(32)
     now = datetime.now()
@@ -33,6 +36,7 @@ def end():
         log("auth.logout", f"Déconnexion de {current_user.full_name}")
         db.session.execute(db.delete(LoginSession).where(LoginSession.id == current_user.session_token))
         db.session.commit()
+    session.pop("oidc_resume", None)
     logout_user()
 
 

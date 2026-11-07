@@ -72,6 +72,28 @@
   </form>
 </section>
 
+{% if consents %}
+<h2 id="applications">Applications autorisées</h2>
+<p class="muted">Ces applications ont reçu votre accord pour vous connecter. Retirer l'accord n'efface pas ce qu'elles ont déjà reçu : elles vous le redemanderont à la prochaine connexion.</p>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Application</th><th>Autorisée le</th><th></th></tr></thead>
+  <tbody>
+  {% for c in consents %}
+  <tr>
+    <td data-label="Application">{{ c.client.name }}</td>
+    <td data-label="Autorisée le">{{ c.granted_at.strftime("%d/%m/%Y") }}</td>
+    <td data-label="" class="actions">
+      <form method="post" action="{{ url_for('account.revoke_consent', client_pk=c.client_id) }}" data-confirm="Retirer l'autorisation donnée à {{ c.client.name }} ?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link-button">Retirer</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+
 <h2 id="sessions">Mes appareils connectés</h2>
 <p class="muted">Un appareil que vous ne reconnaissez pas ? Déconnectez-le, puis changez votre mot de passe.</p>
 <div class="overflow-auto"><table class="striped responsive">

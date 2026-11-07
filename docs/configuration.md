@@ -12,6 +12,7 @@ Le nom, le sous-titre, la couleur et le logo se règlent directement dans **Para
 | `BASE_URL` | `http://localhost:8001` | Adresse publique, utilisée dans les emails. En `https://`, elle active aussi les cookies `Secure`. |
 | `ASSO_NAME` | `Mon association` | Nom par défaut, tant qu'aucun n'est défini dans Paramètres → Apparence. |
 | `DATA_DIR` | `./data` (`/data` dans Docker) | Dossier de la base et des fichiers envoyés. |
+| `OIDC_ISSUER` | `BASE_URL` | Identité du serveur OIDC, inscrite dans les jetons. **À choisir avant de brancher une appli :** la changer oblige à reconfigurer toutes les applis, qui ne reconnaîtraient plus leurs comptes. Un avertissement apparaît au démarrage si elle n'est pas en `https://`, sauf sur `localhost`. |
 | `DATABASE_URL` | `sqlite:///<DATA_DIR>/adherents.db` | Adresse de la base. L'appli est conçue pour SQLite. |
 | `TZ` | `Europe/Paris` dans Docker | Fuseau horaire des dates. |
 
@@ -45,3 +46,13 @@ Le bouton **Paramètres → M'envoyer un email de test** vérifie les réglages.
 | Variable | Rôle |
 |---|---|
 | `FLASK_DEBUG` | `1` : mode de développement, qui autorise une clé secrète par défaut. **Jamais en production.** |
+
+## Serveur OIDC
+
+La sauvegarde doit couvrir la base **et** `SECRET_KEY` : les clés de signature y sont chiffrées avec une clé qui en dérive.
+
+Si `SECRET_KEY` change, la clé de signature devient illisible. Une nouvelle clé la remplace automatiquement et les applis la découvrent seules, donc les connexions continuent. Les secrets TOTP et les codes de secours, eux, restent perdus (voir plus haut).
+
+`flask oidc-rotate-key` met une nouvelle clé en service, comme le bouton de l'écran « Applications ».
+
+Pour brancher une appli : créer ses groupes, la déclarer dans « Applications », puis copier dans sa configuration l'identifiant, le secret (affiché une seule fois) et l'adresse de découverte. Elle doit envoyer PKCE avec S256, et demander le scope `groups` si elle lit les groupes.

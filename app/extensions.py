@@ -57,4 +57,6 @@ def _sqlite_begin(conn):
 def _is_write_request():
     from flask import has_request_context, request
 
-    return has_request_context() and request.method in ("POST", "PUT", "PATCH", "DELETE")
+    # Deux GET écrivent aussi : le code d'autorisation et le journal, la première clé de signature.
+    return has_request_context() and (request.method in ("POST", "PUT", "PATCH", "DELETE")
+                                      or request.endpoint in ("oidc.authorize", "oidc.jwks"))

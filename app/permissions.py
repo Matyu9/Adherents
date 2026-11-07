@@ -18,7 +18,8 @@ A, G, H = Role.ADMIN, Role.GESTIONNAIRE, Role.ADHERENT
 PERMISSION_GROUPS = [
     ("Comptes", [
         ("account.manage", "Gérer les comptes : créer, inviter, couper, fermer les sessions"),
-        ("group.manage", "Gérer les groupes, qui donneront accès aux applis de l'association"),
+        ("group.manage", "Gérer les groupes, qui donnent accès aux applis de l'association"),
+        ("client.manage", "Gérer les applications connectées et les clés de signature"),
     ]),
     ("Administration", [
         ("settings.manage", "Paramètres de l'appli"),

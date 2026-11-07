@@ -9,7 +9,7 @@ from .errors import register_error_handlers
 from .extensions import csrf, db, login_manager, migrate
 from .services import branding
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 # Aucun script ni style en ligne : les comportements passent par app.js (data-confirm, data-autosubmit…).
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
@@ -18,7 +18,8 @@ CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' 
 # Pages qui affichent ou reçoivent des données de compte : jamais gardées par le navigateur ou un proxy.
 NO_STORE = ("auth.login", "auth.password", "auth.two_factor", "auth.forgot", "auth.token_link", "account.index",
             "account.change_email", "account.totp", "account.totp_codes", "account.totp_disable", "accounts.create",
-            "accounts.invite", "accounts.detail")
+            "accounts.invite", "accounts.detail", "oidc.authorize", "oidc.resume", "oidc.consent", "applications.create",
+            "applications.new_secret")
 
 
 def create_app(config_class=Config):
@@ -41,6 +42,7 @@ def create_app(config_class=Config):
     from . import models  # noqa: F401  (enregistre les modèles pour Alembic)
     from .blueprints.account import bp as account_bp
     from .blueprints.accounts import bp as accounts_bp
+    from .blueprints.applications import bp as applications_bp
     from .blueprints.auth import bp as auth_bp
     from .blueprints.csp import bp as csp_bp
     from .blueprints.dashboard import bp as dashboard_bp
@@ -48,11 +50,13 @@ def create_app(config_class=Config):
     from .blueprints.health import bp as health_bp
     from .blueprints.journal import bp as journal_bp
     from .blueprints.notifications import bp as notifications_bp
+    from .blueprints.oidc import bp as oidc_bp
     from .blueprints.roles import bp as roles_bp
     from .blueprints.settings import bp as settings_bp
     from .cli import register_cli
     from .filters import register_filters
     from .permissions import can
+    from .services import oidc_server
     from .services.notify import unread_count
 
     app.register_blueprint(auth_bp)
@@ -66,6 +70,9 @@ def create_app(config_class=Config):
     app.register_blueprint(settings_bp)
     app.register_blueprint(health_bp)
     app.register_blueprint(csp_bp)
+    app.register_blueprint(oidc_bp)
+    app.register_blueprint(applications_bp)
+    oidc_server.init_app(app)
     register_cli(app)
     register_filters(app)
 

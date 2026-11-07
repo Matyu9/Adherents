@@ -1,7 +1,10 @@
 """Modèle de données."""
+import hashlib
+import hmac
 import uuid
 from datetime import datetime
 
+from authlib.oauth2.rfc6749 import ClientMixin
 from flask_login import UserMixin
 from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -190,6 +193,133 @@ class ThrottleEvent(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     key_hash = db.Column(db.String(64), nullable=False, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now, index=True)
+
+
+# ---------------------------------------------------------------------------
+# Serveur OIDC
+# ---------------------------------------------------------------------------
+
+oidc_client_allowed_group = db.Table(
+    "oidc_client_allowed_group",
+    db.Column("client_id", db.ForeignKey("oidc_client.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("group_id", db.ForeignKey("access_group.id", ondelete="CASCADE"), primary_key=True, index=True),
+)
+oidc_client_shared_group = db.Table(
+    "oidc_client_shared_group",
+    db.Column("client_id", db.ForeignKey("oidc_client.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("group_id", db.ForeignKey("access_group.id", ondelete="CASCADE"), primary_key=True, index=True),
+)
+
+
+class OidcClient(TimestampMixin, ClientMixin, db.Model):
+    """Appli qui délègue sa connexion à ce serveur. Les méthodes `check_*` et `get_*` sont celles qu'appelle Authlib."""
+    SCOPES = ("openid", "profile", "email", "groups")
+    AUTH_METHODS = ("client_secret_basic", "client_secret_post")
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.String(64), nullable=False, unique=True)
+    secret_hash = db.Column(db.String(64), nullable=False)  # empreinte : le secret n'est affiché qu'une fois
+    name = db.Column(db.String(80), nullable=False, unique=True)
+    redirect_uris = db.Column(db.JSON, nullable=False, default=list)
+    # Appli de l'association : la personne n'a pas à confirmer ce que l'association lui transmet déjà.
+    first_party = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
+    active = db.Column(db.Boolean, nullable=False, default=True, server_default="1")
+
+    # Aucun groupe autorisé : personne n'entre. L'accès s'accorde, il n'est jamais ouvert par défaut.
+    allowed_groups = db.relationship("AccessGroup", secondary=oidc_client_allowed_group, order_by="AccessGroup.name")
+    shared_groups = db.relationship("AccessGroup", secondary=oidc_client_shared_group, order_by="AccessGroup.name")
+
+    def get_client_id(self):
+        return self.client_id
+
+    def get_default_redirect_uri(self):
+        return None  # l'adresse de retour est toujours demandée explicitement
+
+    def get_allowed_scope(self, scope):
+        return " ".join(s for s in self.SCOPES if s in (scope or "").split())
+
+    def check_redirect_uri(self, redirect_uri):
+        return redirect_uri in self.redirect_uris  # à l'identique : ni préfixe, ni joker
+
+    def check_client_secret(self, client_secret):
+        return hmac.compare_digest(hashlib.sha256(client_secret.encode()).hexdigest(), self.secret_hash)
+
+    def check_endpoint_auth_method(self, method, endpoint):
+        return endpoint == "token" and method in self.AUTH_METHODS
+
+    def check_response_type(self, response_type):
+        return response_type == "code"
+
+    def check_grant_type(self, grant_type):
+        return grant_type == "authorization_code"
+
+
+class OidcCode(db.Model):
+    """Code d'autorisation : stocké en empreinte, à usage unique. `used_at` permet de reconnaître un code rejoué."""
+    id = db.Column(db.String(64), primary_key=True)  # empreinte du code
+    client_id = db.Column(db.ForeignKey("oidc_client.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_id = db.Column(db.ForeignKey("account.id", ondelete="CASCADE"), nullable=False, index=True)
+    redirect_uri = db.Column(db.Text, nullable=False)
+    scope = db.Column(db.String(255), nullable=False)
+    nonce = db.Column(db.Text)
+    code_challenge = db.Column(db.String(128), nullable=False)
+    code_challenge_method = db.Column(db.String(10), nullable=False)
+    auth_time = db.Column(db.Integer, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    used_at = db.Column(db.DateTime)
+
+    account = db.relationship("Account")
+    client = db.relationship("OidcClient")
+
+    def get_redirect_uri(self):
+        return self.redirect_uri
+
+    def get_scope(self):
+        return self.scope
+
+    def get_nonce(self):
+        return self.nonce
+
+    def get_auth_time(self):
+        return self.auth_time
+
+    def get_acr(self):
+        return None
+
+    def get_amr(self):
+        return None
+
+
+class OidcToken(db.Model):
+    """Jeton d'accès opaque, stocké en empreinte : il ne sert qu'à /userinfo, qui revérifie les droits à chaque appel."""
+    id = db.Column(db.String(64), primary_key=True)  # empreinte du jeton
+    client_id = db.Column(db.ForeignKey("oidc_client.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_id = db.Column(db.ForeignKey("account.id", ondelete="CASCADE"), nullable=False, index=True)
+    code_id = db.Column(db.ForeignKey("oidc_code.id", ondelete="SET NULL"), index=True)
+    scope = db.Column(db.String(255), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+
+    account = db.relationship("Account")
+    client = db.relationship("OidcClient")
+
+
+class OidcConsent(db.Model):
+    """Ce qu'une personne a accepté de transmettre à une appli. Elle peut le retirer depuis « Mon compte »."""
+    account_id = db.Column(db.ForeignKey("account.id", ondelete="CASCADE"), primary_key=True)
+    client_id = db.Column(db.ForeignKey("oidc_client.id", ondelete="CASCADE"), primary_key=True, index=True)
+    scope = db.Column(db.String(255), nullable=False)
+    granted_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    client = db.relationship("OidcClient")
+
+
+class OidcKey(db.Model):
+    """Clé de signature des jetons d'identité. Retirée, elle reste publiée sans sa partie privée, le temps que ses jetons expirent."""
+    kid = db.Column(db.String(64), primary_key=True)
+    public_jwk = db.Column(db.JSON, nullable=False)
+    private_key = db.Column(db.Text)  # chiffrée avec une clé dérivée de SECRET_KEY, effacée au retrait
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    retired_at = db.Column(db.DateTime)
 
 
 # ---------------------------------------------------------------------------

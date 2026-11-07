@@ -20,7 +20,7 @@ pytestmark = pytest.mark.e2e
 PASSWORD = "motdepasse-e2e"
 PAGES = ["/", "/mon-compte", "/mon-compte/double-authentification", "/mot-de-passe", "/notifications", "/journal",
          "/comptes", "/comptes/nouveau", "/comptes/1", "/comptes/1/modifier", "/groupes", "/groupes/nouveau",
-         "/roles", "/roles/nouveau", f"/roles/{Role.ADHERENT}/modifier", "/parametres", "/sante", "/nexiste-pas"]
+         "/applications", "/applications/nouvelle", "/roles", "/roles/nouveau", f"/roles/{Role.ADHERENT}/modifier", "/parametres", "/sante", "/nexiste-pas"]
 _app = {}
 
 

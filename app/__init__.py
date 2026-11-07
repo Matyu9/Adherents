@@ -9,7 +9,7 @@ from .errors import register_error_handlers
 from .extensions import csrf, db, login_manager, migrate
 from .services import branding
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 # Aucun script ni style en ligne : les comportements passent par app.js (data-confirm, data-autosubmit…).
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "

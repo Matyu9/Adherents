@@ -2,6 +2,17 @@
 
 Les changements notables du projet sont consignés ici. Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## 0.5.0 - non publiée : phase 5, le branchement de l'Inventaire
+
+### Ajouté
+
+- **`flask oidc-export-accounts --application <nom>`** : exporte en JSON les comptes qui ont accès à une appli, pour qu'elle les rattache à ses fiches avant la bascule. Noté au journal.
+- **Parcours de bout en bout avec le vrai Inventaire** (`tests/test_inventaire_e2e.py`) : export, rattachement, connexion, adresse partagée refusée, et les trois façons d'être déconnecté.
+
+### Modifié
+
+- `flask create-admin` envoie tout de suite les avis de déconnexion des sessions qu'il ferme.
+
 ## 0.4.0 - non publiée : phase 4, la déconnexion
 
 ### Ajouté

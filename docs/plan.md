@@ -124,7 +124,7 @@ Les comptes et l'OIDC passent avant les inscriptions, car celles-ci s'appuient s
 - **Fait aussi :** `sid` public sur chaque session, mis dans le jeton d'identité ; avis quand une autorisation est retirée ; filet de sécurité dans `flask run-tasks` pour une session disparue sans prévenir ; suppression d'une appli seulement une fois fermée.
 - **Non fait :** Front-Channel Logout (des iframes vers chaque appli), plus fragile et inutile si chaque appli reçoit les avis.
 
-### Phase 5 : branchement de l'Inventaire
+### Phase 5 : branchement de l'Inventaire (écrite le 7 novembre 2026, branches `phase-5-inventaire` ici et `phase-5-adherents` dans l'Inventaire)
 
 - **Dans l'Inventaire :** point d'accès Back-Channel Logout qui ferme ses `LoginSession`, déconnexion transmise au serveur OIDC, `external_id` sur `User`.
 - **Migration des comptes :** script avec écran de vérification, qui pré-remplit `oidc_sub`.
@@ -132,6 +132,16 @@ Les comptes et l'OIDC passent avant les inscriptions, car celles-ci s'appuient s
 - **Bascule :** `OIDC_ONLY=1` une fois validé, en gardant un administrateur local.
 - **Preuve de généralité :** brancher aussi une appli tierce standard, sans toucher à son code.
 - **Tests :** parcours Playwright avec les deux applis réelles.
+- **Fait :**
+  - ici, `flask oidc-export-accounts`, qui exporte les comptes ayant accès à une appli ;
+  - dans l'Inventaire, l'écran « Rattacher les comptes OIDC », réservé aux administrateurs. Seuls l'adresse vérifiée et le nom ensemble y sont cochés d'office ;
+  - `OIDC_LINK_BY_EMAIL=0` dans l'Inventaire : sans cela, une ligne « adresse partagée » laissée décochée aurait quand même donné la fiche de l'enfant au parent, à sa première connexion ;
+  - l'accès de secours des administrateurs, `/connexion?local=1` ;
+  - `tests/test_inventaire_e2e.py`, qui lance le vrai Inventaire dans son propre processus.
+- **Trouvé par ce parcours et corrigé dans l'Inventaire :**
+  - une fiche d'emprunteur rattachée restait inactive, et la personne était refusée ;
+  - le bouton « Se connecter avec… » redirigeait après un formulaire. C'était signalé sans être bloqué, car la CSP de l'Inventaire est en mode rapport par défaut, mais il aurait cassé sous Chrome en mode bloquant. Il passe maintenant par une page intermédiaire.
+- **Pas fait :** la preuve avec une appli tierce réelle, car il faudrait l'installer, donc Docker ou un service externe. Les tests utilisent une appli cliente Authlib générique, qui ne connaît d'Adhérents que son adresse de découverte. Reste à choisir l'appli (Nextcloud, Gitea, Grafana…).
 
 ### Phase 6 : campagnes d'inscription
 

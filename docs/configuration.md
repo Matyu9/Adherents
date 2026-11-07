@@ -57,6 +57,10 @@ Si `SECRET_KEY` change, la clé de signature devient illisible. Une nouvelle cl�
 
 Pour brancher une appli : créer ses groupes, la déclarer dans « Applications », puis copier dans sa configuration l'identifiant, le secret (affiché une seule fois) et l'adresse de découverte. Elle doit envoyer PKCE avec S256, et demander le scope `groups` si elle lit les groupes.
 
+### Rattacher les comptes d'une appli existante
+
+`flask oidc-export-accounts --application "Inventaire" > comptes.json` exporte en JSON les comptes qui ont accès à cette appli : `sub`, email, adresse vérifiée ou non, prénom et nom. L'appli s'en sert pour rattacher chacun à sa fiche avant la bascule (pour l'Inventaire : Personnes → Rattacher les comptes OIDC). Le fichier contient des données personnelles : à supprimer une fois le rattachement fait. Chaque export est noté au journal.
+
 ### Déconnexion
 
 Deux adresses facultatives, à déclarer pour chaque appli dans « Applications » :

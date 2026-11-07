@@ -2,6 +2,19 @@
 
 Les changements notables du projet sont consignés ici. Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Non publié
+
+### Ajouté
+
+- **Groupes d'un rôle** (écran Rôles) : chaque compte du rôle fait partie de ces groupes sans qu'on les coche sur sa fiche. Ils ouvrent les applis et y sont transmis comme les autres. Changer le rôle d'un compte, ou les groupes d'un rôle, prévient les applis concernées.
+- **Bouton « Exporter les comptes (JSON) »** sur la fiche de chaque appli : plus besoin de la ligne de commande.
+- **`/oidc/comptes`** : une appli autorisée (case « Peut récupérer la liste des comptes », fermée par défaut) lit elle-même la liste de ses comptes, avec son identifiant et son secret. Une appli tierce n'y voit que les personnes qui lui ont donné leur accord, et seulement ce qu'elles ont accepté.
+- Les groupes transmis figurent dans la liste des comptes.
+
+### Sécurité
+
+- Un gestionnaire ne peut attribuer qu'un rôle dont il a tous les groupes, et ne gère que des comptes dont il a tous les groupes, rôle compris.
+
 ## 0.5.0 - non publiée : phase 5, le branchement de l'Inventaire
 
 ### Ajouté

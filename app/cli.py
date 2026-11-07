@@ -52,16 +52,12 @@ def register_cli(app):
         client = db.session.scalar(db.select(OidcClient).where(db.func.fold(OidcClient.name) == fold(name.strip())))
         if client is None:
             raise click.ClickException(f"Aucune application ne s'appelle « {name} ».")
-        found = [account for account in db.session.scalars(db.select(Account).where(Account.active)
-                                                           .order_by(Account.last_name, Account.first_name))
-                 if oidc.may_access(client, account)]
-        json.dump({"issuer": oidc.issuer(), "application": client.name, "accounts": [
-            {"sub": a.sub, "email": a.email, "email_verified": a.email_verified, "first_name": a.first_name,
-             "last_name": a.last_name} for a in found]}, output, ensure_ascii=False, indent=1)
+        data = oidc.directory(client)
+        json.dump(data, output, ensure_ascii=False, indent=1)
         output.write("\n")
-        log("oidc.export", f"Comptes exportés pour {client.name} ({len(found)}) en ligne de commande")
+        log("oidc.export", f"Comptes exportés pour {client.name} ({len(data['accounts'])}) en ligne de commande")
         db.session.commit()
-        click.echo(f"{len(found)} compte(s) exporté(s) pour {client.name}.", err=True)
+        click.echo(f"{len(data['accounts'])} compte(s) exporté(s) pour {client.name}.", err=True)
 
     @app.cli.command("run-tasks")
     def run_tasks():

@@ -38,6 +38,8 @@ class Role(db.Model):
     name = db.Column(db.String(80), nullable=False, unique=True)
     description = db.Column(db.String(255))
     permissions = db.Column(db.JSON, nullable=False, default=list)
+    # Groupes dont chaque compte de ce rôle fait partie, sans les cocher un par un (voir Account.all_groups).
+    groups = db.relationship("AccessGroup", secondary="role_access_group", order_by="AccessGroup.name")
 
     @property
     def builtin(self):
@@ -50,6 +52,13 @@ class Role(db.Model):
 account_access_group = db.Table(
     "account_access_group",
     db.Column("account_id", db.ForeignKey("account.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("group_id", db.ForeignKey("access_group.id", ondelete="CASCADE"), primary_key=True, index=True),
+)
+
+
+role_access_group = db.Table(
+    "role_access_group",
+    db.Column("role_key", db.ForeignKey("role.key", ondelete="CASCADE"), primary_key=True),
     db.Column("group_id", db.ForeignKey("access_group.id", ondelete="CASCADE"), primary_key=True, index=True),
 )
 
@@ -100,6 +109,17 @@ class Account(UserMixin, TimestampMixin, db.Model):
     @property
     def initials(self):
         return f"{self.first_name[:1]}{self.last_name[:1]}".upper()
+
+    @property
+    def role_groups(self):
+        """Groupes donnés par le rôle du compte."""
+        role = db.session.get(Role, self.role)
+        return list(role.groups) if role is not None else []
+
+    @property
+    def all_groups(self):
+        """Groupes dont le compte fait vraiment partie : les siens et ceux de son rôle. C'est ce qui ouvre les applis."""
+        return sorted(set(self.groups) | set(self.role_groups), key=lambda group: group.name)
 
     @property
     def is_active(self):  # utilisé par Flask-Login
@@ -231,6 +251,8 @@ class OidcClient(TimestampMixin, ClientMixin, db.Model):
     # Appli de l'association : la personne n'a pas à confirmer ce que l'association lui transmet déjà.
     first_party = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
     active = db.Column(db.Boolean, nullable=False, default=True, server_default="1")
+    # Peut lire la liste des comptes qui y ont accès (/oidc/comptes), avec son identifiant et son secret.
+    directory_access = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
 
     # Aucun groupe autorisé : personne n'entre. L'accès s'accorde, il n'est jamais ouvert par défaut.
     allowed_groups = db.relationship("AccessGroup", secondary=oidc_client_allowed_group, order_by="AccessGroup.name")

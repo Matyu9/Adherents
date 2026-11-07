@@ -1,5 +1,8 @@
 """Applications connectées : les applis qui délèguent leur connexion à ce serveur, et les clés qui signent leurs jetons."""
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+import json
+import re
+
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 from flask_wtf import FlaskForm
 from wtforms import BooleanField, StringField, TextAreaField
 from wtforms.validators import DataRequired, Length, Optional, ValidationError
@@ -21,6 +24,7 @@ class ApplicationForm(FlaskForm):
     backchannel_logout_uri = StringField("Adresse des avis de déconnexion (Back-Channel Logout, facultatif)",
                                          validators=[Optional(), Length(max=oidc.MAX_REDIRECT_URI)])
     first_party = BooleanField("Appli de l'association : ne pas demander de consentement")
+    directory_access = BooleanField("Peut récupérer la liste des comptes qui y ont accès (avec son identifiant et son secret)")
 
     def __init__(self, *args, current=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -62,6 +66,7 @@ def _apply(form, client):
     client.post_logout_redirect_uris = list(dict.fromkeys((form.post_logout_redirect_uris.data or "").split()))
     client.backchannel_logout_uri = (form.backchannel_logout_uri.data or "").strip() or None
     client.first_party = form.first_party.data
+    client.directory_access = form.directory_access.data
     client.allowed_groups = _checked_groups("allowed_groups")
     client.shared_groups = _checked_groups("shared_groups")
 
@@ -78,6 +83,7 @@ def _snapshot(client):
     """Ce que le journal compare quand une application est modifiée."""
     return {"nom": client.name, "adresses": client.redirect_uris, "après déconnexion": client.post_logout_redirect_uris,
             "avis de déconnexion": client.backchannel_logout_uri, "association": client.first_party,
+            "liste des comptes": client.directory_access,
             "autorisés": sorted(g.key for g in client.allowed_groups),
             "transmis": sorted(g.key for g in client.shared_groups)}
 
@@ -121,7 +127,7 @@ def create():
 def detail(client_pk):
     client = _get(client_pk)
     return render_template("applications/detail.html", client=client, form=FlaskForm(), discovery=_discovery(),
-                           pending_logouts=logout.pending_for(client))
+                           pending_logouts=logout.pending_for(client), issuer=oidc.issuer())
 
 
 @bp.route("/<int:client_pk>/modifier", methods=["GET", "POST"])
@@ -131,7 +137,8 @@ def edit(client_pk):
     form = ApplicationForm(current=client, data={
         "name": client.name, "redirect_uris": "\n".join(client.redirect_uris),
         "post_logout_redirect_uris": "\n".join(client.post_logout_redirect_uris),
-        "backchannel_logout_uri": client.backchannel_logout_uri or "", "first_party": client.first_party})
+        "backchannel_logout_uri": client.backchannel_logout_uri or "", "first_party": client.first_party,
+        "directory_access": client.directory_access})
     if form.validate_on_submit():
         before = _snapshot(client)
         _apply(form, client)
@@ -154,6 +161,22 @@ def new_secret(client_pk):
     db.session.commit()
     return render_template("applications/secret.html", client=client, secret=secret, created=False,
                            discovery=_discovery())
+
+
+@bp.route("/<int:client_pk>/comptes", methods=["POST"])
+@require("client.manage")
+def export_accounts(client_pk):
+    """Le fichier que l'appli utilise pour rattacher chaque compte à sa fiche (même contenu que /oidc/comptes)."""
+    client = _get(client_pk)
+    data = oidc.directory(client)
+    log("oidc.export", f"Comptes exportés pour {client.name} ({len(data['accounts'])})")
+    db.session.commit()
+    name = re.sub(r"[^a-z0-9]+", "-", fold(client.name)).strip("-") or "application"
+    response = current_app.response_class(json.dumps(data, ensure_ascii=False, indent=1) + "\n",
+                                          mimetype="application/json")
+    response.headers["Content-Disposition"] = f'attachment; filename="comptes-{name}.json"'
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @bp.route("/<int:client_pk>/activer", methods=["POST"])

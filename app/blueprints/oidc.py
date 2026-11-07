@@ -16,7 +16,7 @@ from werkzeug.datastructures import MultiDict
 
 from ..extensions import csrf, db
 from ..models import OidcClient
-from ..services import oidc, sessions, totp
+from ..services import oidc, sessions, throttle, totp
 from ..services.activity import log
 
 bp = Blueprint("oidc", __name__)
@@ -341,3 +341,45 @@ def end_session_confirm():
     if target is None:
         return redirect(url_for("dashboard.index"))
     return render_template("oidc/continue.html", target=target)
+
+
+# ---------------------------------------------------------------------------
+# Liste des comptes, pour une appli autorisée à la lire
+# ---------------------------------------------------------------------------
+
+_directory_failures = throttle.Limiter("directory", 10, 15 * 60)
+
+
+def _directory_refused(status, error):
+    response = jsonify(error=error)
+    response.status_code = status
+    response.headers["Cache-Control"] = "no-store"
+    if status == 401:
+        response.headers["WWW-Authenticate"] = 'Basic realm="oidc"'
+    return response
+
+
+@bp.route("/oidc/comptes")
+def directory():
+    """Comptes qui ont accès à l'appli, pour qu'elle les rattache à ses fiches. Identifiant et secret en HTTP Basic.
+
+    Fermé par défaut : il faut cocher « Peut récupérer la liste des comptes » sur l'appli. Une appli tierce n'y voit
+    que les personnes qui lui ont donné leur accord (voir oidc.directory).
+    """
+    keys = [f"ip:{request.remote_addr}"]
+    if _directory_failures.blocked(keys):
+        return _directory_refused(429, "slow_down")
+    auth = request.authorization
+    client = oidc.find_client(auth.username) if auth is not None and auth.type == "basic" else None
+    if client is None or not client.check_client_secret(auth.password or ""):
+        _directory_failures.hit(keys)
+        db.session.commit()
+        return _directory_refused(401, "invalid_client")
+    if not client.directory_access:
+        return _directory_refused(403, "access_denied")
+    data = oidc.directory(client)
+    log("oidc.directory", f"{client.name} a récupéré la liste de ses comptes ({len(data['accounts'])})")
+    db.session.commit()
+    response = jsonify(data)
+    response.headers["Cache-Control"] = "no-store"
+    return response

@@ -60,14 +60,19 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <fieldset class="choices">
     <legend>Groupes de ce compte</legend>
+    {% set by_role = account.role_groups %}
     {% for g in all_groups %}
+    {% if g in by_role %}
+    <label class="choice"><input type="checkbox" checked disabled>{{ g.name }} <small class="muted">(par le rôle {{ account.role_label }})</small></label>
+    {% else %}
     <label class="choice"><input type="checkbox" name="groups" value="{{ g.id }}" {{ "checked" if g in account.groups }}>{{ g.name }}</label>
+    {% endif %}
     {% endfor %}
   </fieldset>
   <button type="submit" class="secondary">Enregistrer les groupes</button>
 </form>
-{% elif account.groups %}
-<p>{% for g in account.groups %}<span class="badge">{{ g.name }}</span> {% endfor %}</p>
+{% elif account.all_groups %}
+<p>{% for g in account.all_groups %}<span class="badge">{{ g.name }}{% if g in account.role_groups and g not in account.groups %} · par le rôle{% endif %}</span> {% endfor %}</p>
 {% else %}
 <p class="muted">Aucun groupe.</p>
 {% endif %}

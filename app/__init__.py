@@ -19,7 +19,7 @@ CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' 
 NO_STORE = ("auth.login", "auth.password", "auth.two_factor", "auth.forgot", "auth.token_link", "account.index",
             "account.change_email", "account.totp", "account.totp_codes", "account.totp_disable", "accounts.create",
             "accounts.invite", "accounts.detail", "oidc.authorize", "oidc.resume", "oidc.consent", "oidc.end_session", "oidc.end_session_confirm", "applications.create",
-            "applications.new_secret")
+            "applications.new_secret", "applications.export_accounts", "oidc.directory")
 
 
 def create_app(config_class=Config):

@@ -38,12 +38,49 @@ HYPOTHESIS_PROFILE=deep .venv/bin/python -m pytest tests/test_properties.py   # 
 | `test_totp.py` | Double authentification : connexion, rejeu, codes de secours, obligation par rôle, accès de secours |
 | `test_links.py` | Liens à usage unique, mot de passe oublié, changement d'adresse, `email_verified` |
 | `test_accounts_admin.py`, `test_groups.py` | Gestion des comptes et des groupes, et qui peut gérer qui |
+| `test_oidc.py`, `test_oidc_e2e.py` | Serveur OIDC : le parcours complet, puis tout ce qui doit être refusé ; dans un navigateur, avec une appli cliente Authlib |
+| `test_logout.py`, `test_logout_e2e.py` | Déconnexion : chaque façon de fermer une session prévient les bonnes applis, file d'envoi, `end_session_endpoint` |
+| `test_inventaire_e2e.py` | Le vrai Inventaire, lancé dans son propre processus : rattachement, connexion, déconnexions. Ignoré si `INVENTAIRE_DIR` (par défaut `../Inventaire`) n'a pas de `.venv` |
 | `test_properties.py` | Propriétés sur des données générées, avec Hypothesis |
 | Les autres | Un fichier par domaine : rôles, compte, journal, paramètres, emails, santé, erreurs, rapports CSP, CLI |
 
 Dans les tests comme en production, un administrateur a la double authentification : `make_account` la configure et `login` saisit le code. Elle n'a pas de réglage pour la désactiver.
 
 Le client de test (`conftest.py`) oublie l'utilisateur en cache et annule toute écriture non validée après chaque requête. Sans ça, une session révoquée resterait connectée dans les tests et un `commit` oublié passerait inaperçu.
+
+## Essayer avec l'Inventaire en local
+
+Les deux applis tournent côte à côte, sur `127.0.0.1` uniquement. Utilisez des dossiers de données à part, pour ne toucher ni aux bases habituelles ni au `.env` de l'Inventaire (`FLASK_SKIP_DOTENV=1`).
+
+1. **Adhérents**, sur le port 8001 :
+
+   ```sh
+   export FLASK_APP=wsgi.py FLASK_SKIP_DOTENV=1 DATA_DIR=/tmp/essai/adherents SECRET_KEY=une-cle-locale-assez-longue
+   export BASE_URL=http://127.0.0.1:8001 OIDC_ISSUER=http://127.0.0.1:8001
+   .venv/bin/flask db upgrade && .venv/bin/flask create-admin
+   .venv/bin/flask run --port 8001
+   ```
+
+2. Dans **Applications → Nouvelle application**, déclarez l'Inventaire :
+   - adresse de retour : `http://127.0.0.1:8000/connexion/oidc/retour` ;
+   - adresse après déconnexion : `http://127.0.0.1:8000/connexion` ;
+   - adresse des avis de déconnexion : `http://127.0.0.1:8000/connexion/oidc/deconnexion` ;
+   - un groupe autorisé, dont vos comptes d'essai font partie.
+
+   Notez l'identifiant et le secret.
+
+3. **L'Inventaire**, sur le port 8000, depuis son dossier :
+
+   ```sh
+   export FLASK_APP='app:create_app()' FLASK_SKIP_DOTENV=1 DATA_DIR=/tmp/essai/inventaire SECRET_KEY=une-autre-cle-locale
+   export BASE_URL=http://127.0.0.1:8000 OIDC_PROVIDER_NAME=Adhérents OIDC_SCOPES='openid email profile groups'
+   export OIDC_DISCOVERY_URL=http://127.0.0.1:8001/.well-known/openid-configuration
+   export OIDC_CLIENT_ID=<identifiant> OIDC_CLIENT_SECRET=<secret> OIDC_LINK_BY_EMAIL=0
+   .venv/bin/flask db upgrade
+   .venv/bin/flask run --port 8000
+   ```
+
+Ouvrez les deux applis par `127.0.0.1`, et non `localhost` : c'est l'adresse déclarée. Les cookies des deux applis ne se mélangent pas, car Adhérents a ses propres noms de cookies. Pour le rattachement des comptes et les rôles par groupes, suivez `docs/oidc-adherents.md` dans l'Inventaire.
 
 ## Ajouter un écran
 

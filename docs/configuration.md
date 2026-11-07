@@ -57,9 +57,30 @@ Si `SECRET_KEY` change, la clé de signature devient illisible. Une nouvelle cl�
 
 Pour brancher une appli : créer ses groupes, la déclarer dans « Applications », puis copier dans sa configuration l'identifiant, le secret (affiché une seule fois) et l'adresse de découverte. Elle doit envoyer PKCE avec S256, et demander le scope `groups` si elle lit les groupes.
 
+### Donner un rôle dans une appli
+
+Adhérents ne décide que de qui entre. C'est l'appli qui donne les droits, d'après les groupes qu'elle reçoit :
+
+1. Créez le groupe dans **Groupes**. Sa **clé** (par exemple `inventaire-admins`) est la valeur transmise : elle ne change jamais, même si le groupe est renommé.
+2. Ajoutez-y les personnes, depuis leur fiche dans **Comptes**. Ou bien, dans **Rôles**, cochez ce groupe sur un rôle : chaque compte de ce rôle en fait alors partie, sans rien cocher sur sa fiche. Sur la fiche, ces groupes apparaissent « par le rôle », et ne se retirent qu'en changeant le rôle ou ses groupes.
+3. Dans **Applications**, cochez ce groupe parmi les **groupes transmis**. Il doit aussi être autorisé, sauf si ces personnes sont déjà dans un autre groupe autorisé.
+4. Dans l'appli, associez la clé au rôle voulu. Pour l'Inventaire, c'est le champ « Groupes OIDC » de l'écran Rôles, ou `OIDC_ADMIN_GROUPS`.
+
+Quand les groupes transmis d'une personne changent, l'appli reçoit un avis de déconnexion. C'est aussi le cas quand on change son rôle, ou les groupes de son rôle. La personne se reconnecte sans rien ressaisir et reçoit son nouveau rôle.
+
+Seul un administrateur modifie les groupes d'un rôle. Un gestionnaire ne peut attribuer qu'un rôle dont il a lui-même tous les groupes : sinon, il ferait de quelqu'un un administrateur de l'Inventaire sans l'être.
+
 ### Rattacher les comptes d'une appli existante
 
-`flask oidc-export-accounts --application "Inventaire" > comptes.json` exporte en JSON les comptes qui ont accès à cette appli : `sub`, email, adresse vérifiée ou non, prénom et nom. L'appli s'en sert pour rattacher chacun à sa fiche avant la bascule (pour l'Inventaire : Personnes → Rattacher les comptes OIDC). Le fichier contient des données personnelles : à supprimer une fois le rattachement fait. Chaque export est noté au journal.
+Avant la bascule, l'appli rattache chaque compte à sa fiche (pour l'Inventaire : Personnes → Rattacher les comptes OIDC). Elle a besoin de la liste des comptes qui y ont accès : `sub`, email, adresse vérifiée ou non, prénom, nom et groupes transmis. Trois façons de la lui donner :
+
+| Façon | Comment |
+|---|---|
+| L'appli la récupère elle-même | Cochez « Peut récupérer la liste des comptes » sur l'appli. Elle la lit sur `<OIDC_ISSUER>/oidc/comptes`, avec son identifiant et son secret en HTTP Basic. Pour l'Inventaire, renseignez `OIDC_ACCOUNTS_URL`. Fermé par défaut, et limité contre les essais de secret. |
+| Bouton | **Applications → l'appli → Exporter les comptes (JSON)**, puis envoyer le fichier dans l'appli. |
+| Ligne de commande | `flask oidc-export-accounts --application "Inventaire" > comptes.json` |
+
+Une appli de l'association voit tous ses comptes. Une appli tierce ne voit que les personnes qui lui ont donné leur accord, et seulement ce qu'elles ont accepté de transmettre : la liste n'en dit pas plus que la connexion. Chaque lecture et chaque export sont notés au journal. Un fichier exporté contient des données personnelles : à supprimer une fois le rattachement fait.
 
 ### Déconnexion
 

@@ -25,7 +25,7 @@ def purge_expired_logins(now=None):
     """Efface les connexions (à l'appli et aux applis clientes), déconnexions et échecs trop anciens."""
     limit = (now or datetime.now()) - timedelta(days=LOGIN_RETENTION_DAYS)
     return db.session.execute(db.delete(Activity).where(
-        db.or_(Activity.action.startswith("auth."), Activity.action.in_(("oidc.authorize", "oidc.replay"))),
+        db.or_(Activity.action.startswith("auth."), Activity.action.in_(("oidc.authorize", "oidc.replay", "oidc.directory"))),
         Activity.created_at < limit)).rowcount
 
 

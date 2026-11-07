@@ -9,7 +9,7 @@ from flask import current_app, url_for
 from sqlalchemy import and_, exists
 
 from ..extensions import db
-from ..models import Account, AccountToken
+from ..models import Account, AccountToken, Role
 from ..permissions import can, permissions_of
 from . import branding, mailer, roles
 
@@ -38,15 +38,21 @@ def can_manage(actor, target):
     if target.is_admin or not can(actor, "account.manage"):
         return False
     return (permissions_of(target.role) <= permissions_of(actor.role)
-            and {g.id for g in target.groups} <= {g.id for g in actor.groups})
+            and {g.id for g in target.all_groups} <= {g.id for g in actor.all_groups})
 
 
 def assignable_roles(actor):
-    """Rôles que `actor` peut attribuer : jamais plus de droits que les siens."""
+    """Rôles que `actor` peut attribuer : jamais plus de droits que les siens, ni des groupes qu'il n'a pas.
+
+    Sans la règle des groupes, un rôle qui porte « Admins de l'Inventaire » ferait de n'importe qui un administrateur
+    de l'Inventaire, attribué par quelqu'un qui ne l'est pas.
+    """
     if actor.is_admin:
         return roles.choices()
-    own = permissions_of(actor.role)
-    return [(key, name) for key, name in roles.choices(include_admin=False) if permissions_of(key) <= own]
+    own, own_groups = permissions_of(actor.role), {g.id for g in actor.all_groups}
+    return [(role.key, role.name) for role in roles.all_roles()
+            if role.key != Role.ADMIN and permissions_of(role.key) <= own
+            and {g.id for g in role.groups} <= own_groups]
 
 
 # ---------------------------------------------------------------------------

@@ -61,4 +61,5 @@ def _is_write_request():
         return True
     # Trois GET écrivent aussi : le code d'autorisation et le journal, la première clé de signature, la déconnexion.
     return has_request_context() and (request.method in ("POST", "PUT", "PATCH", "DELETE")
-                                      or request.endpoint in ("oidc.authorize", "oidc.jwks", "oidc.end_session"))
+                                      or request.endpoint in ("oidc.authorize", "oidc.jwks", "oidc.end_session",
+                                                              "oidc.directory"))

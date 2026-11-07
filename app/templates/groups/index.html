@@ -4,7 +4,7 @@
 <div class="page-head">
   <div>
     <h1>Groupes</h1>
-    <p class="muted">Les groupes décident qui peut entrer dans quelle appli. Les membres se choisissent sur la page de chaque compte.</p>
+    <p class="muted">Les groupes décident qui peut entrer dans quelle appli. Les membres se choisissent sur la page de chaque compte, ou viennent de leur rôle (écran Rôles).</p>
   </div>
   <a href="{{ url_for('groups.create') }}" role="button">+ Nouveau groupe</a>
 </div>
@@ -15,12 +15,14 @@
   <tr>
     <td data-label="Groupe"><span><strong>{{ g.name }}</strong>{% if g.description %}<br><small class="muted">{{ g.description }}</small>{% endif %}</span></td>
     <td data-label="Valeur transmise"><code>{{ g.key }}</code></td>
-    <td data-label="Comptes">{% if can(current_user, "account.manage") %}<a href="{{ url_for('accounts.index', groupe=g.id) }}">{{ g.members | length }}</a>{% else %}{{ g.members | length }}{% endif %}</td>
+    {% set direct, total = counts[g.id] %}
+    <td data-label="Comptes"><span>{% if can(current_user, "account.manage") %}<a href="{{ url_for('accounts.index', groupe=g.id) }}">{{ total }}</a>{% else %}{{ total }}{% endif %}
+      {% if roles_of[g.id] %}<br><small class="muted">{{ direct }} coché(s), le reste par le rôle {{ roles_of[g.id] | map(attribute="name") | join(", ") }}</small>{% endif %}</span></td>
     <td data-label="" class="actions">
       <a href="{{ url_for('groups.edit', group_id=g.id) }}">Modifier</a>
       <form method="post" action="{{ url_for('groups.delete', group_id=g.id) }}" data-confirm="Supprimer le groupe « {{ g.name }} » ?">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="link-button" {% if g.members %}disabled title="Ce groupe contient des comptes"{% endif %}>Supprimer</button>
+        <button type="submit" class="link-button" {% if g.members or roles_of[g.id] %}disabled title="Ce groupe contient des comptes ou est donné par un rôle"{% endif %}>Supprimer</button>
       </form>
     </td>
   </tr>

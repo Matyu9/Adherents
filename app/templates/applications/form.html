@@ -28,6 +28,8 @@
       {% endfor %}
     </fieldset>
     <label class="form-check">{{ form.first_party() }} {{ form.first_party.label.text }}</label>
+    <label class="form-check">{{ form.directory_access() }} {{ form.directory_access.label.text }}</label>
+    <p class="muted small">Pour qu'elle rattache chaque compte à sa fiche sans fichier à transmettre (<code>/oidc/comptes</code>). Une appli tierce n'y voit que les personnes qui lui ont donné leur accord.</p>
     <button type="submit">Enregistrer</button>
   </form>
 </article>

@@ -42,6 +42,7 @@ Il n'y a aucune étape de build. Pico et HTMX sont copiés dans `static/vendor/`
 | `account_token` | Lien à usage unique (invitation, mot de passe oublié, confirmation d'adresse). Seule son empreinte est stockée. |
 | `recovery_code` | Code de secours de la double authentification. Seule son empreinte est stockée. |
 | `access_group`, `account_access_group` | Groupes et leurs membres. `key` est la valeur transmise aux applis : elle ne change jamais. |
+| `role_access_group` | Groupes donnés par un rôle. Les groupes d'un compte (`Account.all_groups`) sont les siens plus ceux de son rôle : ce sont eux qui ouvrent les applis. |
 | `login_session` | Une connexion ouverte sur un appareil. La supprimer invalide ses cookies, même copiés ailleurs. |
 | `role` | Droits d'un rôle. Les rôles de base n'y figurent qu'une fois modifiés. |
 | `activity` | Journal : auteur, compte concerné, action, message |

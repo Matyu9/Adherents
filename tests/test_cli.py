@@ -47,7 +47,7 @@ def make_app_with_members(name="Inventaire"):
     from app.services import oidc
     members, others = AccessGroup(key="membres", name="Membres"), AccessGroup(key="autres", name="Autres")
     client = OidcClient(client_id=oidc.new_client_id(), name=name, redirect_uris=["https://i.test/retour"],
-                        allowed_groups=[members])
+                        allowed_groups=[members], shared_groups=[members], first_party=True)
     oidc.set_secret(client)
     db.session.add(client)
     db.session.commit()
@@ -69,7 +69,7 @@ def test_export_lists_only_the_accounts_that_may_enter(app):
     data = json.loads(result.stdout)
     assert data["application"] == "Inventaire" and data["issuer"] == "http://localhost:8001"
     assert data["accounts"] == [{"sub": elise.sub, "email": "elise@asso.test", "email_verified": True,
-                                 "first_name": "Élise", "last_name": "Test"}]
+                                 "first_name": "Élise", "last_name": "Test", "groups": ["membres"]}]
     assert "1 compte(s) exporté(s)" in result.stderr
     from app.models import Activity
     assert db.session.scalar(db.select(Activity).filter_by(action="oidc.export")) is not None

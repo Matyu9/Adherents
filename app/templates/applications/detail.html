@@ -21,6 +21,12 @@
 <p>Groupes autorisés : {% for g in client.allowed_groups %}<span class="badge">{{ g.name }}</span> {% else %}<span class="muted">aucun, personne n'y entre</span>{% endfor %}</p>
 <p>Groupes transmis : {% for g in client.shared_groups %}<span class="badge">{{ g.name }}</span> {% else %}<span class="muted">aucun</span>{% endfor %}</p>
 <p>Consentement : {{ "non demandé (appli de l'association)" if client.first_party else "demandé à chaque personne" }}</p>
+<h2>Comptes</h2>
+<p>Liste des comptes pour l'appli : {% if client.directory_access %}l'appli peut la récupérer elle-même sur <code>{{ issuer }}/oidc/comptes</code>, avec son identifiant et son secret.{% else %}<span class="muted">l'appli ne peut pas la récupérer elle-même (voir Modifier).</span>{% endif %}</p>
+<form method="post" action="{{ url_for('applications.export_accounts', client_pk=client.id) }}">
+  {{ form.hidden_tag() }}<button type="submit" class="secondary outline">Exporter les comptes (JSON)</button>
+</form>
+<p class="muted small">Le fichier contient des noms et des adresses : supprimez-le une fois le rattachement fait dans l'appli.</p>
 <h2>Actions</h2>
 <div class="actions">
   <form method="post" action="{{ url_for('applications.new_secret', client_pk=client.id) }}" data-confirm="Générer un nouveau secret ? L'ancien cessera aussitôt de fonctionner.">

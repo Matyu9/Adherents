@@ -95,7 +95,7 @@ def world(tmp_path_factory):
                             redirect_uris=[f"{inventaire}/connexion/oidc/retour"],
                             post_logout_redirect_uris=[f"{inventaire}/connexion"],
                             backchannel_logout_uri=f"{inventaire}/connexion/oidc/deconnexion",
-                            allowed_groups=[group], shared_groups=[group])
+                            allowed_groups=[group], shared_groups=[group], directory_access=True)
         secret = oidc.set_secret(client)
         db.session.add_all([*accounts, client])
         db.session.commit()
@@ -108,7 +108,8 @@ def world(tmp_path_factory):
                DATA_DIR=str(data), BASE_URL=inventaire, ASSO_NAME="Harmonie e2e",
                OIDC_DISCOVERY_URL=f"{issuer}/.well-known/openid-configuration", OIDC_CLIENT_ID=client_id,
                OIDC_CLIENT_SECRET=secret, OIDC_PROVIDER_NAME="Adhérents", OIDC_SCOPES="openid email profile groups",
-               OIDC_ONLY="1", OIDC_LINK_BY_EMAIL="0", PYTHONDONTWRITEBYTECODE="1")
+               OIDC_ONLY="1", OIDC_LINK_BY_EMAIL="0", PYTHONDONTWRITEBYTECODE="1",
+               OIDC_ACCOUNTS_URL=f"{issuer}/oidc/comptes")
     for command in ([str(FLASK), "db", "upgrade"], [str(PYTHON), "-c", SEED]):
         result = subprocess.run(command, cwd=INVENTAIRE, env=env, capture_output=True, text=True, timeout=120)
         assert result.returncode == 0, result.stdout + result.stderr
@@ -183,7 +184,7 @@ def inventaire_logged_in(page, world):
     return "/connexion" not in page.url
 
 
-def test_1_export_then_link_by_an_admin(page, world):
+def test_1_fetch_then_link_by_an_admin(page, world):
     export = world["tmp"] / "comptes.json"
     result = world["idp"].test_cli_runner().invoke(args=["oidc-export-accounts", "--application", "Inventaire",
                                                         "--output", str(export)])
@@ -198,8 +199,7 @@ def test_1_export_then_link_by_an_admin(page, world):
     page.click("form[method=post] button[type=submit]")
     page.wait_for_url(lambda url: "/connexion" not in url)
     page.goto(world["inventaire"] + "/utilisateurs/rattachement-oidc")
-    page.set_input_files("input[name=export]", str(export))
-    page.click("text=Voir les rattachements proposés")
+    page.click("text=Récupérer les comptes depuis Adhérents")  # sans fichier : l'inventaire lit /oidc/comptes
     page.wait_for_selector("table")
     elise = page.locator("tr", has_text="elise@e2e.test").locator("input[type=checkbox]")
     sophie = page.locator("tr", has_text="Sophie").locator("input[type=checkbox]")

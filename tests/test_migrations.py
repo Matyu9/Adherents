@@ -190,7 +190,7 @@ def test_open_sessions_get_their_own_sid_on_upgrade(migrated):
     (rows,) = run_sql(migrated, "SELECT id, sid FROM login_session ORDER BY id")
     assert [row[0] for row in rows] == ["jeton", "jeton-2"]
     assert all(row[1] for row in rows) and rows[0][1] != rows[1][1]
-    assert steps[-1] == "a0000004deconnexion"
+    assert "a0000004deconnexion" in steps
     with pytest.raises(sqlite3.IntegrityError):
         run_sql(migrated, f"INSERT INTO login_session (id, sid, account_id, created_at) "
                           f"VALUES ('jeton-3', '{rows[0][1]}', 1, '2026-09-03')")

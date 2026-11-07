@@ -74,7 +74,7 @@ def index():
         query = query.where(accounts.status_condition(status))
     group = db.session.get(AccessGroup, request.args.get("groupe", type=int) or 0)
     if group:
-        query = query.where(Account.groups.contains(group))
+        query = query.where(groups.is_member(group))  # cochés sur le compte ou donnés par le rôle
     if q := (request.args.get("q") or "").strip():
         query = query.where(or_(*(fold_contains(c, q) for c in (Account.first_name, Account.last_name, Account.email))))
     total = db.session.scalar(db.select(db.func.count()).select_from(query.subquery()))
@@ -139,6 +139,8 @@ def edit(account_id):
             accounts.revoke(account)
         if changes:
             log("account.update", f"Compte modifié : {account.full_name}", changes=changes, target=account)
+        if "role" in changes:
+            logout.review_access(accounts=[account])  # les groupes du rôle viennent ou partent avec lui
         db.session.commit()
         if "email" in changes:
             accounts.send_email_changed_notice(account, old_email)
@@ -196,6 +198,9 @@ def set_groups(account_id):
         return redirect(url_for(".detail", account_id=account.id))
     ids = request.form.getlist("groups", type=int)
     wanted = db.session.scalars(db.select(AccessGroup).where(AccessGroup.id.in_(ids))).all() if ids else []
+    # Les groupes du rôle ne sont pas des cases à cocher : une appartenance cochée avant reste telle quelle.
+    by_role = set(account.role_groups)
+    wanted = [g for g in wanted if g not in by_role] + [g for g in account.groups if g in by_role]
     added, removed = groups.set_members_of(account, wanted)
     if added or removed:
         logout.review_access(accounts=[account])  # une appli qu'il quitte, ou dont les groupes transmis changent

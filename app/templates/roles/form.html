@@ -23,6 +23,19 @@
     </fieldset>
   {% endfor %}
   </div>
+
+  <h2>Groupes</h2>
+  <p class="muted">Chaque compte de ce rôle fait partie de ces groupes, sans qu'on les coche sur sa fiche. Ce sont eux qui ouvrent les applis et y donnent des droits.</p>
+  {% if all_groups %}
+  <fieldset class="choices">
+    <legend>Groupes donnés par ce rôle</legend>
+    {% for g in all_groups %}
+    <label class="choice"><input type="checkbox" name="groups" value="{{ g.id }}" {{ "checked" if g.id in checked_groups }}>{{ g.name }}</label>
+    {% endfor %}
+  </fieldset>
+  {% else %}
+  <p class="muted small">Aucun groupe : <a href="{{ url_for('groups.index') }}">créez-en un</a>.</p>
+  {% endif %}
   <button type="submit">Enregistrer</button>
 </form>
 {% endblock %}

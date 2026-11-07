@@ -15,7 +15,7 @@ from joserfc.errors import JoseError
 from joserfc.jwk import RSAKey
 
 from ..extensions import db
-from ..models import LoginSession, OidcClient, OidcCode, OidcConsent, OidcKey, OidcToken
+from ..models import Account, LoginSession, OidcClient, OidcCode, OidcConsent, OidcKey, OidcToken
 from . import crypto
 from .activity import log
 
@@ -171,7 +171,7 @@ def redirect_uri_problem(uri):
 def may_access(client, account):
     """L'appli est ouverte et cette personne est dans l'un de ses groupes autorisés. Un administrateur n'y échappe pas."""
     return (client.active and account.active
-            and any(group in client.allowed_groups for group in account.groups))
+            and any(group in client.allowed_groups for group in account.all_groups))
 
 
 def clients_using(group):
@@ -265,7 +265,7 @@ def revoke_consent(account, client_id):
 def what_is_shared(client, account, scope):
     """Lignes du formulaire de consentement."""
     lines = [SCOPE_LABELS[s] for s in OidcClient.SCOPES if s in scope.split() and s in SCOPE_LABELS]
-    names = sorted(group.name for group in account.groups if group in client.shared_groups)
+    names = sorted(group.name for group in account.all_groups if group in client.shared_groups)
     return lines, names if "groups" in scope.split() else []
 
 
@@ -274,7 +274,7 @@ def what_is_shared(client, account, scope):
 # ---------------------------------------------------------------------------
 
 def shared_groups(client, account):
-    return sorted(group.key for group in account.groups if group in client.shared_groups)
+    return sorted(group.key for group in account.all_groups if group in client.shared_groups)
 
 
 def claims_for(account, client, scope):
@@ -289,6 +289,37 @@ def claims_for(account, client, scope):
     if "groups" in scopes:
         claims["groups"] = shared_groups(client, account)
     return claims
+
+
+def directory(client):
+    """Comptes que l'appli peut connaître : ceux qui y ont accès, avec ce qu'elle recevrait à leur connexion.
+
+    Une appli de l'association voit tous ses comptes. Une appli tierce ne voit que les personnes qui lui ont donné leur
+    accord, et seulement ce qu'elles ont accepté de transmettre : l'export n'en dit pas plus que la connexion.
+    """
+    consents = {c.account_id: c.scope for c in
+                db.session.scalars(db.select(OidcConsent).filter_by(client_id=client.id))}
+    rows = []
+    for account in db.session.scalars(db.select(Account).where(Account.active)
+                                      .order_by(db.func.fold(Account.last_name), db.func.fold(Account.first_name),
+                                                Account.id)):
+        if not may_access(client, account):
+            continue
+        if client.first_party:
+            scopes = set(OidcClient.SCOPES)
+        elif account.id in consents:
+            scopes = set(consents[account.id].split())
+        else:
+            continue
+        row = {"sub": account.sub}
+        if "email" in scopes:
+            row.update(email=account.email, email_verified=account.email_verified)
+        if "profile" in scopes:
+            row.update(first_name=account.first_name, last_name=account.last_name)
+        if "groups" in scopes:
+            row["groups"] = shared_groups(client, account)
+        rows.append(row)
+    return {"issuer": issuer(), "application": client.name, "accounts": rows}
 
 
 def find_token(raw):

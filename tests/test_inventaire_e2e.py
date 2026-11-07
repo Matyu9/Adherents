@@ -115,7 +115,6 @@ def world(tmp_path_factory):
     server = subprocess.Popen([str(FLASK), "run", "--host", "127.0.0.1", "--port", str(inv_port), "--no-reload",
                                "--no-debugger"], cwd=INVENTAIRE, env=env, stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT, text=True)
-    world_box = {}
     try:
         wait_for_port(inv_port, server)
         yield {"idp": idp, "issuer": issuer, "inventaire": inventaire, "db": data / "inventaire.db",

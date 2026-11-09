@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import pager %}
+{% block title %}Foyers{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Foyers</h1>
+    <p class="muted">{{ total }} foyer{{ "s" if total > 1 }}{{ " archivé(s)" if archived }}. Le foyer est le payeur : adresse postale, cotisations, coordonnées bancaires.</p>
+  </div>
+  {% if can(current_user, "directory.edit") %}<a href="{{ url_for('directory.create_household') }}" role="button">+ Nouveau foyer</a>{% endif %}
+</div>
+<form method="get" class="filters">
+  <input type="search" name="q" value="{{ q }}" placeholder="Nom, membre ou ville" aria-label="Recherche">
+  <select name="archives" aria-label="Archivés" data-autosubmit>
+    <option value="">En activité</option>
+    <option value="1" {{ "selected" if archived }}>Archivés</option>
+  </select>
+  <noscript><button type="submit">Filtrer</button></noscript>
+</form>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Foyer</th><th>Responsables</th><th>À charge</th><th>Ville</th></tr></thead>
+  <tbody>
+  {% for h in items %}
+  <tr>
+    <td data-label="Foyer"><a href="{{ url_for('directory.household', household_id=h.id) }}">{{ h.name }}</a></td>
+    <td data-label="Responsables"><small>{{ h.guardians | map(attribute="person.full_name") | join(", ") or "—" }}</small></td>
+    <td data-label="À charge"><small>{{ h.dependents | map(attribute="person.first_name") | join(", ") or "—" }}</small></td>
+    <td data-label="Ville"><small>{{ h.city or "—" }}</small></td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">Aucun foyer ne correspond.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{{ pager("directory.households", page, pages, args) }}
+{% endblock %}

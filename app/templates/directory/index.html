@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import pager %}
+{% block title %}Annuaire{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Annuaire</h1>
+    <p class="muted">{{ total }} personne{{ "s" if total > 1 }}.{% if current %} Saison en cours : {{ current.label }}.{% elif can(current_user, "directory.edit") %} Aucune saison en cours : <a href="{{ url_for('directory.seasons') }}">choisissez-la</a>.{% endif %}</p>
+  </div>
+  {% if can(current_user, "directory.edit") %}<a href="{{ url_for('directory.create_person') }}" role="button">+ Nouvelle personne</a>{% endif %}
+</div>
+<form method="get" class="filters">
+  <input type="search" name="q" value="{{ q }}" placeholder="Nom, prénom ou email" aria-label="Recherche">
+  <select name="statut" aria-label="Statut" data-autosubmit>
+    <option value="">Toutes les fiches</option>
+    {% for key, label in statuses.items() %}<option value="{{ key }}" {{ "selected" if status == key }}>{{ label }}</option>{% endfor %}
+  </select>
+  {% if seasons %}
+  <select name="saison" aria-label="Saison" data-autosubmit>
+    {% for s in seasons %}<option value="{{ s.id }}" {{ "selected" if season and season.id == s.id }}>{{ s.label }}{{ " (en cours)" if current and current.id == s.id }}</option>{% endfor %}
+  </select>
+  {% endif %}
+  <noscript><button type="submit">Filtrer</button></noscript>
+</form>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Nom</th><th>Naissance</th><th>Email</th><th>Foyers</th><th>Saison</th></tr></thead>
+  <tbody>
+  {% for p in items %}
+  {% set m = (p.memberships | selectattr("season_id", "equalto", season.id) | first) if season else none %}
+  <tr>
+    <td data-label="Nom"><span><a href="{{ url_for('directory.person', person_id=p.id) }}">{{ p.sort_name }}</a>
+      {% if p.teacher and p.teacher.active %} <span class="badge">prof</span>{% endif %}
+      {% if p.archived_at %} <span class="badge">archivée</span>{% endif %}</span></td>
+    <td data-label="Naissance"><small>{{ p.birth_date | date_fr if p.birth_date else "—" }}</small></td>
+    <td data-label="Email"><small>{{ p.email or "—" }}</small></td>
+    <td data-label="Foyers"><small>{% for link in p.household_links %}<a href="{{ url_for('directory.household', household_id=link.household_id) }}">{{ link.household.name }}</a>{{ ", " if not loop.last }}{% else %}—{% endfor %}</small></td>
+    <td data-label="Saison">{% if m %}<span class="badge{{ ' badge-ok' if m.status == 'active' }}">{{ m.category or ("Élève" if m.status == "active" else "Abandon") }}</span>{% else %}<small class="muted">—</small>{% endif %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="5" class="muted">Aucune fiche ne correspond.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{{ pager("directory.index", page, pages, args) }}
+{% endblock %}

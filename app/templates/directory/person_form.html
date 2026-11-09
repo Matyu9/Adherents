@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ "Modifier " ~ person.full_name if person else "Nouvelle personne" }}{% endblock %}
+{% block content %}
+<article class="narrow wide-form">
+  <h1>{{ "Modifier " ~ person.full_name if person else "Nouvelle personne" }}</h1>
+  {% if household %}<p class="muted">Elle sera ajoutée au foyer {{ household.name }}.</p>{% endif %}
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="grid"><div>{{ field(form.civility) }}</div><div>{{ field(form.sex) }}</div></div>
+    <div class="grid"><div>{{ field(form.first_name) }}</div><div>{{ field(form.last_name) }}</div></div>
+    <div class="grid"><div>{{ field(form.birth_name) }}</div><div>{{ field(form.birth_date) }}</div></div>
+    {{ field(form.birth_place) }}
+    {{ field(form.email) }}
+    <small class="muted">L'adresse de la personne elle-même. Pour un enfant, laissez vide : ses responsables ont la leur.</small>
+    <h2>Adresse</h2>
+    <p class="muted small">En général vide : on prend celle du foyer. À remplir pour un parent séparé ou un professeur.</p>
+    {{ field(form.address_recipient) }}
+    {{ field(form.address_street, rows=2) }}
+    <div class="grid"><div>{{ field(form.postal_code) }}</div><div>{{ field(form.city) }}</div><div>{{ field(form.country) }}</div></div>
+    <h2>Divers</h2>
+    {{ field(form.emergency_contact) }}
+    {{ field(form.notes, rows=3) }}
+    <button type="submit">Enregistrer</button>
+  </form>
+</article>
+{% endblock %}

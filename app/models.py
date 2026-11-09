@@ -2,7 +2,7 @@
 import hashlib
 import hmac
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from authlib.oauth2.rfc6749 import ClientMixin
 from flask_login import UserMixin
@@ -389,6 +389,267 @@ class OidcKey(db.Model):
 
 
 # ---------------------------------------------------------------------------
+# Annuaire : personnes, foyers, saisons (voir docs/annuaire.md)
+# ---------------------------------------------------------------------------
+
+def _uuid():
+    return str(uuid.uuid4())
+
+
+class AddressMixin:
+    """Adresse postale. Celle d'une personne reste vide en général : on prend celle de son foyer."""
+    address_recipient = db.Column(db.String(120))  # destinataire, s'il diffère du nom
+    address_street = db.Column(db.Text)
+    postal_code = db.Column(db.String(10))
+    city = db.Column(db.String(80))
+    country = db.Column(db.String(2), nullable=False, default="FR", server_default="FR")
+
+    @property
+    def has_address(self):
+        return bool(self.address_street or self.postal_code or self.city)
+
+
+class Person(AddressMixin, TimestampMixin, db.Model):
+    """Une personne, quel que soit le nombre de ses rôles : élève, responsable, professeur."""
+    CIVILITIES = ("M.", "Mme")
+    SEXES = {"F": "Féminin", "M": "Masculin"}
+
+    id = db.Column(db.Integer, primary_key=True)
+    # Identifiant public : c'est lui qui sortira de l'appli (Inventaire, phase 7), jamais `id`.
+    uuid = db.Column(db.String(36), nullable=False, unique=True, default=_uuid)
+    civility = db.Column(db.String(10))
+    first_name = db.Column(db.String(80), nullable=False)
+    last_name = db.Column(db.String(80), nullable=False, index=True)
+    birth_name = db.Column(db.String(80))
+    sex = db.Column(db.String(1))
+    birth_date = db.Column(db.Date)
+    birth_place = db.Column(db.String(120))  # réservé aux gestionnaires (directory.edit)
+    # Adresse propre à la personne, jamais celle d'un parent recopiée : non unique, un couple peut la partager.
+    email = db.Column(db.String(255), index=True)
+    emergency_contact = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+    archived_at = db.Column(db.DateTime)
+    # Compte de connexion rattaché (0 ou 1). Le lien est ici et non sur `account`, pour ne pas recréer cette
+    # table sous SQLite : toutes les autres en dépendent.
+    account_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"), unique=True)
+
+    account = db.relationship("Account", backref=db.backref("person", uselist=False))
+    phones = db.relationship("Phone", back_populates="person", cascade="all, delete-orphan",
+                             order_by="(Phone.position, Phone.id)")
+    external_refs = db.relationship("ExternalRef", back_populates="person", cascade="all, delete-orphan")
+    household_links = db.relationship("HouseholdMember", back_populates="person", cascade="all, delete-orphan")
+    memberships = db.relationship("Membership", back_populates="person", cascade="all, delete-orphan",
+                                  order_by="Membership.season_id.desc()")
+    teacher = db.relationship("Teacher", back_populates="person", uselist=False, cascade="all, delete-orphan")
+
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
+    @property
+    def sort_name(self):
+        return f"{self.last_name.upper()} {self.first_name}"
+
+    def age(self, on=None):
+        if self.birth_date is None:
+            return None
+        on = on or date.today()
+        return on.year - self.birth_date.year - ((on.month, on.day) < (self.birth_date.month, self.birth_date.day))
+
+    @property
+    def is_minor(self):
+        age = self.age()
+        return age is not None and age < 18
+
+    def __repr__(self):
+        return f"<Person {self.full_name}>"
+
+
+class Household(AddressMixin, TimestampMixin, db.Model):
+    """Un foyer : le payeur. Les cotisations, l'adresse postale et les IBAN s'y rattachent."""
+    id = db.Column(db.Integer, primary_key=True)
+    uuid = db.Column(db.String(36), nullable=False, unique=True, default=_uuid)
+    name = db.Column(db.String(120), nullable=False, index=True)
+    notes = db.Column(db.Text)
+    archived_at = db.Column(db.DateTime)
+
+    members = db.relationship("HouseholdMember", back_populates="household", cascade="all, delete-orphan",
+                              order_by="(HouseholdMember.role.desc(), HouseholdMember.guardian_rank)")
+    phones = db.relationship("Phone", back_populates="household", cascade="all, delete-orphan",
+                             order_by="(Phone.position, Phone.id)")
+    external_refs = db.relationship("ExternalRef", back_populates="household", cascade="all, delete-orphan")
+    bank_accounts = db.relationship("BankAccount", back_populates="household", cascade="all, delete-orphan",
+                                    order_by="BankAccount.id")
+
+    @property
+    def guardians(self):
+        return [m for m in self.members if m.role == HouseholdMember.GUARDIAN]
+
+    @property
+    def dependents(self):
+        return [m for m in self.members if m.role == HouseholdMember.DEPENDENT]
+
+    def __repr__(self):
+        return f"<Household {self.name}>"
+
+
+class HouseholdMember(db.Model):
+    """Appartenance d'une personne à un foyer : responsable 1 ou 2, ou à charge."""
+    GUARDIAN = "guardian"
+    DEPENDENT = "dependent"
+    ROLES = {GUARDIAN: "Responsable", DEPENDENT: "À charge"}
+    __table_args__ = (
+        db.UniqueConstraint("household_id", "guardian_rank"),  # un seul responsable 1, un seul responsable 2
+        db.CheckConstraint("(role = 'guardian' AND guardian_rank IS NOT NULL AND guardian_rank IN (1, 2)) OR "
+                           "(role = 'dependent' AND guardian_rank IS NULL)", name="ck_household_member_role"),
+    )
+
+    household_id = db.Column(db.ForeignKey("household.id", ondelete="CASCADE"), primary_key=True)
+    person_id = db.Column(db.ForeignKey("person.id", ondelete="CASCADE"), primary_key=True, index=True)
+    role = db.Column(db.String(10), nullable=False)
+    guardian_rank = db.Column(db.Integer)
+    relationship = db.Column(db.String(40))  # lien juridique : mère, père, tuteur, « lui-même »…
+
+    household = db.relationship("Household", back_populates="members")
+    person = db.relationship("Person", back_populates="household_links")
+
+    @property
+    def label(self):
+        return f"Responsable {self.guardian_rank}" if self.role == self.GUARDIAN else "À charge"
+
+
+class Phone(db.Model):
+    """Téléphone d'une personne ou d'un foyer, jamais des deux."""
+    __table_args__ = (
+        db.CheckConstraint("(person_id IS NULL) <> (household_id IS NULL)", name="ck_phone_owner"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    person_id = db.Column(db.ForeignKey("person.id", ondelete="CASCADE"), index=True)
+    household_id = db.Column(db.ForeignKey("household.id", ondelete="CASCADE"), index=True)
+    number = db.Column(db.String(20), nullable=False)  # format international : +33…
+    label = db.Column(db.String(40))
+    position = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+
+    person = db.relationship("Person", back_populates="phones")
+    household = db.relationship("Household", back_populates="phones")
+
+
+class ExternalRef(db.Model):
+    """Numéro d'une fiche dans le logiciel de gestion : ce qui rend l'import rejouable sans doublons."""
+    KINDS = {"student": "N° élève", "household": "N° famille", "teacher": "N° professeur"}
+    __table_args__ = (
+        db.UniqueConstraint("kind", "value"),
+        db.CheckConstraint("(person_id IS NULL) <> (household_id IS NULL)", name="ck_external_ref_owner"),
+        db.CheckConstraint("kind IN ('student', 'household', 'teacher')", name="ck_external_ref_kind"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    kind = db.Column(db.String(10), nullable=False)
+    value = db.Column(db.String(40), nullable=False)
+    person_id = db.Column(db.ForeignKey("person.id", ondelete="CASCADE"), index=True)
+    household_id = db.Column(db.ForeignKey("household.id", ondelete="CASCADE"), index=True)
+
+    person = db.relationship("Person", back_populates="external_refs")
+    household = db.relationship("Household", back_populates="external_refs")
+
+
+class Season(db.Model):
+    """Saison (« 2026-2027 »). La saison en cours se choisit dans l'annuaire, elle n'est pas déduite de la date."""
+    __table_args__ = (db.CheckConstraint("ends_on > starts_on", name="ck_season_dates"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    label = db.Column(db.String(20), nullable=False, unique=True)
+    starts_on = db.Column(db.Date, nullable=False)
+    ends_on = db.Column(db.Date, nullable=False)
+
+    def __repr__(self):
+        return f"<Season {self.label}>"
+
+
+class Membership(TimestampMixin, db.Model):
+    """Adhésion d'une personne, comme élève, pour une saison. Jamais supprimée : c'est l'historique."""
+    ACTIVE = "active"
+    WITHDRAWN = "withdrawn"
+    STATUSES = {ACTIVE: "Active", WITHDRAWN: "Abandon"}
+    __table_args__ = (
+        db.UniqueConstraint("person_id", "season_id"),
+        db.CheckConstraint("status IN ('active', 'withdrawn')", name="ck_membership_status"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    person_id = db.Column(db.ForeignKey("person.id", ondelete="CASCADE"), nullable=False)
+    # Une saison qui a des adhésions ne se supprime pas.
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="RESTRICT"), nullable=False, index=True)
+    status = db.Column(db.String(10), nullable=False, default=ACTIVE)
+    withdrawn_on = db.Column(db.Date)
+    category = db.Column(db.String(40))  # scolaire, non scolaire, adulte…
+    school_level = db.Column(db.String(40))
+    school_class = db.Column(db.String(40))
+
+    person = db.relationship("Person", back_populates="memberships")
+    season = db.relationship("Season")
+
+
+class Teacher(db.Model):
+    """Profil de professeur. Les droits dans l'appli passent par le compte, pas par cette table."""
+    STATUSES = ("CDI", "CDD", "Vacataire", "Bénévole", "Autre")
+
+    person_id = db.Column(db.ForeignKey("person.id", ondelete="CASCADE"), primary_key=True)
+    status = db.Column(db.String(20))
+    started_on = db.Column(db.Date)
+    left_on = db.Column(db.Date)  # un départ n'efface pas la fiche
+    work_email = db.Column(db.String(255))
+    notes = db.Column(db.Text)
+
+    person = db.relationship("Person", back_populates="teacher")
+
+    @property
+    def active(self):
+        return self.left_on is None or self.left_on > date.today()
+
+
+class BankAccount(TimestampMixin, db.Model):
+    """Coordonnées bancaires d'un foyer. L'IBAN est chiffré (services/bank.py) : seuls ses 4 derniers caractères
+    sont en clair, et son empreinte sert à repérer un même IBAN sans rien déchiffrer."""
+    id = db.Column(db.Integer, primary_key=True)
+    household_id = db.Column(db.ForeignKey("household.id", ondelete="CASCADE"), nullable=False, index=True)
+    holder_person_id = db.Column(db.ForeignKey("person.id", ondelete="SET NULL"), index=True)
+    holder_name = db.Column(db.String(120), nullable=False)
+    iban_ciphertext = db.Column(db.LargeBinary, nullable=False)
+    iban_last4 = db.Column(db.String(4), nullable=False)
+    iban_fingerprint = db.Column(db.String(64), nullable=False, index=True)
+    bic = db.Column(db.String(11))
+    key_version = db.Column(db.Integer, nullable=False)
+
+    household = db.relationship("Household", back_populates="bank_accounts")
+    holder = db.relationship("Person")
+    mandates = db.relationship("SepaMandate", back_populates="bank_account", cascade="all, delete-orphan",
+                               order_by="SepaMandate.id")
+
+    @property
+    def masked_iban(self):
+        return f"•••• •••• {self.iban_last4}"
+
+
+class SepaMandate(db.Model):
+    """Mandat de prélèvement SEPA. Le document signé n'est pas conservé ici."""
+    id = db.Column(db.Integer, primary_key=True)
+    bank_account_id = db.Column(db.ForeignKey("bank_account.id", ondelete="CASCADE"), nullable=False, index=True)
+    rum = db.Column(db.String(35), nullable=False, unique=True)  # référence unique du mandat
+    signed_on = db.Column(db.Date, nullable=False)
+    first_debit_on = db.Column(db.Date)
+    last_debit_on = db.Column(db.Date)
+    revoked_on = db.Column(db.Date)
+
+    bank_account = db.relationship("BankAccount", back_populates="mandates")
+
+    @property
+    def active(self):
+        return self.revoked_on is None
+
+
+# ---------------------------------------------------------------------------
 # Journal, notifications, réglages
 # ---------------------------------------------------------------------------
 
@@ -401,6 +662,9 @@ class Activity(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now, server_default=func.now(), index=True)
     # Compte concerné par l'action (rôle changé…), à distinguer de son auteur `account_id`.
     target_account_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"), index=True)
+    # Fiche de l'annuaire concernée, pour retrouver son historique.
+    person_id = db.Column(db.ForeignKey("person.id", ondelete="SET NULL"), index=True)
+    household_id = db.Column(db.ForeignKey("household.id", ondelete="SET NULL"), index=True)
 
     account = db.relationship("Account", foreign_keys=[account_id])
     target_account = db.relationship("Account", foreign_keys=[target_account_id])

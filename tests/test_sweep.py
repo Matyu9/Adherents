@@ -18,6 +18,8 @@ ANONYMOUS = "anonyme"
 PUBLIC, LOGGED_IN, ADMIN_ONLY = "public", "connecté", "admin"
 SETTINGS, JOURNAL, HIDDEN = "settings.manage", "activity.view", "caché"  # caché : 404 pour qui n'a pas settings.manage
 ACCOUNTS, GROUPS, CLIENTS = "account.manage", "group.manage", "client.manage"
+DIR_VIEW, DIR_EDIT, DIR_MERGE, BANK = "directory.view", "directory.edit", "directory.merge", "bank.view"
+LINKING = "account.manage+directory.edit"
 ACCESS = {
     "static": PUBLIC, "auth.login": PUBLIC, "csp.report": PUBLIC, "settings.logo_file": PUBLIC,
     "auth.two_factor": PUBLIC, "auth.forgot": PUBLIC, "auth.token_link": PUBLIC,
@@ -41,10 +43,23 @@ ACCESS = {
     "settings.remove_logo": SETTINGS, "settings.test_email": SETTINGS, "settings.run_tasks": SETTINGS,
     "settings.revoke_sessions": SETTINGS,
     "health.as_json": HIDDEN, "health.page": HIDDEN,
+    **{f"directory.{name}": DIR_VIEW for name in ("index", "person", "households", "household")},
+    **{f"directory.{name}": DIR_EDIT for name in (
+        "create_person", "edit_person", "archive_person", "restore_person", "add_person_phone", "add_household_phone",
+        "delete_phone", "create_membership", "edit_membership", "teacher", "delete_teacher", "create_household",
+        "edit_household", "archive_household", "restore_household", "add_member", "update_member", "remove_member",
+        "swap_guardians", "seasons", "create_season", "edit_season", "set_current_season", "delete_season")},
+    "directory.merge_person": DIR_MERGE, "directory.merge_household": DIR_MERGE,
+    **{f"directory.{name}": BANK for name in ("create_bank_account", "reveal_iban", "delete_bank_account",
+                                              "create_mandate", "edit_mandate")},
+    **{f"directory.{name}": LINKING for name in ("create_account", "unlink_account", "link_accounts", "link_account",
+                                                 "person_from_account")},
 }
-HOLDERS = {SETTINGS: {A}, JOURNAL: {A, G}, ADMIN_ONLY: {A}, HIDDEN: {A}, ACCOUNTS: {A}, GROUPS: {A}, CLIENTS: {A}}
+HOLDERS = {SETTINGS: {A}, JOURNAL: {A, G}, ADMIN_ONLY: {A}, HIDDEN: {A}, ACCOUNTS: {A}, GROUPS: {A}, CLIENTS: {A},
+           DIR_VIEW: {A, G}, DIR_EDIT: {A, G}, DIR_MERGE: {A, G}, BANK: {A}, LINKING: {A}}
 ARGUMENTS = {"filename": "css/app.css", "key": "adherent", "sid": "inconnue", "name": "absent",
-             "account_id": 1, "group_id": 999, "token": "inconnu", "client_pk": 999}
+             "account_id": 1, "group_id": 999, "token": "inconnu", "client_pk": 999, "person_id": 999,
+             "household_id": 999, "phone_id": 999, "membership_id": 999, "season_id": 999, "mandate_id": 999}
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
 SENDS_TO_LOGIN = {"auth.logout", "auth.two_factor", "auth.token_link", "oidc.end_session"}
 
@@ -64,7 +79,7 @@ def test_every_route_is_declared(app):
 
 def test_every_declared_permission_exists():
     from app.permissions import PERMISSIONS
-    assert {SETTINGS, JOURNAL, ACCOUNTS, GROUPS, CLIENTS} <= set(PERMISSIONS)
+    assert {SETTINGS, JOURNAL, ACCOUNTS, GROUPS, CLIENTS, DIR_VIEW, DIR_EDIT, DIR_MERGE, BANK} <= set(PERMISSIONS)
 
 
 @pytest.mark.parametrize("who", [ANONYMOUS, H, G, A])
@@ -117,11 +132,45 @@ def rich(app, accounts):
     for account in accounts.values():
         db.session.add(OidcConsent(account_id=account.id, client_id=client.id, scope="email"))
     log("settings.branding", "Apparence <em>modifiée</em>", user=accounts[A], target=accounts[H])
+    _directory(accounts)
     for account in accounts.values():
         db.session.add(Notification(account_id=account.id, message="Dossier <b>à compléter</b>", link="/mon-compte"))
         db.session.add(Notification(account_id=account.id, message="Sans lien", read=True))
     db.session.commit()
     return accounts
+
+
+def _directory(accounts):
+    """Un foyer complet, avec du HTML dans chaque champ affiché."""
+    from datetime import date
+
+    from app.models import (BankAccount, ExternalRef, Household, Membership, Person, Phone, Season, SepaMandate,
+                            Teacher)
+    from app.services import bank, directory
+
+    season = Season(label="2026-2027", starts_on=date(2026, 9, 1), ends_on=date(2027, 8, 31))
+    old = Season(label="2025-2026", starts_on=date(2025, 9, 1), ends_on=date(2026, 8, 31))
+    household = Household(name="Famille <b>Dupont</b>", address_street="1 rue <i>Haute</i>", postal_code="76000",
+                          city="Rouen", notes="<script>")
+    parent = Person(first_name="Anne <script>", last_name="Dupont", email="anne@asso.test", birth_place="<i>Caen</i>",
+                    birth_date=date(1980, 1, 2), notes="<em>modifiée</em>", account=accounts[H])
+    child = Person(first_name="Zoé", last_name="Dupont <script>", birth_date=date(2015, 5, 6))
+    teacher = Person(first_name="Paul", last_name="Prof", teacher=Teacher(status="CDI", notes="<b>x</b>"))
+    db.session.add_all([season, old, household, parent, child, teacher])
+    db.session.flush()
+    directory.set_current_season(season)
+    directory.add_member(household, parent, "guardian", "<b>mère</b>")
+    directory.add_member(household, child, "dependent")
+    household.phones.append(Phone(number="+33612345678", label="<b>maison</b>"))
+    child.phones.append(Phone(number="+41791234567"))
+    db.session.add_all([Membership(person=child, season=season, category="<b>scolaire</b>"),
+                        Membership(person=child, season=old, status="withdrawn", withdrawn_on=date(2026, 1, 5)),
+                        ExternalRef(kind="student", value="<b>42</b>", person=child)])
+    account = BankAccount(household_id=household.id, holder_name="Anne <b>Dupont</b>", holder=parent)
+    bank.set_iban(account, "FR7630006000011234567890189")
+    db.session.add(account)
+    db.session.add(SepaMandate(bank_account=account, rum="ADH-2026-ABC", signed_on=date(2026, 9, 1)))
+    log("person.update", "Fiche <em>modifiée</em>", user=accounts[A], person=parent)
 
 
 INLINE = re.compile(r"""<[a-z][^>]*\son[a-z]+\s*=|<[a-z][^>]*\sstyle\s*=|<style\b|<script\b(?![^>]*\ssrc=)|href\s*=\s*["']javascript:""", re.I)
@@ -152,7 +201,7 @@ def test_crawl_every_link(app, rich, who):
             problems.append(f"{path} : une donnée n'a pas été échappée")
         for link in LINK.findall(html):
             target = urlsplit(urljoin(path, link.replace("&amp;", "&")))
-            if not target.netloc and target.scheme != "data":  # QR code intégré à la page
+            if not target.netloc and target.scheme not in ("data", "mailto", "tel"):  # data : QR code intégré
                 queue.append(target.path + (f"?{target.query}" if target.query else ""))
     assert not problems, "\n".join(problems)
     assert "/mon-compte" in seen and any(p.startswith("/static/css/app.css") for p in seen)
@@ -162,6 +211,12 @@ def test_crawl_every_link(app, rich, who):
     assert ("/comptes" in seen) == (who == A)
     assert ("/groupes" in seen) == (who == A)
     assert ("/applications" in seen) == (who == A)
+    assert ("/annuaire" in seen) == (who in (A, G)) and ("/annuaire/foyers" in seen) == (who in (A, G))
+    assert ("/annuaire/saisons" in seen) == (who in (A, G))
+    assert ("/annuaire/rattachement" in seen) == (who == A)
+    assert any(p.startswith("/annuaire/personnes/") for p in seen) == (who in (A, G))
+    assert any(p.endswith("/afficher") for p in seen) == (who == A)
+    assert any(p.endswith("/fusionner") for p in seen) == (who in (A, G))
 
 
 def test_custom_role_gets_exactly_its_rights(app, rich):

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import address, phones, history, post_button, csrf %}
+{% block title %}{{ household.name }}{% endblock %}
+{% block content %}
+{% set edit = can(current_user, "directory.edit") %}
+{% set banker = can(current_user, "bank.view") %}
+<p><a href="{{ url_for('directory.households') }}">← Foyers</a></p>
+<div class="page-head">
+  <div>
+    <h1>{{ household.name }}</h1>
+    {% if household.archived_at %}<p class="muted"><span class="badge">Archivé le {{ household.archived_at | date_fr }}</span></p>{% endif %}
+  </div>
+  <div class="actions">
+    {% if edit %}<a href="{{ url_for('directory.edit_household', household_id=household.id) }}" role="button" class="secondary">Modifier</a>{% endif %}
+    {% if can(current_user, "directory.merge") %}<a href="{{ url_for('directory.merge_household', household_id=household.id) }}" role="button" class="secondary outline">Fusionner un doublon</a>{% endif %}
+  </div>
+</div>
+
+<div class="detail-grid">
+  <section class="card">
+    <h2>Adresse</h2>
+    <p>{{ address(household) }}</p>
+    {% for ref in household.external_refs %}<p class="small">{{ ref.KINDS[ref.kind] }} : <code>{{ ref.value }}</code></p>{% endfor %}
+    {% if household.notes %}<p class="notes">{{ household.notes }}</p>{% endif %}
+  </section>
+  <section class="card" id="telephones">
+    <h2>Téléphones</h2>
+    {{ phones(household, phone_form, url_for('directory.add_household_phone', household_id=household.id), edit) }}
+  </section>
+</div>
+
+<h2 id="membres">Membres</h2>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Personne</th><th>Rôle</th><th>Lien</th><th>Email</th>{% if edit %}<th></th>{% endif %}</tr></thead>
+  <tbody>
+  {% for m in household.members %}
+  <tr>
+    <td data-label="Personne"><a href="{{ url_for('directory.person', person_id=m.person_id) }}">{{ m.person.full_name }}</a>{% if m.person.birth_date %} <small class="muted">{{ m.person.age() }} ans</small>{% endif %}</td>
+    {% if edit %}
+    <td data-label="Rôle" colspan="2">
+      <form method="post" action="{{ url_for('directory.update_member', household_id=household.id, person_id=m.person_id) }}" class="inline-form">
+        {{ csrf() }}
+        <select name="role" aria-label="Rôle de {{ m.person.full_name }}">
+          {% for key, label in roles.items() %}<option value="{{ key }}" {{ "selected" if m.role == key }}>{{ m.label if m.role == key else label }}</option>{% endfor %}
+        </select>
+        <input type="text" name="relationship" value="{{ m.relationship or '' }}" placeholder="mère, père, tuteur…" aria-label="Lien" maxlength="40">
+        <button type="submit" class="secondary small">Enregistrer</button>
+      </form>
+    </td>
+    {% else %}
+    <td data-label="Rôle"><span class="badge">{{ m.label }}</span></td>
+    <td data-label="Lien">{{ m.relationship or "—" }}</td>
+    {% endif %}
+    <td data-label="Email"><small>{{ m.person.email or "—" }}</small></td>
+    {% if edit %}<td data-label="" class="actions">{{ post_button(url_for('directory.remove_member', household_id=household.id, person_id=m.person_id), "Retirer", "link-button", "Retirer " ~ m.person.full_name ~ " du foyer ? Sa fiche est conservée.") }}</td>{% endif %}
+  </tr>
+  {% else %}
+  <tr><td colspan="5" class="muted">Aucun membre.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if edit %}
+<div class="actions">
+  {% if household.guardians %}{{ post_button(url_for('directory.swap_guardians', household_id=household.id), "Échanger responsables 1 et 2", "secondary outline small") }}{% endif %}
+  <a href="{{ url_for('directory.create_person', foyer=household.id, role='dependent') }}">+ Nouvelle personne à charge</a>
+  <a href="{{ url_for('directory.create_person', foyer=household.id, role='guardian') }}">+ Nouveau responsable</a>
+</div>
+<form method="get" class="filters" action="#membres">
+  <input type="search" name="q" value="{{ q }}" placeholder="Ajouter une personne déjà dans l'annuaire" aria-label="Chercher une personne à ajouter">
+  <button type="submit" class="secondary">Chercher</button>
+</form>
+{% if q %}
+<ul class="plain-list">
+  {% for p in found %}
+  <li><a href="{{ url_for('directory.person', person_id=p.id) }}">{{ p.sort_name }}</a>{% if p.birth_date %} <small class="muted">{{ p.birth_date | date_fr }}</small>{% endif %}
+    <form method="post" action="{{ url_for('directory.add_member', household_id=household.id) }}" class="inline-form">
+      {{ csrf() }}<input type="hidden" name="person_id" value="{{ p.id }}">
+      <button type="submit" name="role" value="guardian" class="link-button small">comme responsable</button>
+      <button type="submit" name="role" value="dependent" class="link-button small">à charge</button>
+    </form></li>
+  {% else %}<li class="muted">Personne ne correspond.</li>{% endfor %}
+</ul>
+{% endif %}
+{% endif %}
+
+{% if banker %}
+<h2 id="banque">Coordonnées bancaires</h2>
+{% if household.bank_accounts %}
+{% for b in household.bank_accounts %}
+<section class="card">
+  <p><strong>{{ b.masked_iban }}</strong> · {{ b.holder_name }}{% if b.bic %} · <small>{{ b.bic }}</small>{% endif %}</p>
+  <div class="actions">
+    <a href="{{ url_for('directory.reveal_iban', account_id=b.id) }}">Afficher l'IBAN</a>
+    <a href="{{ url_for('directory.create_mandate', account_id=b.id) }}">+ Mandat</a>
+    {{ post_button(url_for('directory.delete_bank_account', account_id=b.id), "Supprimer", "link-button", "Supprimer ces coordonnées bancaires et leurs mandats ?") }}
+  </div>
+  {% if b.mandates %}
+  <ul class="plain-list">
+    {% for md in b.mandates %}
+    <li>Mandat <code>{{ md.rum }}</code> signé le {{ md.signed_on | date_fr }}
+      {% if md.last_debit_on %} · dernier prélèvement le {{ md.last_debit_on | date_fr }}{% endif %}
+      {% if md.revoked_on %} <span class="badge">révoqué le {{ md.revoked_on | date_fr }}</span>{% endif %}
+      · <a href="{{ url_for('directory.edit_mandate', mandate_id=md.id) }}">Modifier</a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endfor %}
+{% else %}<p class="muted">Aucune.</p>{% endif %}
+{% if bank_enabled %}<p><a href="{{ url_for('directory.create_bank_account', household_id=household.id) }}">+ Ajouter des coordonnées bancaires</a></p>
+{% else %}<p class="muted small">BANK_DATA_KEYS n'est pas définie : aucun IBAN ne peut être enregistré.</p>{% endif %}
+{% endif %}
+
+{% if edit %}
+<h2>Archivage</h2>
+{% if household.archived_at %}
+{{ post_button(url_for('directory.restore_household', household_id=household.id), "Restaurer le foyer", "secondary small") }}
+{% else %}
+{{ post_button(url_for('directory.archive_household', household_id=household.id), "Archiver le foyer", "contrast outline small", "Archiver le foyer " ~ household.name ~ " ?") }}
+{% endif %}
+{% endif %}
+
+<h2>Journal</h2>
+{{ history(entries) }}
+{% endblock %}

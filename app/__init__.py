@@ -36,16 +36,19 @@ def create_app(config_class=Config):
 
     db.init_app(app)
     migrate.init_app(app, db)
+    from . import models  # noqa: F401  (enregistre les modèles pour Alembic)
+    from .services import bank
+    bank.check_startup(app)  # IBAN en base sans leur clé : on refuse de démarrer
     csrf.init_app(app)
     login_manager.init_app(app)
 
-    from . import models  # noqa: F401  (enregistre les modèles pour Alembic)
     from .blueprints.account import bp as account_bp
     from .blueprints.accounts import bp as accounts_bp
     from .blueprints.applications import bp as applications_bp
     from .blueprints.auth import bp as auth_bp
     from .blueprints.csp import bp as csp_bp
     from .blueprints.dashboard import bp as dashboard_bp
+    from .blueprints.directory import bp as directory_bp
     from .blueprints.groups import bp as groups_bp
     from .blueprints.health import bp as health_bp
     from .blueprints.journal import bp as journal_bp
@@ -61,6 +64,7 @@ def create_app(config_class=Config):
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
+    app.register_blueprint(directory_bp)
     app.register_blueprint(account_bp)
     app.register_blueprint(accounts_bp)
     app.register_blueprint(groups_bp)

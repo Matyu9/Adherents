@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}Mandat SEPA{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>{{ "Mandat " ~ mandate.rum if mandate else "Nouveau mandat SEPA" }}</h1>
+  <p class="muted">{{ account.holder_name }} · {{ account.masked_iban }} · foyer {{ account.household.name }}</p>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.rum) }}
+    {{ field(form.signed_on) }}
+    <div class="grid"><div>{{ field(form.first_debit_on) }}</div><div>{{ field(form.last_debit_on) }}</div></div>
+    {{ field(form.revoked_on) }}
+    <button type="submit">Enregistrer</button>
+  </form>
+  <p class="muted small">Un mandat est supprimé 13 mois après son dernier prélèvement.</p>
+  <p class="small"><a href="{{ url_for('directory.household', household_id=account.household_id) }}#banque">Annuler</a></p>
+</article>
+{% endblock %}

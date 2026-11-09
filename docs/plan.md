@@ -6,13 +6,14 @@ Ce document regroupe les décisions prises depuis le 4 novembre 2026 et le déco
 
 Adhérents a deux missions :
 
-1. **Faire le lien entre le logiciel de gestion et les adhérents**, surtout pour les inscriptions et réinscriptions.
+1. **Faire le lien entre le logiciel de gestion et les adhérents**, surtout pour les inscriptions et réinscriptions, **puis le remplacer** : catalogue, cotisations et règlements (décision du 8 novembre 2026).
 2. **Être le fournisseur d'identité de l'association.** L'Inventaire en sera le premier client, et toute appli standard devra pouvoir s'y brancher sans code spécifique.
 
 ```
             Adhérents
   ┌──────────────────────────────┐
   │ Annuaire, foyers, dossiers   │
+  │ Cours, cotisations, SEPA     │
   │ Comptes et groupes           │
   │ Serveur OIDC  ───────────────┼──▶ Inventaire
   └──────────────────────────────┘──▶ future appli
@@ -26,9 +27,14 @@ Adhérents a deux missions :
 | Connexion | Adhérents est lui-même le serveur OIDC, sans Authentik. |
 | Emplacement du serveur OIDC | Dans l'appli Adhérents, en module isolé (`app/idp/`), qu'on pourra extraire plus tard. |
 | Socle technique | Copié de l'Inventaire, pas partagé en paquet. |
-| Paiements | Hors périmètre. |
-| IBAN | Conservés seulement jusqu'au transfert vers le logiciel de gestion, chiffrés, puis supprimés. |
-| Mandat SEPA | Pas de document dans l'appli : au plus une coche « Mandat signé », posée par un admin et tracée au journal. |
+| Remplacement du logiciel de gestion (8 novembre 2026) | À terme, Adhérents le remplace : saisons, inscriptions, tarifs et cotisations entreront dans l'appli. Le logiciel de gestion reste la référence jusqu'à la bascule. |
+| IBAN (8 novembre 2026) | Conservés dans l'appli, chiffrés avec une clé dédiée. Voir [annuaire.md](annuaire.md#iban-et-mandats-sepa). Remplace la décision de les supprimer après transfert. |
+| Modèle de l'annuaire | [annuaire.md](annuaire.md), mis en place le 9 novembre 2026 (migration `a0000006annuaire`). |
+| Mandat SEPA (8 novembre 2026) | Suivi dans l'appli : RUM, date de signature, premier et dernier prélèvement. Pas de dépôt du document signé : son lieu de conservation reste à préciser. |
+| Adhésion (9 novembre 2026) | Chaque élève est adhérent et paie son adhésion, une par saison. Un élève de moins de 16 ans est représenté à l'assemblée générale par un responsable, qui ne paie pas d'adhésion. |
+| Accès des professeurs (9 novembre 2026) | Un professeur ne voit que ses élèves et leurs responsables, à partir des inscriptions. |
+| Date de bascule (9 novembre 2026) | Aucune : on construit au fil de l'eau, et la date se décidera quand l'appli couvrira tout. |
+| Règlements (9 novembre 2026) | Trois voies : prélèvement SEPA généré par l'appli, paiement en ligne sur HelloAsso, et saisie manuelle par le secrétariat (chèque, espèces, ANCV…). |
 | Ordre des phases (6 novembre 2026) | Sans exports du logiciel de gestion pour l'instant : les comptes et l'OIDC passent d'abord (2 → 3 → 4 → 5), l'annuaire ensuite. |
 | Comptes des adhérents (6 novembre 2026) | Le système de comptes se construit dès maintenant, mais les adhérents ne sont invités qu'une fois l'annuaire en place, pour que leurs comptes soient créés déjà rattachés à leur fiche. |
 
@@ -38,7 +44,7 @@ Ces principes ont été proposés mais pas formellement validés. Ils guident le
 
 - **Séparer `Account`, `Person` et `Household`.** Un parent a une seule adresse email et plusieurs enfants, et un enfant sans email n'a pas de compte : son responsable légal le gère depuis le sien.
 - **Garder l'adhésion et l'accès indépendants.** Une saison terminée ne coupe pas un compte : un parent doit encore voir l'instrument que son enfant a en garde.
-- **Considérer le logiciel de gestion comme la référence**, sauf pendant qu'un dossier est ouvert.
+- **Considérer le logiciel de gestion comme la référence jusqu'à la bascule**, sauf pendant qu'un dossier est ouvert.
 
 ## Questions ouvertes
 
@@ -48,9 +54,21 @@ Ces principes ont été proposés mais pas formellement validés. Ils guident le
 | Quel fichier sert à l'import initial, et le logiciel de gestion sait-il importer ? | Dépend des exports | Phase 1 |
 | Base de l'appli ou OpenLDAP pour les comptes ? | Base de l'appli, retenue par défaut pour la phase 2 : OpenLDAP ajoute un service sans remplacer ni le serveur OIDC ni le reste | Phase 2 |
 | Longueur minimale des mots de passe : 8 caractères suffisent-ils pour un compte qui ouvrira toutes les applis ? | À relever avant d'inviter les adhérents | Phase 3 |
-| Combien de chiffres de l'IBAN garder (4 à 8) ? | 4 : ils suffisent à reconnaître le compte | Phase 6 |
-| Où va le mandat SEPA signé : logiciel de gestion, papier, banque ? | À préciser par l'association | Phase 6 |
+| Où est conservé le mandat SEPA signé : papier au secrétariat, signature électronique ? | À préciser par l'association | Phase 10 |
+| Format du fichier de prélèvement accepté par la banque | SEPA XML (pain.008) : l'ancien format AFB ne sert plus pour les prélèvements depuis 2014. À confirmer avec la banque, avec l'identifiant créancier SEPA (ICS) de l'association | Phase 10 |
+| Une ou deux campagnes HelloAsso, pour les régies EMHN et OHN ? | À préciser par le trésorier | Phase 10 |
 | Adresse définitive du serveur OIDC ? | Par exemple `https://compte.<domaine>` | Mise en production de la phase 3 |
+
+### Questions pour la directrice
+
+Elles bloquent les tarifs et les cotisations (phase 9), pas l'annuaire :
+
+- Comment s'applique la dégressivité « défavorable famille » : quel enfant paie plein tarif, quelle réduction pour les suivants ?
+- Comment la tranche de quotient familial est-elle attribuée : justificatif CAF, avis d'imposition, tranche C par défaut ?
+- Un parent présent dans deux familles est-il saisi deux fois aujourd'hui ?
+- Que recouvrent cycle, niveau, catégorie (scolaire ou non) et modalité d'une inscription ?
+- Assemblée générale : quel responsable représente un élève de moins de 16 ans, et un parent de trois enfants a-t-il trois voix ?
+- Combien de temps garder les données d'un ancien adhérent ?
 
 ### Exports attendus pour la phase 1
 
@@ -75,7 +93,7 @@ Sur la forme :
 
 Les comptes et l'OIDC passent avant les inscriptions, car celles-ci s'appuient sur les personnes et les droits.
 
-**Ordre de réalisation : 0 → 2 → 3 → 4 → 5 → 1 → 6 → 7.** La phase 1 attend les exports du logiciel de gestion. Les numéros de phase ne changent pas.
+**Ordre de réalisation : 0 → 2 → 3 → 4 → 5 → 1 → 8 → 6 → 7 → 9 → 10 → 11.** Le catalogue (8) passe avant les campagnes (6), où les familles choisissent leurs activités. Les numéros de phase ne changent pas.
 
 ### Phase 0 : socle (terminée le 5 novembre 2026)
 
@@ -83,14 +101,24 @@ Les comptes et l'OIDC passent avant les inscriptions, car celles-ci s'appuient s
 - Corrections : plus de JavaScript en ligne, CSP bloquante, thème sombre sans doublon, limitation des tentatives en base.
 - **Tests :** balayage des routes par rôle, migrations sur base remplie.
 
-### Phase 1 : annuaire
+### Phase 1 : annuaire (étapes 1 à 5 écrites le 9 novembre 2026, branche `phase-1-annuaire`)
 
-- Personnes, foyers, responsables légaux, recherche sans accents, fusion de doublons et archivage.
-- Import depuis le logiciel de gestion avec essai à blanc, avec un `external_ref` sur chaque fiche.
-- **Tests :** foyer partagé, doublons, droits d'accès aux fiches.
+Modèle : voir [annuaire.md](annuaire.md), qui liste aussi les écarts avec la proposition.
+
+1. **Modèles et migration** : personnes, foyers et leurs membres, téléphones, numéros externes, professeurs, saisons et adhésions. Plus `Account.person_id`, et la saison en cours dans les réglages.
+2. **IBAN** : chiffrement AES-GCM avec la clé `BANK_DATA_KEYS`, `flask bank-rotate-key`, refus de démarrer sans la clé. Lecture en clair avec le droit `bank.view` et une nouvelle saisie du TOTP, journalisée.
+3. **Écrans** :
+   - liste avec recherche sans accents et filtres (saison, élèves actifs, anciens, professeurs) ;
+   - fiche d'une personne, fiche d'un foyer avec ses membres ;
+   - fusion de deux fiches, archivage.
+4. **Droits** : `directory.view`, `directory.edit`, `directory.merge`, `bank.view`. Le lieu de naissance reste réservé aux gestionnaires. L'accès d'un professeur à ses élèves attend les inscriptions (phases 8 et 6).
+5. **Rattachement des comptes et invitation des adhérents** (voir ci-dessous).
+6. **Import** depuis le logiciel de gestion, avec essai à blanc et rapport de contrôle. La correspondance avec les exports viendra quand ils seront disponibles, sans modifier le modèle. **Seule étape restante.**
+
+- **Tests :** foyer partagé, parent dans deux foyers, doublons et fusion, droits d'accès aux fiches, IBAN (voir [annuaire.md](annuaire.md#tests-prévus)).
 - **Rattachement des comptes :** relier chaque compte existant à sa personne, avec un écran de vérification, car l'email seul ne suffit pas (adresse partagée, parents séparés). `Account` reçoit alors un lien vers `Person`, vide au départ.
-- **Invitation des adhérents :** les comptes sont créés à partir de l'import, déjà rattachés à leur fiche.
-- **Prérequis :** les exports du logiciel de gestion.
+- **Invitation des adhérents :** les comptes sont créés à partir de l'import, déjà rattachés à leur fiche. En attendant, un compte se crée depuis la fiche d'un adulte qui a une adresse, avec son invitation ; l'invitation en masse viendra avec l'import.
+- **Prérequis :** les exports du logiciel de gestion, pour l'import seulement : les étapes 1 à 5 n'en dépendent pas.
 
 ### Phase 2 : comptes (terminée le 6 novembre 2026)
 
@@ -148,28 +176,58 @@ Les comptes et l'OIDC passent avant les inscriptions, car celles-ci s'appuient s
 1. Un admin ouvre la campagne de la saison, avec ses dates.
 2. Le parent retrouve son dossier pré-rempli depuis le logiciel de gestion.
 3. Il corrige ses informations, choisit les activités, donne ses consentements et renseigne son IBAN.
-4. Le dossier passe par les statuts : brouillon, soumis, à corriger, validé, transféré au logiciel de gestion.
-5. L'admin ne récupère que les changements à reporter dans le logiciel de gestion.
+4. Le dossier passe par les statuts : brouillon, soumis, à corriger, validé. Tant que le logiciel de gestion reste la référence, s'y ajoute « reporté dans le logiciel de gestion ».
+5. La validation crée l'adhésion et les inscriptions de la saison. Avant la bascule, l'admin récupère aussi les changements à reporter dans le logiciel de gestion.
 
-Les nouvelles inscriptions passent par un formulaire public avec vérification de l'email. Les relances concernent les dossiers incomplets et les familles qui n'ont pas répondu. Cette phase prévoit aussi les durées de conservation et l'anonymisation.
+Les nouvelles inscriptions passent par un formulaire public avec vérification de l'email. Les relances concernent les dossiers incomplets et les familles qui n'ont pas répondu. Cette phase prévoit aussi les durées de conservation et l'anonymisation, ainsi que les consentements datés par saison (droit à l'image…).
 
-**Protection des IBAN, à construire avant d'ouvrir les inscriptions :**
+Une fois cette phase faite, chaque professeur voit ses élèves.
 
-- **Chiffrement** dans l'appli avant d'aller en base, avec une clé hors de `data/`, et une clé par campagne détruite à sa clôture.
-- **Suppression** quand l'admin confirme « transféré au logiciel de gestion », et non au téléchargement du fichier, pour ne rien perdre si l'import échoue. Le `scheduler` supprime aussi ceux des dossiers abandonnés à la fin de la campagne. Seuls les derniers chiffres restent.
-- **Affichage** masqué par défaut. Le voir en entier demande un droit dédié `bank.view` et une nouvelle saisie du TOTP, et chaque consultation est journalisée.
-- **Fuites à bloquer :** jamais d'IBAN dans les claims OIDC, l'API, les emails, les logs ou les exports généraux. `activity.diff()` le masque déjà.
-- **Saisie** uniquement dans un champ, sans dépôt de RIB en PDF ou en photo.
-- **Rattachement** au payeur, c'est-à-dire au compte ou au foyer, et non à l'enfant. Le titulaire du compte est enregistré à part.
-- **Fichier d'export :** il contient les IBAN en clair sur l'ordinateur de l'admin. L'appli ne peut pas le protéger, donc il faut rappeler à l'écran de le supprimer après l'import.
-- **RGPD :** durée de conservation à justifier au registre des traitements. Aucune durée officielle pour les IBAN n'a été trouvée : à confirmer sur le site de la CNIL.
-- **Tests :** après la suppression, l'IBAN est introuvable dans le fichier de base.
+**IBAN saisis par les familles :** la protection est construite en phase 1 (voir [annuaire.md](annuaire.md#protection)). S'y ajoutent ici :
+
+- **Saisie** uniquement dans un champ, sans dépôt de RIB en PDF ou en photo, avec contrôle de la clé de l'IBAN.
+- **Rattachement** au foyer payeur, et non à l'enfant. Le titulaire du compte est enregistré à part.
+- **Fichier de report** vers le logiciel de gestion, tant qu'il reste la référence : il contient les IBAN en clair sur l'ordinateur de l'admin. L'appli ne peut pas le protéger, donc il faut rappeler à l'écran de le supprimer après l'import.
+- **RGPD :** durée de conservation à justifier au registre des traitements ; mandat supprimé 13 mois après son dernier prélèvement.
 
 ### Phase 7 : espace adhérent
 
 - Le parent voit son foyer, ses dossiers et les instruments de ses enfants.
 - Nouvelle route API dans l'Inventaire pour lire les prêts par `external_id`, avec un compte de service limité à cette lecture.
+- Une fois les phases 9 et 10 faites : ses cotisations, ses règlements et son solde, et un lien de paiement HelloAsso.
 - **Tests :** un parent ne voit que son foyer, y compris en modifiant l'identifiant dans l'URL.
+
+### Phase 8 : catalogue
+
+- Disciplines, niveaux, sites et salles, communs à toutes les saisons.
+- Cours d'une saison : discipline, niveau, professeur, jour, horaires, salle, effectif maximum.
+- Disciplines enseignées par chaque professeur, par saison.
+- Copie du catalogue d'une saison sur la suivante, pour ne pas tout ressaisir.
+- **Tests :** copie de saison, cours complet, professeur parti.
+
+### Phase 9 : tarifs et cotisations
+
+- **Grille par saison** : éléments de cotisation (adhésion, formules, pratiques collectives, location…) et tarifs selon la commune, la tranche de quotient familial et le statut adulte. Les codes d'éléments changent d'une saison à l'autre : aucun ne sert de clé durable.
+- **Régies** : EMHN et OHN, chaque élément relevant de l'une d'elles.
+- **Situation du foyer par saison** : tranche de quotient familial, et le quotient seulement si nécessaire, visible du trésorier et de la direction.
+- **Calcul des cotisations** d'un foyer à partir de ses inscriptions, avec la dégressivité et l'arrondi au décime. Le calcul est proposé, puis validé : un gestionnaire peut le corriger, et la correction est tracée.
+- **Prérequis :** les réponses de la directrice sur la dégressivité et le quotient familial.
+- **Tests :** grille comparée aux montants appelés par le logiciel de gestion sur une saison importée ; c'est le critère de réussite.
+
+### Phase 10 : règlements
+
+- **Saisie manuelle** par le secrétariat : chèque, espèces, virement, carte, ANCV, chèque loisirs, chèque CE, avoir, subvention.
+- **Prélèvements SEPA** : échéancier, fichier pour la banque, retours et rejets. Le fichier contient les IBAN en clair : il est généré à la demande, jamais stocké.
+- **HelloAsso** : paiement en ligne d'une cotisation, et rapprochement automatique des paiements reçus.
+- **Soldes** par foyer et par régie, relances des impayés, reçus.
+- **Prérequis :** l'identifiant créancier SEPA de l'association et le format accepté par la banque.
+- **Tests :** fichier SEPA validé contre le schéma XML, rejet d'un prélèvement, paiement HelloAsso reçu deux fois.
+
+### Phase 11 : bascule
+
+- Dernier import complet depuis le logiciel de gestion, comparaison des soldes, puis l'appli devient la référence.
+- La date est à choisir quand les phases 8 à 10 seront terminées, de préférence au début d'une saison.
+- Le logiciel de gestion reste consultable en lecture pour l'historique.
 
 ## Pièges déjà repérés
 
@@ -177,7 +235,17 @@ Les nouvelles inscriptions passent par un formulaire public avec vérification d
 2. **`form-action 'self'` :** Chrome applique cette règle aux redirections après un formulaire. Le login POST suivi d'une redirection vers l'appli cliente serait bloqué. Résolu en phase 3 sans toucher à la CSP : après un formulaire, le retour passe par une page intermédiaire (`/oidc/reprendre`), vérifié avec Playwright sous Chromium.
 3. **Adresse de l'émetteur :** elle est liée aux `sub` enregistrés dans chaque appli et ne doit plus changer ensuite. Il faut la choisir avant la production.
 4. **Panne d'Adhérents :** les sessions déjà ouvertes dans l'Inventaire continuent, mais plus personne ne peut se connecter. Sa sauvegarde devient critique, clés de signature comprises.
-5. **Une seule appli pour l'OIDC et les IBAN :** une faille exposerait les deux. C'est une raison de plus de ne pas conserver les IBAN après le transfert.
+5. **Une seule appli pour l'OIDC et les IBAN :** une faille exposerait les deux. Les IBAN étant désormais conservés, leur clé dédiée, le droit `bank.view` avec une nouvelle saisie du TOTP et le journal des lectures limitent ce risque sans le supprimer. Si l'appli grossit, on pourra sortir la partie paiements dans un service séparé.
+
+## Avant la mise en production
+
+- Longueur minimale des mots de passe : 12 caractères conseillés, avant d'inviter les adhérents.
+- Adresse définitive du serveur OIDC.
+- Hébergement et HTTPS.
+- Sauvegardes chiffrées, avec `SECRET_KEY` et `BANK_DATA_KEYS` sauvegardées à part de la base.
+- Suite de conformité OIDC.
+- Preuve avec une appli tierce réelle.
+- Registre des traitements RGPD et information des familles.
 
 ## Pour plus tard
 

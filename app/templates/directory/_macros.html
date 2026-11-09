@@ -1,0 +1,56 @@
+{#- Morceaux communs aux pages de l'annuaire. -#}
+{% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endmacro %}
+
+{% macro post_button(action, label, cls="link-button", confirm=none) -%}
+<form method="post" action="{{ action }}" class="button-form"{% if confirm %} data-confirm="{{ confirm }}"{% endif %}>
+  {{ csrf() }}
+  <button type="submit" class="{{ cls }}">{{ label }}</button>
+</form>
+{%- endmacro %}
+
+{% macro address(record) -%}
+{%- if record.has_address -%}
+{% if record.address_recipient %}{{ record.address_recipient }}<br>{% endif %}
+{% for line in (record.address_street or "").splitlines() %}{{ line }}<br>{% endfor %}
+{{ record.postal_code or "" }} {{ record.city or "" }}{% if record.country and record.country != "FR" %} ({{ record.country }}){% endif %}
+{%- else -%}<span class="muted">—</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro phones(owner, form, add_action, editable) %}
+{% if owner.phones %}
+<ul class="plain-list">
+  {% for p in owner.phones %}
+  <li><a href="tel:{{ p.number }}">{{ p.number | phone }}</a>{% if p.label %} <small class="muted">{{ p.label }}</small>{% endif %}
+    {% if editable %}{{ post_button(url_for('directory.delete_phone', phone_id=p.id), "Retirer", "link-button small", "Retirer ce numéro ?") }}{% endif %}</li>
+  {% endfor %}
+</ul>
+{% else %}<p class="muted">Aucun téléphone.</p>{% endif %}
+{% if editable %}
+<form method="post" action="{{ add_action }}" class="inline-form">
+  {{ csrf() }}
+  <input type="tel" name="number" placeholder="06 12 34 56 78" aria-label="Numéro" required>
+  <input type="text" name="label" placeholder="Libellé (portable mère…)" aria-label="Libellé" maxlength="40">
+  <button type="submit" class="secondary small">Ajouter</button>
+</form>
+{% endif %}
+{% endmacro %}
+
+{% macro history(entries) %}
+{% if entries %}
+<ul class="timeline">
+  {% for a in entries %}
+  <li><small class="muted">{{ a.created_at | datetime_fr }}{% if a.account %} · par {{ a.account.full_name }}{% endif %}</small><br>{{ a.message }}</li>
+  {% endfor %}
+</ul>
+{% else %}<p class="muted">Rien pour l'instant.</p>{% endif %}
+{% endmacro %}
+
+{% macro pager(endpoint, page, pages, args) %}
+{% if pages > 1 %}
+<div class="actions">
+  {% if page > 1 %}<a href="{{ url_for(endpoint, page=page - 1, **args) }}">← Précédents</a>{% endif %}
+  <span class="muted small">Page {{ page }} sur {{ pages }}</span>
+  {% if page < pages %}<a href="{{ url_for(endpoint, page=page + 1, **args) }}">Suivants →</a>{% endif %}
+</div>
+{% endif %}
+{% endmacro %}

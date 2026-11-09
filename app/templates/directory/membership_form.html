@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}Adhésion de {{ person.full_name }}{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>Adhésion de {{ person.full_name }}</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.season_id) }}
+    <div class="grid"><div>{{ field(form.status) }}</div><div>{{ field(form.withdrawn_on) }}</div></div>
+    {{ field(form.category) }}
+    <div class="grid"><div>{{ field(form.school_level) }}</div><div>{{ field(form.school_class) }}</div></div>
+    <button type="submit">Enregistrer</button>
+  </form>
+  <p class="small"><a href="{{ url_for('directory.person', person_id=person.id) }}">Annuler</a></p>
+</article>
+{% endblock %}

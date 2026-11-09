@@ -15,6 +15,7 @@ Le nom, le sous-titre, la couleur et le logo se règlent directement dans **Para
 | `OIDC_ISSUER` | `BASE_URL` | Identité du serveur OIDC, inscrite dans les jetons. **À choisir avant de brancher une appli :** la changer oblige à reconfigurer toutes les applis, qui ne reconnaîtraient plus leurs comptes. Un avertissement apparaît au démarrage si elle n'est pas en `https://`, sauf sur `localhost`. |
 | `DATABASE_URL` | `sqlite:///<DATA_DIR>/adherents.db` | Adresse de la base. L'appli est conçue pour SQLite. |
 | `TZ` | `Europe/Paris` dans Docker | Fuseau horaire des dates. |
+| `BANK_DATA_KEYS` | aucune | Clés de chiffrement des IBAN, voir [plus bas](#coordonnées-bancaires). Sans elle, l'annuaire marche mais aucun IBAN ne peut être enregistré. |
 
 ## Réseau et sécurité
 
@@ -46,6 +47,20 @@ Le bouton **Paramètres → M'envoyer un email de test** vérifie les réglages.
 | Variable | Rôle |
 |---|---|
 | `FLASK_DEBUG` | `1` : mode de développement, qui autorise une clé secrète par défaut. **Jamais en production.** |
+
+## Coordonnées bancaires
+
+Les IBAN sont chiffrés avec `BANK_DATA_KEYS`, une clé **distincte de `SECRET_KEY`** : changer l'une ne fait pas perdre l'autre, et une fuite de l'une ne donne pas l'autre.
+
+```sh
+flask bank-generate-key          # affiche « 1:… » : à copier dans .env
+BANK_DATA_KEYS=1:xxxxxxxx…
+```
+
+- **Sauvegarde :** la base et `BANK_DATA_KEYS` se sauvegardent **séparément**. Une copie de la base seule ne livre aucun IBAN ; perdre la clé les rend tous illisibles.
+- **Démarrage :** l'appli refuse de démarrer s'il existe en base des IBAN chiffrés avec une clé absente de `BANK_DATA_KEYS`, ou si une clé est mal écrite.
+- **Changer de clé :** `flask bank-generate-key` donne une clé numérotée à la suite. Mettez-la en tête (`BANK_DATA_KEYS=2:nouvelle,1:ancienne`), redémarrez, lancez `flask bank-rotate-key`, puis retirez l'ancienne et redémarrez. La clé au numéro le plus haut chiffre ; les autres ne servent qu'à relire.
+- **Limite :** la clé est sur le même serveur que la base. Ce chiffrement protège d'une fuite de la base, d'une sauvegarde ou d'un disque, pas d'une prise de contrôle du serveur.
 
 ## Serveur OIDC
 

@@ -4,7 +4,7 @@ import click
 
 from .extensions import db, fold
 from .models import Account, OidcClient, Role
-from .services import accounts, logout, oidc, sessions, totp
+from .services import accounts, bank, logout, oidc, sessions, totp
 from .services.activity import log
 
 
@@ -58,6 +58,30 @@ def register_cli(app):
         log("oidc.export", f"Comptes exportés pour {client.name} ({len(data['accounts'])}) en ligne de commande")
         db.session.commit()
         click.echo(f"{len(data['accounts'])} compte(s) exporté(s) pour {client.name}.", err=True)
+
+    @app.cli.command("bank-generate-key")
+    def bank_generate_key():
+        """Affiche une nouvelle clé pour BANK_DATA_KEYS, avec le numéro suivant. Rien n'est enregistré."""
+        try:
+            version = max(bank.keys(), default=0) + 1
+        except bank.BankKeyError:
+            version = 1
+        click.echo(f"{version}:{bank.new_key()}")
+        click.echo("Ajoutez-la en tête de BANK_DATA_KEYS (séparée par une virgule), redémarrez, puis lancez "
+                   "flask bank-rotate-key. Sauvegardez-la à part de la base.", err=True)
+
+    @app.cli.command("bank-rotate-key")
+    def bank_rotate_key():
+        """Rechiffre tous les IBAN avec la clé la plus haute de BANK_DATA_KEYS. Les anciennes peuvent ensuite partir."""
+        try:
+            count = bank.rotate()
+            version = bank.current_version()
+        except bank.BankKeyError as exc:
+            raise click.ClickException(str(exc)) from None
+        log("bank.rotate", f"IBAN rechiffrés avec la clé n° {version} ({count}) en ligne de commande")
+        db.session.commit()
+        click.echo(f"{count} IBAN rechiffré(s) avec la clé n° {version}. Les autres clés peuvent être retirées "
+                   "de BANK_DATA_KEYS.")
 
     @app.cli.command("run-tasks")
     def run_tasks():

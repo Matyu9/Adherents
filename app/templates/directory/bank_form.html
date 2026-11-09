@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}Coordonnées bancaires{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>Coordonnées bancaires</h1>
+  <p class="muted">Foyer {{ household.name }}. L'IBAN est chiffré dès l'enregistrement ; seuls ses 4 derniers caractères restent affichés.</p>
+  <form method="post" novalidate autocomplete="off">
+    {{ form.hidden_tag() }}
+    {{ field(form.holder_person_id) }}
+    {{ field(form.holder_name) }}
+    {{ field(form.iban, autocomplete="off", spellcheck="false") }}
+    {{ field(form.bic, autocomplete="off") }}
+    <button type="submit">Enregistrer</button>
+  </form>
+  <p class="small"><a href="{{ url_for('directory.household', household_id=household.id) }}#banque">Annuler</a></p>
+</article>
+{% endblock %}

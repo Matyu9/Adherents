@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ "Modifier " ~ household.name if household else "Nouveau foyer" }}{% endblock %}
+{% block content %}
+<article class="narrow wide-form">
+  <h1>{{ "Modifier " ~ household.name if household else "Nouveau foyer" }}</h1>
+  {% if founder %}<p class="muted">{{ founder.full_name }} en sera le responsable 1.</p>{% endif %}
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.name) }}
+    {{ field(form.address_recipient) }}
+    {{ field(form.address_street, rows=2) }}
+    <div class="grid"><div>{{ field(form.postal_code) }}</div><div>{{ field(form.city) }}</div><div>{{ field(form.country) }}</div></div>
+    {{ field(form.notes, rows=3) }}
+    <button type="submit">Enregistrer</button>
+  </form>
+</article>
+{% endblock %}

@@ -32,7 +32,7 @@ failures = throttle.Limiter("totp", 5, 15 * 60)
 def required(account):
     """Qui peut agir sur les comptes des autres doit protéger le sien : il ouvrira toutes les applis."""
     return (account.is_admin or can(account, "account.manage") or can(account, "group.manage")
-            or can(account, "client.manage"))
+            or can(account, "client.manage") or can(account, "bank.view"))
 
 
 def _fernet():

@@ -48,6 +48,10 @@ class Config:
     # Avis de déconnexion aux applis : envoyés juste après la requête, sans la faire attendre.
     BACKCHANNEL_IN_BACKGROUND = True
 
+    # Clés de chiffrement des IBAN, « numéro:clé » séparées par des virgules (voir docs/configuration.md).
+    # Distinctes de SECRET_KEY, et sauvegardées à part de la base.
+    BANK_DATA_KEYS = os.environ.get("BANK_DATA_KEYS", "")
+
     # Content-Security-Policy : appliquée par défaut. « 1 » = Report-Only, pour diagnostiquer sans rien bloquer.
     CSP_REPORT_ONLY = os.environ.get("CSP_REPORT_ONLY", "0") == "1"
 
@@ -73,3 +77,4 @@ class TestConfig(Config):
     WTF_CSRF_ENABLED = False
     MAIL_IN_BACKGROUND = False
     BACKCHANNEL_IN_BACKGROUND = False
+    BANK_DATA_KEYS = "1:dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3QtMDE"

@@ -11,7 +11,7 @@ app/
 ├── permissions.py   Catalogue des droits, can(), @require
 ├── errors.py        Pages d'erreur
 ├── filters.py       Dates en français
-├── cli.py           flask create-admin, flask run-tasks
+├── cli.py           flask create-admin, run-tasks, bank-rotate-key…
 ├── blueprints/      Routes : valident les formulaires et la transaction
 ├── services/        Règles métier : ne font pas de commit
 ├── templates/       Jinja
@@ -50,14 +50,27 @@ Il n'y a aucune étape de build. Pico et HTMX sont copiés dans `static/vendor/`
 | `app_setting` | Réglages modifiables dans l'appli (nom, logo, couleur) |
 | `throttle_event` | Tentatives comptées pour la limitation de débit |
 
-`Person` et `Household` arrivent avec l'annuaire (phase 1). `Account` ne doit pas devenir la fiche d'une personne : voir le [plan](plan.md).
+### Annuaire (phase 1)
+
+Le modèle est décrit et justifié dans [annuaire.md](annuaire.md). En bref :
+
+| Table | Rôle |
+|---|---|
+| `person` | Une personne, quels que soient ses rôles. `account_id` la relie à son compte de connexion (0 ou 1). |
+| `household`, `household_member` | Le foyer (le payeur) et ses membres : responsables 1 et 2, personnes à charge |
+| `phone`, `external_ref` | Téléphones (d'une personne ou d'un foyer) et numéros du logiciel de gestion |
+| `season`, `membership` | Saisons et adhésions, une par personne et par saison. La saison en cours est dans `app_setting`. |
+| `teacher` | Profil de professeur |
+| `bank_account`, `sepa_mandate` | IBAN chiffrés (`services/bank.py`) et mandats SEPA |
+
+`Account` ne devient pas la fiche d'une personne : un enfant a une fiche sans compte, son responsable la voit depuis le sien. Le journal (`activity`) note aussi la fiche concernée (`person_id`, `household_id`), ce qui donne l'historique de chaque fiche.
 
 ## Rôles et droits
 
 | Rôle de base | Droits par défaut |
 |---|---|
 | Administrateur | Tous, sans qu'on puisse les lui retirer, plus la gestion des rôles |
-| Gestionnaire | Voir le journal |
+| Gestionnaire | Voir le journal ; consulter, modifier et fusionner l'annuaire (pas les IBAN) |
 | Adhérent | Aucun droit d'administration |
 
 Les rôles se modifient et se créent dans **Administration → Rôles**. Ajouter un droit se fait dans `PERMISSION_GROUPS` (`permissions.py`).
@@ -76,15 +89,16 @@ Gérer un compte permet d'en prendre le contrôle, car un lien d'invitation s'af
 | **Liens par email** | Usage unique, 7 jours pour une invitation, 24 heures pour une adresse, 1 heure pour un mot de passe. Ouvrir le lien ne consomme rien, car les antivirus de messagerie les suivent : il faut envoyer le formulaire. Limite connue : le lien figure dans les journaux d'accès de gunicorn et du proxy tant qu'il n'a pas servi. |
 | **`email_verified`** | Vrai seulement après un clic sur un lien parti par email. Un lien transmis à la main ne prouve rien, et un changement d'adresse par un responsable remet la valeur à faux. Les applis clientes s'y fieront. |
 | **Mot de passe oublié** | Même réponse et même durée que le compte existe ou non : l'envoi se fait hors de la requête. Avec la double authentification, le lien change le mot de passe sans ouvrir de session : une boîte mail piratée ne suffit pas. |
-| **Double authentification** | Secret chiffré avec une clé dérivée de `SECRET_KEY`, tolérance de ±30 secondes, un code ne sert qu'une fois, 5 essais en 15 minutes. Obligatoire pour les administrateurs et tout rôle qui gère les comptes ou les groupes. L'activer, la désactiver ou changer d'adresse demande à nouveau le mot de passe. |
+| **Double authentification** | Secret chiffré avec une clé dérivée de `SECRET_KEY`, tolérance de ±30 secondes, un code ne sert qu'une fois, 5 essais en 15 minutes. Obligatoire pour les administrateurs, tout rôle qui gère les comptes ou les groupes, et tout rôle qui lit les IBAN. L'activer, la désactiver ou changer d'adresse demande à nouveau le mot de passe. |
 | **CSRF** | Sur tous les formulaires et requêtes HTMX. Le jeton vit aussi longtemps que la session, pour qu'un long formulaire ouvert sur un téléphone n'échoue pas à l'envoi. |
-| **Journal** | Les champs de `SENSITIVE_FIELDS` (`password_hash`, `iban`, `bic`) sont masqués. Les connexions sont effacées au bout d'un an, car elles contiennent des adresses IP. |
+| **IBAN** | Chiffrés en AES-GCM avec `BANK_DATA_KEYS`, distincte de `SECRET_KEY`, et l'identifiant du foyer en données associées. Seuls les 4 derniers caractères s'affichent. La lecture en clair demande le droit `bank.view` et un nouveau code TOTP, et elle est écrite au journal. L'appli refuse de démarrer s'il manque la clé d'un IBAN en base. |
+| **Journal** | Les champs de `SENSITIVE_FIELDS` (`password_hash`, `iban`, `bic`, `iban_ciphertext`) sont masqués. Les connexions sont effacées au bout d'un an, car elles contiennent des adresses IP. |
 | **Logo** | Réencodé en PNG, ce qui retire les métadonnées, et servi sous un nom aléatoire. |
-| **Cache** | `no-store` sur les pages de connexion, de mot de passe et de compte. |
+| **Cache** | `no-store` sur les pages de connexion, de mot de passe et de compte, et sur toutes celles de l'annuaire. |
 
 ## Tâches périodiques
 
-`flask run-tasks`, lancée par le service `scheduler`, efface les connexions trop anciennes, les tentatives périmées et les liens expirés, ferme les sessions trop anciennes, renvoie les avis de déconnexion en attente, puis envoie les emails en attente. Elle écrit aussi `data/scheduler.last`, que `/sante` utilise pour vérifier que le planificateur tourne.
+`flask run-tasks`, lancée par le service `scheduler`, efface les connexions trop anciennes, les tentatives périmées et les liens expirés, ferme les sessions trop anciennes, renvoie les avis de déconnexion en attente, supprime les mandats SEPA 13 mois après leur dernier prélèvement (avec le compte bancaire qui n'en a plus), puis envoie les emails en attente. Elle écrit aussi `data/scheduler.last`, que `/sante` utilise pour vérifier que le planificateur tourne.
 
 ## Serveur OIDC
 

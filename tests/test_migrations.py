@@ -216,3 +216,66 @@ def test_logout_tables_cascade_on_the_real_schema(migrated):
     assert run_sql(migrated, "SELECT count(*) FROM oidc_session", "SELECT count(*) FROM oidc_logout") == [[(0,)], [(1,)]]
     run_sql(migrated, "DELETE FROM oidc_client WHERE id = 1")
     assert run_sql(migrated, "SELECT count(*) FROM oidc_logout") == [[(0,)]]
+
+
+def test_directory_on_the_real_schema(migrated):
+    """Phase 1 : les comptes existants n'ont pas de fiche, et les contraintes de l'annuaire tiennent dans la vraie base."""
+    upgrade(MIGRATIONS, revision="a0000005rolesgroupes")
+    run_sql(migrated, *SEED)
+    upgrade(MIGRATIONS)
+    assert_data_intact(migrated)
+    (activity,) = run_sql(migrated, "SELECT account_id, target_account_id, person_id, household_id FROM activity")
+    assert activity == [(1, 2, None, None)]  # le journal a été recopié tel quel
+    run_sql(migrated,
+            "INSERT INTO person (id, uuid, first_name, last_name, country, account_id, created_at, updated_at) "
+            "VALUES (1, 'u1', 'Paul', 'Martin', 'FR', 2, '2026-11-09', '2026-11-09'), "
+            "(2, 'u2', 'Zoé', 'Martin', 'FR', NULL, '2026-11-09', '2026-11-09')",
+            "INSERT INTO household (id, uuid, name, country, created_at, updated_at) "
+            "VALUES (1, 'h1', 'Famille Martin', 'FR', '2026-11-09', '2026-11-09')",
+            "INSERT INTO household_member (household_id, person_id, role, guardian_rank) "
+            "VALUES (1, 1, 'guardian', 1), (1, 2, 'dependent', NULL)",
+            "INSERT INTO phone (person_id, number, position) VALUES (2, '+33612345678', 0)",
+            "INSERT INTO season (id, label, starts_on, ends_on) VALUES (1, '2026-2027', '2026-09-01', '2027-08-31')",
+            "INSERT INTO membership (person_id, season_id, status, created_at, updated_at) "
+            "VALUES (2, 1, 'active', '2026-11-09', '2026-11-09')",
+            "INSERT INTO bank_account (id, household_id, holder_person_id, holder_name, iban_ciphertext, iban_last4, "
+            "iban_fingerprint, key_version, created_at, updated_at) "
+            "VALUES (1, 1, 1, 'Paul', x'00', '0189', 'f', 1, '2026-11-09', '2026-11-09')",
+            "INSERT INTO sepa_mandate (bank_account_id, rum, signed_on) VALUES (1, 'R1', '2026-09-01')",
+            "UPDATE activity SET person_id = 2, household_id = 1")
+    for statement in (
+        "INSERT INTO person (uuid, first_name, last_name, country, account_id, created_at, updated_at) "
+        "VALUES ('u3', 'A', 'B', 'FR', 2, '2026-11-09', '2026-11-09')",  # un compte, une seule fiche
+        "INSERT INTO household_member (household_id, person_id, role, guardian_rank) VALUES (1, 2, 'guardian', 1)",
+        "INSERT INTO household_member (household_id, person_id, role, guardian_rank) VALUES (1, 1, 'guardian', NULL)",
+        "INSERT INTO phone (person_id, household_id, number, position) VALUES (1, 1, '+33600000000', 0)",
+        "INSERT INTO phone (number, position) VALUES ('+33600000000', 0)",
+        "INSERT INTO membership (person_id, season_id, status, created_at, updated_at) "
+        "VALUES (2, 1, 'active', '2026-11-09', '2026-11-09')",
+        "INSERT INTO season (label, starts_on, ends_on) VALUES ('x', '2027-09-01', '2027-01-01')",
+        "INSERT INTO external_ref (kind, value, person_id) VALUES ('autre', '1', 1)",
+        "DELETE FROM season WHERE id = 1",  # elle a des adhésions
+    ):
+        with pytest.raises(sqlite3.IntegrityError):
+            run_sql(migrated, statement)
+    run_sql(migrated, "DELETE FROM account WHERE id = 2")
+    assert run_sql(migrated, "SELECT account_id FROM person WHERE id = 1") == [[(None,)]]
+    run_sql(migrated, "DELETE FROM person WHERE id = 2")
+    assert run_sql(migrated, "SELECT count(*) FROM phone", "SELECT count(*) FROM membership",
+                   "SELECT count(*) FROM household_member", "SELECT person_id FROM activity") == [
+        [(0,)], [(0,)], [(1,)], [(None,)]]
+    run_sql(migrated, "DELETE FROM household WHERE id = 1")
+    assert run_sql(migrated, "SELECT count(*) FROM bank_account", "SELECT count(*) FROM sepa_mandate",
+                   "SELECT household_id FROM activity", "SELECT count(*) FROM person") == [
+        [(0,)], [(0,)], [(None,)], [(1,)]]
+
+
+def test_directory_migration_can_be_undone_with_the_journal_intact(migrated):
+    upgrade(MIGRATIONS)
+    run_sql(migrated, *SEED)
+    downgrade(MIGRATIONS, revision="a0000005rolesgroupes")
+    assert_data_intact(migrated)
+    (tables,) = run_sql(migrated, "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN "
+                                  "('person', 'household', 'bank_account')")
+    assert tables == [] and run_sql(migrated, "SELECT count(*) FROM activity", "SELECT count(*) FROM login_session") == [
+        [(1,)], [(1,)]]

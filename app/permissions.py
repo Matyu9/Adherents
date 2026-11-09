@@ -16,6 +16,12 @@ A, G, H = Role.ADMIN, Role.GESTIONNAIRE, Role.ADHERENT
 
 # Catalogue des droits, regroupés comme dans l'écran « Rôles ».
 PERMISSION_GROUPS = [
+    ("Annuaire", [
+        ("directory.view", "Consulter l'annuaire : personnes, foyers, adhésions"),
+        ("directory.edit", "Modifier l'annuaire et les saisons, voir le lieu de naissance"),
+        ("directory.merge", "Fusionner deux fiches en double"),
+        ("bank.view", "Voir et modifier les coordonnées bancaires (IBAN), après une nouvelle saisie du code TOTP"),
+    ]),
     ("Comptes", [
         ("account.manage", "Gérer les comptes : créer, inviter, couper, fermer les sessions"),
         ("group.manage", "Gérer les groupes, qui donnent accès aux applis de l'association"),
@@ -31,7 +37,7 @@ PERMISSIONS = {key: label for _, perms in PERMISSION_GROUPS for key, label in pe
 # Droits des rôles de base tant qu'ils n'ont pas été modifiés (et à la création de la base).
 DEFAULT_PERMISSIONS = {
     A: set(PERMISSIONS),
-    G: {"activity.view"},
+    G: {"activity.view", "directory.view", "directory.edit", "directory.merge"},
     H: set(),
 }
 

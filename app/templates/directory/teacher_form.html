@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}Profil de professeur{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>Profil de professeur</h1>
+  <p class="muted">{{ person.full_name }}. Les droits dans l'appli se règlent sur son compte, pas ici.</p>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.status) }}
+    <div class="grid"><div>{{ field(form.started_on) }}</div><div>{{ field(form.left_on) }}</div></div>
+    {{ field(form.work_email) }}
+    {{ field(form.notes, rows=3) }}
+    <button type="submit">Enregistrer</button>
+  </form>
+  <p class="small"><a href="{{ url_for('directory.person', person_id=person.id) }}">Annuler</a></p>
+</article>
+{% endblock %}

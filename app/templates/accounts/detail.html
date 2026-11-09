@@ -20,6 +20,9 @@
       <dt>Double authentification</dt><dd>{% if account.totp_enabled %}Activée ({{ recovery_left }} code(s) de secours){% else %}Non{% endif %}</dd>
       <dt>Dernière connexion</dt><dd>{{ account.last_login_at | datetime_fr if account.last_login_at else "jamais" }}</dd>
       <dt>Créé le</dt><dd>{{ account.created_at | date_fr }}</dd>
+      {% if can(current_user, "directory.view") %}
+      <dt>Fiche de l'annuaire</dt><dd>{% if account.person %}<a href="{{ url_for('directory.person', person_id=account.person.id) }}">{{ account.person.full_name }}</a>{% else %}Aucune{% if can(current_user, "directory.edit") %} · <a href="{{ url_for('directory.link_accounts') }}">rattacher</a>{% endif %}{% endif %}</dd>
+      {% endif %}
     </dl>
   </section>
   {% if manage %}

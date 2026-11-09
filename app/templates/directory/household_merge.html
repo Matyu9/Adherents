@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Fusionner{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('directory.household', household_id=keep.id) }}">← {{ keep.name }}</a></p>
+<h1>Fusionner un doublon dans le foyer {{ keep.name }}</h1>
+{% if not other %}
+<p class="muted">Le foyer choisi sera absorbé : ses membres, téléphones, numéros et coordonnées bancaires passent sur {{ keep.name }}, puis il est supprimé.</p>
+<form method="get" class="filters">
+  <input type="search" name="q" value="{{ q }}" placeholder="Nom, membre ou ville" aria-label="Recherche">
+  <button type="submit" class="secondary">Chercher</button>
+</form>
+<ul class="plain-list">
+  {% for h in candidates %}
+  <li><a href="{{ url_for('directory.household', household_id=h.id) }}">{{ h.name }}</a> <small class="muted">{{ h.members | map(attribute="person.full_name") | join(", ") }}</small>
+    · <a href="{{ url_for('directory.merge_household', household_id=keep.id, avec=h.id) }}">Comparer</a></li>
+  {% else %}<li class="muted">Aucun foyer ne correspond.</li>{% endfor %}
+</ul>
+{% else %}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th></th><th>Foyer gardé</th><th>Foyer absorbé</th></tr></thead>
+  <tbody>
+  <tr><th>Nom</th><td data-label="Gardé">{{ keep.name }}</td><td data-label="Absorbé">{{ other.name }}</td></tr>
+  <tr><th>Membres</th><td data-label="Gardé">{% for m in keep.members %}{{ m.person.full_name }} ({{ m.label }}){{ ", " if not loop.last }}{% endfor %}</td><td data-label="Absorbé">{% for m in other.members %}{{ m.person.full_name }} ({{ m.label }}){{ ", " if not loop.last }}{% endfor %}</td></tr>
+  <tr><th>Ville</th><td data-label="Gardé">{{ keep.city or "—" }}</td><td data-label="Absorbé">{{ other.city or "—" }}</td></tr>
+  <tr><th>Comptes bancaires</th><td data-label="Gardé">{{ keep.bank_accounts | length }}</td><td data-label="Absorbé">{{ other.bank_accounts | length }}</td></tr>
+  </tbody>
+</table></div>
+{% if problems %}
+<div class="flash flash-error" role="alert">{{ problems | join(" ") }}</div>
+{% else %}
+<div class="actions">
+  <form method="post" data-confirm="Fusionner ? Le foyer {{ other.name }} sera supprimé.">
+    {{ csrf() }}
+    <input type="hidden" name="avec" value="{{ other.id }}">
+    <button type="submit">Fusionner</button>
+  </form>
+  <a href="{{ url_for('directory.merge_household', household_id=other.id, avec=keep.id) }}">Garder plutôt l'autre foyer</a>
+</div>
+{% endif %}
+<p class="small"><a href="{{ url_for('directory.merge_household', household_id=keep.id) }}">Choisir un autre foyer</a></p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import address, phones, history, post_button %}
+{% block title %}{{ person.full_name }}{% endblock %}
+{% block content %}
+{% set edit = can(current_user, "directory.edit") %}
+<p><a href="{{ url_for('directory.index') }}">← Annuaire</a></p>
+<div class="page-head">
+  <div>
+    <h1>{{ person.civility ~ " " if person.civility }}{{ person.full_name }}</h1>
+    <p class="muted">
+      {% if person.birth_date %}{{ person.age() }} ans{% endif %}
+      {% if person.teacher %}<span class="badge">{{ "Professeur" if person.teacher.active else "Ancien professeur" }}</span>{% endif %}
+      {% if person.archived_at %}<span class="badge">Archivée le {{ person.archived_at | date_fr }}</span>{% endif %}
+    </p>
+  </div>
+  <div class="actions">
+    {% if edit %}<a href="{{ url_for('directory.edit_person', person_id=person.id) }}" role="button" class="secondary">Modifier</a>{% endif %}
+    {% if can(current_user, "directory.merge") %}<a href="{{ url_for('directory.merge_person', person_id=person.id) }}" role="button" class="secondary outline">Fusionner un doublon</a>{% endif %}
+  </div>
+</div>
+
+<div class="detail-grid">
+  <section class="card">
+    <h2>Identité</h2>
+    <dl class="props">
+      {% if person.birth_name %}<dt>Nom de naissance</dt><dd>{{ person.birth_name }}</dd>{% endif %}
+      <dt>Sexe</dt><dd>{{ person.SEXES.get(person.sex, "—") }}</dd>
+      <dt>Naissance</dt><dd>{{ person.birth_date | date_fr if person.birth_date else "—" }}{% if edit and person.birth_place %} à {{ person.birth_place }}{% endif %}</dd>
+      <dt>Email</dt><dd>{% if person.email %}<a href="mailto:{{ person.email }}">{{ person.email }}</a>{% else %}—{% endif %}</dd>
+      <dt>Adresse</dt><dd>{{ address(person) }}</dd>
+      <dt>Urgence</dt><dd>{{ person.emergency_contact or "—" }}</dd>
+      {% for ref in person.external_refs %}<dt>{{ ref.KINDS[ref.kind] }}</dt><dd><code>{{ ref.value }}</code></dd>{% endfor %}
+    </dl>
+    {% if person.notes %}<p class="notes">{{ person.notes }}</p>{% endif %}
+  </section>
+  <section class="card" id="telephones">
+    <h2>Téléphones</h2>
+    {{ phones(person, phone_form, url_for('directory.add_person_phone', person_id=person.id), edit) }}
+  </section>
+</div>
+
+<h2 id="foyers">Foyers</h2>
+{% if person.household_links %}
+<ul class="plain-list">
+  {% for link in person.household_links %}
+  <li><a href="{{ url_for('directory.household', household_id=link.household_id) }}">{{ link.household.name }}</a>
+    <span class="badge">{{ link.label }}</span>{% if link.relationship %} <small class="muted">{{ link.relationship }}</small>{% endif %}</li>
+  {% endfor %}
+</ul>
+{% else %}<p class="muted">Dans aucun foyer.</p>{% endif %}
+{% if edit and not person.archived_at %}<p><a href="{{ url_for('directory.create_household', personne=person.id) }}">+ Créer un foyer dont {{ person.first_name }} est responsable</a></p>{% endif %}
+
+<h2 id="adhesions">Adhésions</h2>
+{% if person.memberships %}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Saison</th><th>Statut</th><th>Catégorie</th><th>Scolarité</th><th></th></tr></thead>
+  <tbody>
+  {% for m in person.memberships %}
+  <tr>
+    <td data-label="Saison">{{ m.season.label }}{% if current and current.id == m.season_id %} <small class="muted">(en cours)</small>{% endif %}</td>
+    <td data-label="Statut"><span class="badge{{ ' badge-ok' if m.status == 'active' }}">{{ m.STATUSES[m.status] }}</span>{% if m.withdrawn_on %} <small>le {{ m.withdrawn_on | date_fr }}</small>{% endif %}</td>
+    <td data-label="Catégorie">{{ m.category or "—" }}</td>
+    <td data-label="Scolarité">{{ [m.school_level, m.school_class] | select | join(" · ") or "—" }}</td>
+    <td data-label="" class="actions">{% if edit %}<a href="{{ url_for('directory.edit_membership', membership_id=m.id) }}">Modifier</a>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}<p class="muted">Aucune adhésion.</p>{% endif %}
+{% if edit and person.memberships | length < season_count %}<p><a href="{{ url_for('directory.create_membership', person_id=person.id) }}">+ Ajouter une adhésion</a></p>
+{% elif edit and not season_count %}<p class="muted small">Pour ajouter une adhésion, <a href="{{ url_for('directory.seasons') }}">créez d'abord la saison</a>.</p>{% endif %}
+
+<h2>Professeur</h2>
+{% if person.teacher %}
+{% set t = person.teacher %}
+<dl class="props">
+  <dt>Statut</dt><dd>{{ t.status or "—" }}</dd>
+  <dt>Arrivée</dt><dd>{{ t.started_on | date_fr if t.started_on else "—" }}</dd>
+  <dt>Départ</dt><dd>{{ t.left_on | date_fr if t.left_on else "—" }}</dd>
+  <dt>Email professionnel</dt><dd>{{ t.work_email or "—" }}</dd>
+</dl>
+{% if t.notes %}<p class="notes">{{ t.notes }}</p>{% endif %}
+{% if edit %}<div class="actions"><a href="{{ url_for('directory.teacher', person_id=person.id) }}">Modifier le profil</a>
+  {{ post_button(url_for('directory.delete_teacher', person_id=person.id), "Retirer le profil", "link-button", "Retirer le profil de professeur ? Pour un départ, indiquez plutôt la date de départ.") }}</div>{% endif %}
+{% else %}
+<p class="muted">Pas de profil de professeur.{% if edit %} <a href="{{ url_for('directory.teacher', person_id=person.id) }}">En créer un</a>{% endif %}</p>
+{% endif %}
+
+<h2 id="compte">Compte de connexion</h2>
+{% if person.account %}
+<p>{% if can(current_user, "account.manage") %}<a href="{{ url_for('accounts.detail', account_id=person.account.id) }}">{{ person.account.email }}</a>{% else %}{{ person.account.email }}{% endif %}
+  <span class="badge">{{ person.account.role_label }}</span></p>
+{% if can_account %}{{ post_button(url_for('directory.unlink_account', person_id=person.id), "Détacher ce compte", "link-button", "Détacher le compte de cette fiche ? Le compte existe toujours.") }}{% endif %}
+{% else %}
+<p class="muted">Aucun compte.</p>
+{% if can_account %}
+  {% if account_problem %}<p class="muted small">{{ account_problem }}</p>
+  {% else %}{{ post_button(url_for('directory.create_account', person_id=person.id), "Créer son compte et l'inviter", "secondary small", "Créer un compte pour " ~ person.email ~ " et lui envoyer une invitation ?") }}{% endif %}
+  <p class="small"><a href="{{ url_for('directory.link_accounts') }}">Rattacher un compte existant</a></p>
+{% endif %}
+{% endif %}
+
+{% if edit %}
+<h2>Archivage</h2>
+{% if person.archived_at %}
+{{ post_button(url_for('directory.restore_person', person_id=person.id), "Restaurer la fiche", "secondary small") }}
+{% else %}
+<p class="muted small">Une fiche archivée disparaît de la liste, sans rien effacer.</p>
+{{ post_button(url_for('directory.archive_person', person_id=person.id), "Archiver la fiche", "contrast outline small", "Archiver la fiche de " ~ person.full_name ~ " ?") }}
+{% endif %}
+{% endif %}
+
+<h2>Journal</h2>
+{{ history(entries) }}
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Fusionner{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('directory.person', person_id=keep.id) }}">← {{ keep.full_name }}</a></p>
+<h1>Fusionner un doublon dans la fiche de {{ keep.full_name }}</h1>
+{% if not other %}
+<p class="muted">Cherchez la fiche en double. Elle sera absorbée : ses foyers, téléphones, adhésions, numéros et son compte
+  passent sur la fiche de {{ keep.full_name }}, puis elle est supprimée.</p>
+<form method="get" class="filters">
+  <input type="search" name="q" value="{{ q }}" placeholder="Nom, prénom ou email" aria-label="Recherche">
+  <button type="submit" class="secondary">Chercher</button>
+</form>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Nom</th><th>Naissance</th><th>Email</th><th></th></tr></thead>
+  <tbody>
+  {% for p in candidates %}
+  <tr>
+    <td data-label="Nom"><a href="{{ url_for('directory.person', person_id=p.id) }}">{{ p.sort_name }}</a></td>
+    <td data-label="Naissance">{{ p.birth_date | date_fr if p.birth_date else "—" }}</td>
+    <td data-label="Email"><small>{{ p.email or "—" }}</small></td>
+    <td data-label=""><a href="{{ url_for('directory.merge_person', person_id=keep.id, avec=p.id) }}">Comparer</a></td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">Aucune fiche ne correspond.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th></th><th>Fiche gardée</th><th>Fiche absorbée</th></tr></thead>
+  <tbody>
+  {% for label, attr in [("Nom", "full_name"), ("Nom de naissance", "birth_name"), ("Naissance", "birth_date"), ("Email", "email"), ("Ville", "city"), ("Urgence", "emergency_contact")] %}
+  <tr><th>{{ label }}</th><td data-label="Gardée">{{ keep[attr] or "—" }}</td><td data-label="Absorbée">{{ other[attr] or "—" }}</td></tr>
+  {% endfor %}
+  <tr><th>Foyers</th><td data-label="Gardée">{{ keep.household_links | map(attribute="household.name") | join(", ") or "—" }}</td><td data-label="Absorbée">{{ other.household_links | map(attribute="household.name") | join(", ") or "—" }}</td></tr>
+  <tr><th>Adhésions</th><td data-label="Gardée">{{ keep.memberships | map(attribute="season.label") | join(", ") or "—" }}</td><td data-label="Absorbée">{{ other.memberships | map(attribute="season.label") | join(", ") or "—" }}</td></tr>
+  <tr><th>Compte</th><td data-label="Gardée">{{ keep.account.email if keep.account else "—" }}</td><td data-label="Absorbée">{{ other.account.email if other.account else "—" }}</td></tr>
+  </tbody>
+</table></div>
+<p class="muted small">Les champs vides de la fiche gardée sont complétés par ceux de l'autre ; en cas de conflit, la fiche gardée l'emporte.</p>
+{% if problems %}
+<div class="flash flash-error" role="alert">{{ problems | join(" ") }}</div>
+{% else %}
+<div class="actions">
+  <form method="post" data-confirm="Fusionner ? La fiche de {{ other.full_name }} sera supprimée.">
+    {{ csrf() }}
+    <input type="hidden" name="avec" value="{{ other.id }}">
+    <button type="submit">Fusionner</button>
+  </form>
+  <a href="{{ url_for('directory.merge_person', person_id=other.id, avec=keep.id) }}">Garder plutôt l'autre fiche</a>
+</div>
+{% endif %}
+<p class="small"><a href="{{ url_for('directory.merge_person', person_id=keep.id) }}">Choisir une autre fiche</a></p>
+{% endif %}
+{% endblock %}

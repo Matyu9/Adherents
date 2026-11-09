@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import post_button %}
+{% block title %}Saisons{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Saisons</h1>
+    <p class="muted">La saison en cours se choisit ici : elle n'est pas déduite de la date, car la réinscription à la saison suivante s'ouvre pendant la saison actuelle.</p>
+  </div>
+  <a href="{{ url_for('directory.create_season') }}" role="button">+ Nouvelle saison</a>
+</div>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Saison</th><th>Dates</th><th>Adhésions</th><th></th></tr></thead>
+  <tbody>
+  {% for s in seasons %}
+  <tr>
+    <td data-label="Saison"><strong>{{ s.label }}</strong>{% if current and current.id == s.id %} <span class="badge badge-ok">en cours</span>{% endif %}</td>
+    <td data-label="Dates"><small>du {{ s.starts_on | date_fr }} au {{ s.ends_on | date_fr }}</small></td>
+    <td data-label="Adhésions">{{ counts.get(s.id, 0) }}</td>
+    <td data-label="" class="actions">
+      <a href="{{ url_for('directory.edit_season', season_id=s.id) }}">Modifier</a>
+      {% if not current or current.id != s.id %}
+      {{ post_button(url_for('directory.set_current_season', season_id=s.id), "Mettre en cours", "link-button", "Faire de " ~ s.label ~ " la saison en cours ?") }}
+      {% if not counts.get(s.id) %}{{ post_button(url_for('directory.delete_season', season_id=s.id), "Supprimer", "link-button", "Supprimer la saison " ~ s.label ~ " ?") }}{% endif %}
+      {% endif %}
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">Aucune saison pour l'instant.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}IBAN{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>IBAN de {{ account.holder_name }}</h1>
+  <p class="muted">Foyer {{ household.name }} · {{ account.masked_iban }}</p>
+  {% if iban %}
+  <p><code class="iban">{{ iban }}</code></p>
+  {% if account.bic %}<p>BIC : <code>{{ account.bic }}</code></p>{% endif %}
+  <p class="muted small">Cette lecture est inscrite au journal. Ne recopiez l'IBAN nulle part ailleurs.</p>
+  {% else %}
+  <p>Saisissez un code de votre application de double authentification. Chaque lecture est inscrite au journal.</p>
+  <form method="post" novalidate autocomplete="off">
+    {{ form.hidden_tag() }}
+    {{ field(form.code, inputmode="numeric", autocomplete="one-time-code", autofocus=true) }}
+    <button type="submit">Afficher</button>
+  </form>
+  {% endif %}
+  <p class="small"><a href="{{ url_for('directory.household', household_id=household.id) }}#banque">← Retour au foyer</a></p>
+</article>
+{% endblock %}

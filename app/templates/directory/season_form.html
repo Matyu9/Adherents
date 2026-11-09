@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ "Saison " ~ season.label if season else "Nouvelle saison" }}{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>{{ "Saison " ~ season.label if season else "Nouvelle saison" }}</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.label, placeholder="2026-2027") }}
+    <div class="grid"><div>{{ field(form.starts_on) }}</div><div>{{ field(form.ends_on) }}</div></div>
+    <button type="submit">Enregistrer</button>
+  </form>
+  <p class="small"><a href="{{ url_for('directory.seasons') }}">Annuler</a></p>
+</article>
+{% endblock %}

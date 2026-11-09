@@ -402,3 +402,18 @@ progress { height: .6rem; border-radius: 999px; }
 .totp-secret { overflow-wrap: anywhere; }
 .recovery-codes { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .4rem; padding: 0; margin: 0 0 1rem; list-style: none; }
 .recovery-codes li { list-style: none; }
+
+/* --- Annuaire ------------------------------------------------------------ */
+.plain-list { list-style: none; padding: 0; margin: 0 0 1rem; }
+.plain-list > li { list-style: none; padding: .35rem 0; border-bottom: 1px solid var(--border); }
+.plain-list > li:last-child { border-bottom: 0; }
+.inline-form { display: inline-flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin: 0; }
+.inline-form input, .inline-form select { width: auto; margin: 0; padding-top: .3rem; padding-bottom: .3rem; }
+.inline-form button { width: auto; margin: 0; }
+.button-form { display: inline-block; margin: 0 .5rem .5rem 0; }
+.button-form button { width: auto; margin: 0; }
+.plain-list .button-form, .actions .button-form { margin: 0 0 0 .5rem; }
+.notes { white-space: pre-line; color: var(--text-2); font-size: .9rem; margin-top: 1rem; }
+.wide-form { max-width: 40rem; }
+.iban { font-size: 1.15rem; letter-spacing: .04em; user-select: all; }
+section.card + section.card { margin-top: .75rem; }

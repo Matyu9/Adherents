@@ -15,7 +15,9 @@ Déjà en place :
 - **les comptes** : invitations, mot de passe oublié, groupes, sessions révocables, double authentification obligatoire pour qui administre ;
 - **le serveur OIDC** : les applis de l'association s'y connectent (Authorization Code avec PKCE), et sont prévenues quand une session se ferme (Back-Channel Logout).
 
-Pas encore : l'annuaire, qui attend les exports du logiciel de gestion, puis les inscriptions et l'espace adhérent. La suite est décrite dans le [plan du projet](docs/plan.md).
+- **l'annuaire** : personnes, foyers, téléphones, saisons et adhésions, professeurs, fusion des doublons, IBAN chiffrés et mandats SEPA, rattachement des comptes à leur fiche.
+
+Pas encore : l'import depuis le logiciel de gestion, qui attend ses exports, puis le catalogue, les inscriptions et l'espace adhérent. La suite est décrite dans le [plan du projet](docs/plan.md).
 
 ## Démarrage rapide (développement)
 

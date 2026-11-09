@@ -20,6 +20,7 @@ PERMISSION_GROUPS = [
         ("directory.view", "Consulter l'annuaire : personnes, foyers, adhésions"),
         ("directory.edit", "Modifier l'annuaire et les saisons, voir le lieu de naissance"),
         ("directory.merge", "Fusionner deux fiches en double"),
+        ("teacher.manage", "Gérer les professeurs et voir leurs contrats"),
         ("bank.view", "Voir et modifier les coordonnées bancaires (IBAN), après une nouvelle saisie du code TOTP"),
     ]),
     ("Comptes", [

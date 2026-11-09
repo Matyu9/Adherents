@@ -29,7 +29,7 @@
   {% set m = (p.memberships | selectattr("season_id", "equalto", season.id) | first) if season else none %}
   <tr>
     <td data-label="Nom"><span><a href="{{ url_for('directory.person', person_id=p.id) }}">{{ p.sort_name }}</a>
-      {% if p.teacher and p.teacher.active %} <span class="badge">prof</span>{% endif %}
+ {% if p.teacher and p.teacher.active %} <span class="badge">prof</span>{% endif %}
       {% if p.archived_at %} <span class="badge">archivée</span>{% endif %}</span></td>
     <td data-label="Naissance"><small>{{ p.birth_date | date_fr if p.birth_date else "—" }}</small></td>
     <td data-label="Email"><small>{{ p.email or "—" }}</small></td>

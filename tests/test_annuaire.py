@@ -285,7 +285,7 @@ def test_status_filters(client, admin, family):
     old, current = season("2025-2026"), season("2026-2027", current=True)
     db.session.add_all([Membership(person=family["zoe"], season=current), Membership(person=family["anne"], season=old),
                         Membership(person=family["marc"], season=current, status=Membership.WITHDRAWN)])
-    prof = person("Paul", "Prof", teacher=Teacher())
+    prof = person("Paul", "Prof", teacher=Teacher())  # professeur seulement : dans l'écran Professeurs
     person("Parti", "Prof", teacher=Teacher(left_on=date(2020, 1, 1)))
     gone = person("Ancienne", "Fiche", archived_at=date(2026, 1, 1))
     db.session.commit()
@@ -294,11 +294,11 @@ def test_status_filters(client, admin, family):
         page = client.get("/annuaire?" + query).get_data(as_text=True)
         return {n for n in ("Zoé", "Anne", "Marc", "Paul", "Parti", "Ancienne") if f" {n}</a>" in page}
 
-    assert names("") == {"Zoé", "Anne", "Marc", "Paul", "Parti"}
+    assert names("") == {"Zoé", "Anne", "Marc"}
     assert names("statut=eleves") == {"Zoé"}
     assert names(f"statut=eleves&saison={old.id}") == {"Anne"}
     assert names("statut=anciens") == {"Anne", "Marc"}  # Marc a abandonné cette saison
-    assert names("statut=professeurs") == {"Paul"}
+    assert names("statut=professeurs") == {"Zoé", "Anne", "Marc"}  # filtre retiré : ignoré
     assert names("statut=archives") == {"Ancienne"}
     assert prof and gone
 
@@ -423,21 +423,6 @@ def test_membership_form(client, admin, family):
     assert m.status == "withdrawn" and m.withdrawn_on == date(2027, 1, 10)
     assert db.session.scalar(db.select(Activity).filter_by(action="membership.update")).changes["status"] == [
         "active", "withdrawn"]
-
-
-def test_teacher_profile(client, admin, family):
-    anne = family["anne"]
-    response = client.post(f"/annuaire/personnes/{anne.id}/professeur",
-                           data={"status": "CDI", "started_on": "2020-09-01", "left_on": "2019-01-01"})
-    assert "ne peut pas précéder" in response.get_data(as_text=True)
-    client.post(f"/annuaire/personnes/{anne.id}/professeur", data={"status": "CDI", "started_on": "2020-09-01",
-                                                                   "work_email": "prof@ecole.test"})
-    teacher = db.session.get(Person, anne.id).teacher
-    assert teacher.status == "CDI" and teacher.active and teacher.work_email == "prof@ecole.test"
-    client.post(f"/annuaire/personnes/{anne.id}/professeur", data={"status": "CDI", "left_on": "2021-06-30"})
-    assert not db.session.get(Person, anne.id).teacher.active
-    client.post(f"/annuaire/personnes/{anne.id}/professeur/supprimer")
-    assert db.session.get(Person, anne.id).teacher is None and db.session.get(Teacher, anne.id) is None
 
 
 # ---------------------------------------------------------------------------

@@ -9,7 +9,7 @@
     <h1>{{ person.civility ~ " " if person.civility }}{{ person.full_name }}</h1>
     <p class="muted">
       {% if person.birth_date %}{{ person.age() }} ans{% endif %}
-      {% if person.teacher %}<span class="badge">{{ "Professeur" if person.teacher.active else "Ancien professeur" }}</span>{% endif %}
+      {% if person.teacher %}{% if can(current_user, "teacher.manage") %}<a href="{{ url_for('teachers.detail', person_id=person.id) }}" class="badge">{{ "Professeur" if person.teacher.active else "Ancien professeur" }}</a>{% else %}<span class="badge">{{ "Professeur" if person.teacher.active else "Ancien professeur" }}</span>{% endif %}{% endif %}
       {% if person.archived_at %}<span class="badge">Archivée le {{ person.archived_at | date_fr }}</span>{% endif %}
     </p>
   </div>
@@ -69,22 +69,6 @@
 {% else %}<p class="muted">Aucune adhésion.</p>{% endif %}
 {% if edit and person.memberships | length < season_count %}<p><a href="{{ url_for('directory.create_membership', person_id=person.id) }}">+ Ajouter une adhésion</a></p>
 {% elif edit and not season_count %}<p class="muted small">Pour ajouter une adhésion, <a href="{{ url_for('directory.seasons') }}">créez d'abord la saison</a>.</p>{% endif %}
-
-<h2>Professeur</h2>
-{% if person.teacher %}
-{% set t = person.teacher %}
-<dl class="props">
-  <dt>Statut</dt><dd>{{ t.status or "—" }}</dd>
-  <dt>Arrivée</dt><dd>{{ t.started_on | date_fr if t.started_on else "—" }}</dd>
-  <dt>Départ</dt><dd>{{ t.left_on | date_fr if t.left_on else "—" }}</dd>
-  <dt>Email professionnel</dt><dd>{{ t.work_email or "—" }}</dd>
-</dl>
-{% if t.notes %}<p class="notes">{{ t.notes }}</p>{% endif %}
-{% if edit %}<div class="actions"><a href="{{ url_for('directory.teacher', person_id=person.id) }}">Modifier le profil</a>
-  {{ post_button(url_for('directory.delete_teacher', person_id=person.id), "Retirer le profil", "link-button", "Retirer le profil de professeur ? Pour un départ, indiquez plutôt la date de départ.") }}</div>{% endif %}
-{% else %}
-<p class="muted">Pas de profil de professeur.{% if edit %} <a href="{{ url_for('directory.teacher', person_id=person.id) }}">En créer un</a>{% endif %}</p>
-{% endif %}
 
 <h2 id="compte">Compte de connexion</h2>
 {% if person.account %}

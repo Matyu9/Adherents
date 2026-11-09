@@ -1,4 +1,4 @@
-"""Annuaire : personnes, foyers, adhésions, professeurs, saisons, coordonnées bancaires et rattachement des comptes.
+"""Annuaire : personnes, foyers, adhésions, saisons, coordonnées bancaires et rattachement des comptes.
 
 Toutes ses pages contiennent des données personnelles : le navigateur ne les garde pas (Cache-Control: no-store).
 """
@@ -10,7 +10,7 @@ from wtforms.validators import DataRequired, Length, Optional, Regexp, Validatio
 
 from ..extensions import db
 from ..models import (Account, Activity, BankAccount, Household, HouseholdMember, Membership, Person, Phone, Season,
-                      SepaMandate, Teacher)
+                      SepaMandate)
 from ..permissions import can, require
 from ..services import accounts as accounts_service
 from ..services import bank, directory, throttle
@@ -115,18 +115,6 @@ class MembershipForm(FlaskForm):
     def withdrawn_date(self):
         """La date d'abandon ne compte que pour un abandon : masquée sinon, on ne garde pas ce qui y traînerait."""
         return self.withdrawn_on.data if self.status.data == Membership.WITHDRAWN else None
-
-
-class TeacherForm(FlaskForm):
-    status = SelectField("Statut", default="", coerce=_text, validate_choice=False, choices=[("", "—"), *((s, s) for s in Teacher.STATUSES)])
-    started_on = DateField("Arrivée", validators=[Optional()])
-    left_on = DateField("Départ", validators=[Optional()])
-    work_email = EmailField("Email professionnel", validators=[Optional(), Length(max=255), EMAIL], filters=[_strip])
-    notes = TextAreaField("Notes", validators=[Optional(), Length(max=5000)])
-
-    def validate_left_on(self, field):
-        if field.data and self.started_on.data and field.data < self.started_on.data:
-            raise ValidationError("Le départ ne peut pas précéder l'arrivée.")
 
 
 class SeasonForm(FlaskForm):
@@ -427,42 +415,6 @@ def edit_membership(membership_id):
         flash("Adhésion enregistrée.", "success")
         return redirect(url_for(".person", person_id=person.id) + "#adhesions")
     return render_template("directory/membership_form.html", form=form, person=person, membership=membership)
-
-
-# --- Professeur ------------------------------------------------------------
-
-@bp.route("/personnes/<int:person_id>/professeur", methods=["GET", "POST"])
-@require("directory.edit")
-def teacher(person_id):
-    person = _person(person_id)
-    form = TeacherForm(obj=person.teacher)
-    if form.validate_on_submit():
-        created = person.teacher is None
-        if created:
-            person.teacher = Teacher()
-        changes = diff(person.teacher, ("status", "started_on", "left_on", "work_email", "notes"),
-                       {"status": form.status.data if form.status.data in Teacher.STATUSES else None, "started_on": form.started_on.data,
-                        "left_on": form.left_on.data, "work_email": _blank(form.work_email.data),
-                        "notes": _blank(form.notes.data)})
-        log("teacher.create" if created else "teacher.update",
-            f"Profil de professeur {'créé' if created else 'modifié'} : {person.full_name}", changes=changes,
-            person=person)
-        db.session.commit()
-        flash("Profil de professeur enregistré.", "success")
-        return redirect(url_for(".person", person_id=person.id))
-    return render_template("directory/teacher_form.html", form=form, person=person)
-
-
-@bp.route("/personnes/<int:person_id>/professeur/supprimer", methods=["POST"])
-@require("directory.edit")
-def delete_teacher(person_id):
-    person = _person(person_id)
-    if person.teacher is not None:
-        person.teacher = None
-        log("teacher.delete", f"Profil de professeur retiré : {person.full_name}", person=person)
-        db.session.commit()
-        flash("Profil de professeur retiré. Pour un départ, indiquez plutôt la date de départ.", "success")
-    return redirect(url_for(".person", person_id=person.id))
 
 
 # --- Fusion ----------------------------------------------------------------

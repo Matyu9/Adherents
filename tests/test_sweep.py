@@ -20,6 +20,7 @@ SETTINGS, JOURNAL, HIDDEN = "settings.manage", "activity.view", "caché"  # cach
 ACCOUNTS, GROUPS, CLIENTS = "account.manage", "group.manage", "client.manage"
 DIR_VIEW, DIR_EDIT, DIR_MERGE, BANK = "directory.view", "directory.edit", "directory.merge", "bank.view"
 LINKING = "account.manage+directory.edit"
+TEACHERS = "teacher.manage"
 ACCESS = {
     "static": PUBLIC, "auth.login": PUBLIC, "csp.report": PUBLIC, "settings.logo_file": PUBLIC,
     "auth.two_factor": PUBLIC, "auth.forgot": PUBLIC, "auth.token_link": PUBLIC,
@@ -46,9 +47,10 @@ ACCESS = {
     **{f"directory.{name}": DIR_VIEW for name in ("index", "person", "households", "household")},
     **{f"directory.{name}": DIR_EDIT for name in (
         "create_person", "edit_person", "archive_person", "restore_person", "add_person_phone", "add_household_phone",
-        "delete_phone", "create_membership", "edit_membership", "teacher", "delete_teacher", "create_household",
+        "delete_phone", "create_membership", "edit_membership", "create_household",
         "edit_household", "archive_household", "restore_household", "add_member", "update_member", "remove_member",
         "swap_guardians", "seasons", "create_season", "edit_season", "set_current_season", "delete_season")},
+    **{f"teachers.{name}": TEACHERS for name in ("index", "create", "detail", "edit", "remove")},
     "directory.merge_person": DIR_MERGE, "directory.merge_household": DIR_MERGE,
     **{f"directory.{name}": BANK for name in ("create_bank_account", "reveal_iban", "delete_bank_account",
                                               "create_mandate", "edit_mandate")},
@@ -56,7 +58,7 @@ ACCESS = {
                                                  "person_from_account")},
 }
 HOLDERS = {SETTINGS: {A}, JOURNAL: {A, G}, ADMIN_ONLY: {A}, HIDDEN: {A}, ACCOUNTS: {A}, GROUPS: {A}, CLIENTS: {A},
-           DIR_VIEW: {A, G}, DIR_EDIT: {A, G}, DIR_MERGE: {A, G}, BANK: {A}, LINKING: {A}}
+           DIR_VIEW: {A, G}, DIR_EDIT: {A, G}, DIR_MERGE: {A, G}, BANK: {A}, LINKING: {A}, TEACHERS: {A}}
 ARGUMENTS = {"filename": "css/app.css", "key": "adherent", "sid": "inconnue", "name": "absent",
              "account_id": 1, "group_id": 999, "token": "inconnu", "client_pk": 999, "person_id": 999,
              "household_id": 999, "phone_id": 999, "membership_id": 999, "season_id": 999, "mandate_id": 999}
@@ -214,6 +216,7 @@ def test_crawl_every_link(app, rich, who):
     assert ("/annuaire" in seen) == (who in (A, G)) and ("/annuaire/foyers" in seen) == (who in (A, G))
     assert ("/annuaire/saisons" in seen) == (who in (A, G))
     assert ("/annuaire/rattachement" in seen) == (who == A)
+    assert ("/professeurs" in seen) == (who == A) and any(p.startswith("/professeurs/") for p in seen) == (who == A)
     assert any(p.startswith("/annuaire/personnes/") for p in seen) == (who in (A, G))
     assert any(p.endswith("/afficher") for p in seen) == (who == A)
     assert any(p.endswith("/fusionner") for p in seen) == (who in (A, G))

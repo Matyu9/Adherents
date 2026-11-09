@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ "Contrat de " ~ person.full_name if person else "Nouveau professeur" }}{% endblock %}
+{% block content %}
+<article class="narrow wide-form">
+  {% if person %}
+  <h1>Contrat de {{ person.full_name }}</h1>
+  {% elif existing %}
+  <h1>{{ existing.full_name }} devient professeur</h1>
+  <p class="muted">Sa fiche de l'annuaire est conservée telle quelle : on y ajoute seulement son contrat.</p>
+  {% else %}
+  <h1>Nouveau professeur</h1>
+  <details class="already"{% if q %} open{% endif %}>
+    <summary>Il est déjà dans l'annuaire (parent, élève) ?</summary>
+    <form method="get">
+      <div class="inline-form">
+        <input type="search" name="q" value="{{ q }}" placeholder="Nom, prénom ou email" aria-label="Chercher dans l'annuaire">
+        <button type="submit" class="secondary small">Chercher</button>
+      </div>
+    </form>
+    {% if q %}
+    <ul class="plain-list">
+      {% for p in found %}
+      <li>{{ p.sort_name }}{% if p.birth_date %} <small class="muted">{{ p.birth_date | date_fr }}</small>{% endif %}
+        · <a href="{{ url_for('teachers.create', personne=p.id) }}">En faire un professeur</a></li>
+      {% else %}<li class="muted">Personne ne correspond : remplissez le formulaire ci-dessous.</li>{% endfor %}
+    </ul>
+    {% endif %}
+  </details>
+  {% endif %}
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {% if form.first_name %}
+    <div class="grid"><div>{{ field(form.civility) }}</div><div></div></div>
+    <div class="grid"><div>{{ field(form.first_name) }}</div><div>{{ field(form.last_name) }}</div></div>
+    <div class="grid"><div>{{ field(form.email) }}</div><div>{{ field(form.phone) }}</div></div>
+    <h2>Contrat</h2>
+    {% endif %}
+    {{ field(form.status) }}
+    <div class="grid"><div>{{ field(form.started_on) }}</div><div>{{ field(form.left_on) }}</div></div>
+    {{ field(form.work_email) }}
+    {{ field(form.notes, rows=3) }}
+    <button type="submit">Enregistrer</button>
+  </form>
+  <p class="small"><a href="{{ url_for('teachers.detail', person_id=person.id) if person else url_for('teachers.index') }}">Annuler</a></p>
+</article>
+{% endblock %}

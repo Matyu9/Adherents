@@ -427,3 +427,7 @@ section.card + section.card { margin-top: .75rem; }
 .flash-close:focus-visible { outline: 2px solid currentColor; border-radius: 4px; }
 .merge-table tr.conflict > * { background: var(--warn-bg); }
 .merge-table .choice { margin: 0; }
+.already { margin: 0 0 1.25rem; padding: .75rem 1rem; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); }
+.already summary { cursor: pointer; font-weight: 550; }
+.already form { margin: .75rem 0 .25rem; }
+a.badge:hover { text-decoration: none; border-color: var(--brand); }

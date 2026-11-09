@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Professeurs{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Professeurs</h1>
+    <p class="muted">{{ items | length }} professeur{{ "s" if items | length > 1 }}{{ " parti(s)" if gone }}. Leurs contrats ne sont visibles que d'ici.</p>
+  </div>
+  <a href="{{ url_for('teachers.create') }}" role="button">+ Nouveau professeur</a>
+</div>
+<form method="get" class="filters">
+  <input type="search" name="q" value="{{ q }}" placeholder="Nom, prénom ou email" aria-label="Recherche">
+  <select name="partis" aria-label="Présents ou partis" data-autosubmit>
+    <option value="">En poste</option>
+    <option value="1" {{ "selected" if gone }}>Partis</option>
+  </select>
+  <noscript><button type="submit">Filtrer</button></noscript>
+</form>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Nom</th><th>Contrat</th><th>Arrivée</th><th>{{ "Départ" if gone else "Email professionnel" }}</th></tr></thead>
+  <tbody>
+  {% for p in items %}
+  <tr>
+    <td data-label="Nom"><span><a href="{{ url_for('teachers.detail', person_id=p.id) }}">{{ p.sort_name }}</a>
+      {% if p.memberships or p.household_links %} <span class="badge">aussi adhérent ou parent</span>{% endif %}</span></td>
+    <td data-label="Contrat">{{ p.teacher.status or "—" }}</td>
+    <td data-label="Arrivée"><small>{{ p.teacher.started_on | date_fr if p.teacher.started_on else "—" }}</small></td>
+    <td data-label="{{ 'Départ' if gone else 'Email professionnel' }}"><small>{% if gone %}{{ p.teacher.left_on | date_fr }}{% else %}{{ p.teacher.work_email or "—" }}{% endif %}</small></td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">Aucun professeur ne correspond.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

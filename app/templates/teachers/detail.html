@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import post_button %}
+{% block title %}{{ person.full_name }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('teachers.index') }}">← Professeurs</a></p>
+<div class="page-head">
+  <div>
+    <h1>{{ person.civility ~ " " if person.civility }}{{ person.full_name }}</h1>
+    <p class="muted"><span class="badge{{ ' badge-ok' if teacher.active }}">{{ "En poste" if teacher.active else "Parti le " ~ (teacher.left_on | date_fr) }}</span></p>
+  </div>
+  <a href="{{ url_for('teachers.edit', person_id=person.id) }}" role="button" class="secondary">Modifier le contrat</a>
+</div>
+<div class="detail-grid">
+  <section class="card">
+    <h2>Contrat</h2>
+    <dl class="props">
+      <dt>Contrat</dt><dd>{{ teacher.status or "—" }}</dd>
+      <dt>Arrivée</dt><dd>{{ teacher.started_on | date_fr if teacher.started_on else "—" }}</dd>
+      <dt>Départ</dt><dd>{{ teacher.left_on | date_fr if teacher.left_on else "—" }}</dd>
+    </dl>
+    {% if teacher.notes %}<p class="notes">{{ teacher.notes }}</p>{% endif %}
+  </section>
+  <section class="card">
+    <h2>Contact</h2>
+    <dl class="props">
+      <dt>Email pro</dt><dd>{% if teacher.work_email %}<a href="mailto:{{ teacher.work_email }}">{{ teacher.work_email }}</a>{% else %}—{% endif %}</dd>
+      <dt>Email perso</dt><dd>{{ person.email or "—" }}</dd>
+      {% for p in person.phones %}<dt>{{ p.label or "Téléphone" }}</dt><dd><a href="tel:{{ p.number }}">{{ p.number | phone }}</a></dd>{% endfor %}
+    </dl>
+    {% if can(current_user, "directory.view") %}<p class="small"><a href="{{ url_for('directory.person', person_id=person.id) }}">Fiche complète dans l'annuaire</a>{% if person.memberships or person.household_links %} (aussi adhérent ou parent){% endif %}</p>{% endif %}
+  </section>
+</div>
+<p class="muted small">Un départ s'indique par sa date : la fiche et l'historique restent. Ne retirez le statut de professeur qu'en cas d'erreur de saisie.</p>
+{{ post_button(url_for('teachers.remove', person_id=person.id), "Ce n'est pas un professeur (erreur de saisie)", "contrast outline small", "Retirer " ~ person.full_name ~ " des professeurs ? Son contrat est effacé, sa fiche de l'annuaire reste.") }}
+{% endblock %}

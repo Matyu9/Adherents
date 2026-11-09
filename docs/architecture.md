@@ -70,7 +70,7 @@ Le modèle est décrit et justifié dans [annuaire.md](annuaire.md). En bref :
 | Rôle de base | Droits par défaut |
 |---|---|
 | Administrateur | Tous, sans qu'on puisse les lui retirer, plus la gestion des rôles |
-| Gestionnaire | Voir le journal ; consulter, modifier et fusionner l'annuaire (pas les IBAN) |
+| Gestionnaire | Voir le journal ; consulter, modifier et fusionner l'annuaire (ni les IBAN, ni les contrats des professeurs) |
 | Adhérent | Aucun droit d'administration |
 
 Les rôles se modifient et se créent dans **Administration → Rôles**. Ajouter un droit se fait dans `PERMISSION_GROUPS` (`permissions.py`).

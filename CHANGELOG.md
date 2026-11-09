@@ -12,6 +12,7 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 - **Rattachement des comptes** à leur fiche, avec des propositions (même email, même nom) qu'une personne valide une à une ; création d'une fiche depuis un compte, et d'un compte avec invitation depuis la fiche d'une personne de 16 ans ou plus (accord d'un responsable légal avant 18 ans).
 - **Fusion champ par champ** : ce qui n'est rempli que d'un côté est repris, et l'écran demande quoi garder quand les deux fiches diffèrent.
 - Un IBAN présent sur plusieurs foyers est signalé en permanence sur chacun d'eux.
+- **Écran Professeurs**, avec son droit `teacher.manage` : fiche et contrat d'un nouveau professeur en une fois, ou contrat ajouté à un adulte déjà dans l'annuaire. La fiche d'un adhérent ne propose plus de contrat.
 
 ### Modifié
 

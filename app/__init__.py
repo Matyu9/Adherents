@@ -56,6 +56,7 @@ def create_app(config_class=Config):
     from .blueprints.oidc import bp as oidc_bp
     from .blueprints.roles import bp as roles_bp
     from .blueprints.settings import bp as settings_bp
+    from .blueprints.teachers import bp as teachers_bp
     from .cli import register_cli
     from .filters import register_filters
     from .permissions import can
@@ -65,6 +66,7 @@ def create_app(config_class=Config):
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(directory_bp)
+    app.register_blueprint(teachers_bp)
     app.register_blueprint(account_bp)
     app.register_blueprint(accounts_bp)
     app.register_blueprint(groups_bp)

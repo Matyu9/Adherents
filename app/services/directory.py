@@ -13,7 +13,7 @@ PERSON_FIELDS = ("civility", "first_name", "last_name", "birth_name", "sex", "bi
                  "emergency_contact", "notes")
 ADDRESS_FIELDS = ("address_recipient", "address_street", "postal_code", "city", "country")
 # Filtres de la liste des personnes.
-STATUSES = {"eleves": "Élèves de la saison", "anciens": "Anciens adhérents", "professeurs": "Professeurs",
+STATUSES = {"eleves": "Élèves de la saison", "anciens": "Anciens adhérents",
             "archives": "Archivées"}
 
 
@@ -97,11 +97,17 @@ def search(query, text):
     return query
 
 
+def staff_only():
+    """Condition « la personne n'est là que comme professeur » : profil de professeur, sans adhésion ni foyer.
+    Elle figure dans l'écran Professeurs, pas dans la liste des personnes."""
+    return db.and_(Person.teacher.has(), ~Person.memberships.any(), ~Person.household_links.any())
+
+
 def person_query(text=None, status=None, season=None):
     query = search(db.select(Person), text)
     if status == "archives":
         return query.where(Person.archived_at.is_not(None))
-    query = query.where(Person.archived_at.is_(None))
+    query = query.where(Person.archived_at.is_(None), ~staff_only())
     if status == "eleves" and season is not None:
         query = query.where(active_in(season))
     elif status == "eleves":
@@ -111,8 +117,6 @@ def person_query(text=None, status=None, season=None):
         current = current_season()
         if current is not None:
             query = query.where(~active_in(current))
-    elif status == "professeurs":
-        query = query.where(Person.teacher.has(db.or_(Teacher.left_on.is_(None), Teacher.left_on > db.func.date("now"))))
     return query
 
 

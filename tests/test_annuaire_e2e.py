@@ -66,14 +66,9 @@ def test_a_household_from_start_to_iban(session):
     content = page.content()
     assert "06 12 34 56 78" in content and "Léon Lefèvre" in content and "Responsable 1" in content
 
+    # Opération bancaire : le mode sécurisé demande un code, puis revient sur le formulaire demandé.
     page.click("text=+ Ajouter des coordonnées bancaires")
-    page.fill("#iban", "FR76 3000 6000 0112 3456 7890 189")
-    page.click("main form[method=post] button[type=submit]")
-    page.wait_for_url("**/annuaire/foyers/*")
-    assert "•••• •••• 0189" in page.content() and IBAN not in page.content()
-    shot(page, "foyer")
-
-    page.click("text=Afficher l'IBAN")
+    page.wait_for_url("**/annuaire/mode-securise?**")
     with _app["app"].app_context():
         from app.models import Account, Role
         db.session.scalar(db.select(Account).filter_by(role=Role.ADMIN)).totp_last_counter = None
@@ -81,6 +76,15 @@ def test_a_household_from_start_to_iban(session):
     from .conftest import TOTP_SECRET, totp_code
     page.fill("#code", totp_code(TOTP_SECRET))
     page.click("main form[method=post] button[type=submit]")
+    page.wait_for_url("**/banque/nouveau")
+    page.fill("#iban", "FR76 3000 6000 0112 3456 7890 189")
+    page.click("main form[method=post] button[type=submit]")
+    page.wait_for_url("**/annuaire/foyers/*")
+    assert "•••• •••• 0189" in page.content() and IBAN not in page.content()
+    assert "Mode sécurisé" in page.content()
+    shot(page, "foyer")
+
+    page.click("text=Afficher l'IBAN")  # fenêtre encore ouverte : pas de nouveau code
     assert "FR76 3000 6000 0112 3456 7890 189" in page.content()
 
     with _app["app"].app_context():

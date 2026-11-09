@@ -431,3 +431,5 @@ section.card + section.card { margin-top: .75rem; }
 .already summary { cursor: pointer; font-weight: 550; }
 .already form { margin: .75rem 0 .25rem; }
 a.badge:hover { text-decoration: none; border-color: var(--brand); }
+.secure-mode { display: flex; align-items: center; gap: .5rem; margin-bottom: .75rem; }
+.secure-mode .button-form { margin: 0; }

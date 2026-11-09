@@ -16,7 +16,7 @@ def by_name(report):
 def test_page_and_json_for_admin(client, admin):
     assert "État de l'installation" in client.get("/sante").get_data(as_text=True)
     data = client.get("/health").get_json()
-    assert set(by_name(data)) == {"database", "migrations", "storage", "scheduler", "email"}
+    assert set(by_name(data)) == {"database", "migrations", "storage", "permissions", "scheduler", "email"}
     assert data["version"]
 
 

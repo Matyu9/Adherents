@@ -3,7 +3,7 @@ import re
 import secrets
 from datetime import datetime, timedelta
 
-from flask import current_app, request, session
+from flask import current_app, flash, request, session
 from flask_login import current_user, login_user, logout_user
 
 from ..extensions import db
@@ -89,11 +89,24 @@ SEEN_EVERY = timedelta(minutes=5)
 
 
 def touch(login):
-    """Note l'activité d'une session (appelé au chargement de l'utilisateur, en début de requête)."""
+    """Note l'activité d'une session (appelé au chargement de l'utilisateur, en début de requête).
+
+    Renvoie False si la session vient d'être fermée pour inactivité (compte qui voit des données personnelles).
+    """
+    from . import guard
+
     now = datetime.now()
+    if guard.idle_expired(login, now):
+        account = login.account
+        log("auth.idle", f"Session de {account.full_name} fermée après une inactivité", user=account)
+        _close(LoginSession.id == login.id)
+        db.session.commit()
+        flash("Votre session a été fermée après une période d'inactivité : reconnectez-vous.", "info")
+        return False
     if login.last_seen_at is None or now - login.last_seen_at >= SEEN_EVERY:
         login.last_seen_at = now
         db.session.commit()
+    return True
 
 
 _BROWSERS = (("Edg", "Edge"), ("OPR", "Opera"), ("Firefox", "Firefox"), ("Chrome", "Chrome"), ("Safari", "Safari"))

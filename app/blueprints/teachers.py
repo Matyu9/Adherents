@@ -74,6 +74,18 @@ def _teacher(person_id):
     return person
 
 
+@bp.before_request
+def count_reads():
+    from flask import g
+    from flask_login import current_user
+
+    from ..services import guard
+
+    if request.method == "GET" and current_user.is_authenticated:
+        g.sqlite_immediate = True
+        guard.count_read()
+
+
 @bp.after_request
 def no_store(response):
     response.headers["Cache-Control"] = "no-store"
@@ -142,7 +154,7 @@ def edit(person_id):
     person = _teacher(person_id)
     form = ContractForm(obj=person.teacher)
     if form.validate_on_submit():
-        changes = diff(person.teacher, CONTRACT_FIELDS, form.values())
+        changes = diff(person.teacher, CONTRACT_FIELDS, form.values(), mask=CONTRACT_FIELDS)
         if changes:
             log("teacher.update", f"Contrat de {person.full_name} modifié", changes=changes, person=person)
         db.session.commit()

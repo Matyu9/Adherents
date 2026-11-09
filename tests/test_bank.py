@@ -200,7 +200,20 @@ def home(app):
     return record
 
 
-def test_adding_an_iban_keeps_it_out_of_the_journal(client, admin, home):
+def open_secure_mode(client, account, code=None):
+    """Saisit un code TOTP sur la page du mode sécurisé (le compteur anti-rejeu est remis à zéro avant)."""
+    account.totp_last_counter = None
+    db.session.commit()
+    return client.post("/annuaire/mode-securise", data={"code": code or totp_code(), "suite": "/annuaire/foyers"})
+
+
+@pytest.fixture
+def secure(client, admin):
+    assert open_secure_mode(client, admin).status_code == 302
+    return admin
+
+
+def test_adding_an_iban_keeps_it_out_of_the_journal(client, secure, home):
     response = client.post(f"/annuaire/foyers/{home.id}/banque/nouveau",
                            data={"holder_person_id": 0, "holder_name": "Anne Martin", "iban": bank.group(IBAN),
                                  "bic": "agrifrpp882"})
@@ -214,64 +227,123 @@ def test_adding_an_iban_keeps_it_out_of_the_journal(client, admin, home):
     assert IBAN not in client.get("/journal").get_data(as_text=True)
 
 
-def test_invalid_iban_is_explained(client, admin, home):
+def test_invalid_iban_is_explained(client, secure, home):
     response = client.post(f"/annuaire/foyers/{home.id}/banque/nouveau",
                            data={"holder_person_id": 0, "holder_name": "A", "iban": "FR7630006000011234567890188"})
     assert response.status_code == 200 and "clé de contrôle" in response.get_data(as_text=True)
     assert db.session.scalar(db.select(db.func.count(BankAccount.id))) == 0
 
 
-def test_same_iban_on_two_households_is_flagged(client, admin, home):
+def test_same_iban_on_two_households_is_flagged(client, secure, home):
     bank_account(household("Famille Durand"))
     response = client.post(f"/annuaire/foyers/{home.id}/banque/nouveau",
                            data={"holder_person_id": 0, "holder_name": "A", "iban": IBAN}, follow_redirects=True)
     assert "déjà enregistré pour le foyer Famille Durand" in response.get_data(as_text=True)
 
 
-def test_without_key_the_form_is_not_offered(client, admin, home, app):
+def test_without_key_the_form_is_not_offered(client, secure, home, app):
     app.config["BANK_DATA_KEYS"] = ""
     response = client.get(f"/annuaire/foyers/{home.id}/banque/nouveau", follow_redirects=True)
     assert "BANK_DATA_KEYS" in response.get_data(as_text=True)
 
 
-def test_reading_an_iban_needs_a_fresh_code_and_is_logged(client, admin, home):
+# ---------------------------------------------------------------------------
+# Mode sécurisé
+# ---------------------------------------------------------------------------
+
+def test_every_bank_operation_needs_the_secure_mode(client, admin, home):
+    account = bank_account(home)
+    mandate = SepaMandate(bank_account=account, rum="R1", signed_on=date(2026, 9, 1))
+    db.session.add(mandate)
+    db.session.commit()
+    for url in (f"/annuaire/banque/{account.id}/afficher", f"/annuaire/foyers/{home.id}/banque/nouveau",
+                f"/annuaire/banque/{account.id}/mandats/nouveau", f"/annuaire/mandats/{mandate.id}/modifier"):
+        response = client.get(url)
+        assert response.status_code == 302 and "/annuaire/mode-securise?suite=" in response.location, url
+        assert IBAN not in response.get_data(as_text=True)
+    for url, data in ((f"/annuaire/banque/{account.id}/supprimer", {}),
+                      (f"/annuaire/foyers/{home.id}/banque/nouveau", {"holder_name": "X", "iban": OTHER_IBAN}),
+                      (f"/annuaire/mandats/{mandate.id}/modifier", {"rum": "R1", "signed_on": "2027-01-01"})):
+        assert "/annuaire/mode-securise" in client.post(url, data=data).location
+    assert db.session.scalar(db.select(db.func.count(BankAccount.id))) == 1
+    assert db.session.get(SepaMandate, mandate.id).signed_on == date(2026, 9, 1)
+
+
+def test_reading_an_iban_in_secure_mode_is_logged(client, admin, home):
     account = bank_account(home)
     url = f"/annuaire/banque/{account.id}/afficher"
-    page = client.get(url)
-    assert page.headers["Cache-Control"] == "no-store" and IBAN not in page.get_data(as_text=True)
-    wrong = client.post(url, data={"code": "000000"}).get_data(as_text=True)
+    first = client.get(url)
+    wrong = client.post("/annuaire/mode-securise", data={"code": "000000", "suite": url}).get_data(as_text=True)
     assert "Code incorrect" in wrong and bank.group(IBAN) not in wrong
-    admin.totp_last_counter = None
-    db.session.commit()
-    shown = client.post(url, data={"code": totp_code()})
+    assert db.session.scalar(db.select(Activity).filter_by(action="auth.elevate_failed")) is not None
+    response = open_secure_mode(client, admin)
+    assert response.status_code == 302 and first.status_code == 302
+    shown = client.get(url)
     assert bank.group(IBAN) in shown.get_data(as_text=True) and shown.headers["Cache-Control"] == "no-store"
-    entry = db.session.scalar(db.select(Activity).filter_by(action="bank.view"))
-    assert entry.account_id == admin.id and entry.household_id == home.id and IBAN not in entry.message
-    replay = client.post(url, data={"code": totp_code()}).get_data(as_text=True)  # un code ne sert qu'une fois
-    assert bank.group(IBAN) not in replay
+    assert client.get(url).status_code == 200  # la fenêtre reste ouverte
+    views = db.session.scalars(db.select(Activity).filter_by(action="bank.view")).all()
+    assert len(views) == 2 and views[0].account_id == admin.id and views[0].household_id == home.id
+    assert all(IBAN not in v.message for v in views)
+    assert "Mode sécurisé" in client.get(f"/annuaire/foyers/{home.id}").get_data(as_text=True)
+    client.post("/annuaire/mode-securise/quitter", data={"suite": f"/annuaire/foyers/{home.id}"})
+    assert client.get(url).status_code == 302
 
 
-def test_reading_is_throttled(client, admin, home):
+def test_secure_mode_expires(client, admin, home, app):
     account = bank_account(home)
+    app.config["ELEVATION_MINUTES"] = 0
+    open_secure_mode(client, admin)
+    assert client.get(f"/annuaire/banque/{account.id}/afficher").status_code == 302
+
+
+def test_a_used_code_cannot_open_the_secure_mode_twice(client, admin, home):
+    code = totp_code()
+    open_secure_mode(client, admin, code)
+    client.post("/annuaire/mode-securise/quitter")
+    replay = client.post("/annuaire/mode-securise", data={"code": code})  # compteur non remis à zéro
+    assert "Code incorrect" in replay.get_data(as_text=True)
+
+
+def test_secure_mode_stays_with_its_session(app, admin, home):
+    """Une autre session du même compte n'en hérite pas, même avec une copie du cookie de session Flask."""
+    from .conftest import Client
+    account = bank_account(home)
+    first = app.test_client()
+    login(first, admin)
+    open_secure_mode(first, admin)
+    assert first.get(f"/annuaire/banque/{account.id}/afficher").status_code == 200
+    second = app.test_client()
+    login(second, admin)
+    assert second.get(f"/annuaire/banque/{account.id}/afficher").status_code == 302
+    assert isinstance(second, Client)
+
+
+def test_secure_mode_is_throttled(client, admin, home):
     for _ in range(5):
-        client.post(f"/annuaire/banque/{account.id}/afficher", data={"code": "000000"})
-    admin.totp_last_counter = None
-    db.session.commit()
-    response = client.post(f"/annuaire/banque/{account.id}/afficher", data={"code": totp_code()})
-    assert "Trop de tentatives" in response.get_data(as_text=True) and IBAN not in response.get_data(as_text=True)
+        client.post("/annuaire/mode-securise", data={"code": "000000"})
+    response = open_secure_mode(client, admin)
+    assert "Trop de tentatives" in response.get_data(as_text=True)
 
 
-def test_reading_without_two_factor_is_refused(client, app, home):
+def test_secure_mode_only_returns_inside_the_directory(client, admin):
+    for target in ("https://pirate.test/", "//pirate.test", "/annuaire/\\pirate", "/comptes"):
+        admin.totp_last_counter = None
+        db.session.commit()
+        client.post("/annuaire/mode-securise/quitter")
+        response = client.post("/annuaire/mode-securise", data={"code": totp_code(), "suite": target})
+        assert response.location == "/annuaire", target
+
+
+def test_secure_mode_needs_two_factor(client, app, home):
     db.session.add(Role(key="tresorier", name="Trésorier", permissions=["bank.view", "directory.view"]))
     db.session.commit()
     treasurer = make_account("tresorier", email="t@asso.test")
-    login(client, treasurer)  # bank.view exige la double authentification : il est renvoyé la configurer
-    account = bank_account(home)
-    response = client.get(f"/annuaire/banque/{account.id}/afficher")
-    assert response.status_code == 302 and IBAN not in response.get_data(as_text=True)
+    login(client, treasurer)
+    response = client.get("/annuaire/mode-securise")
+    assert response.status_code == 302 and "double-authentification" in response.location
     enroll_totp(treasurer)
     login(client, treasurer)
-    assert client.get(f"/annuaire/banque/{account.id}/afficher").status_code == 200
+    assert client.get("/annuaire/mode-securise").status_code == 200
 
 
 def test_manager_without_bank_right_sees_no_bank_section(client, accounts, home):
@@ -279,11 +351,12 @@ def test_manager_without_bank_right_sees_no_bank_section(client, accounts, home)
     account = bank_account(home)
     assert "Coordonnées bancaires" not in client.get(f"/annuaire/foyers/{home.id}").get_data(as_text=True)
     assert client.get(f"/annuaire/banque/{account.id}/afficher").status_code == 403
+    assert client.get("/annuaire/mode-securise").status_code == 403
     assert client.post(f"/annuaire/banque/{account.id}/supprimer").status_code == 403
     assert db.session.get(BankAccount, account.id) is not None
 
 
-def test_mandate_and_deletion(client, admin, home):
+def test_mandate_and_deletion(client, secure, home):
     account = bank_account(home)
     form = client.get(f"/annuaire/banque/{account.id}/mandats/nouveau").get_data(as_text=True)
     rum = re.search(r'name="rum"[^>]*value="([^"]+)"', form).group(1)

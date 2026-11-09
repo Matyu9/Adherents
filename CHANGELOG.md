@@ -14,6 +14,17 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 - Un IBAN présent sur plusieurs foyers est signalé en permanence sur chacun d'eux.
 - **Écran Professeurs**, avec son droit `teacher.manage` : fiche et contrat d'un nouveau professeur en une fois, ou contrat ajouté à un adulte déjà dans l'annuaire. La fiche d'un adhérent ne propose plus de contrat.
 
+### Sécurité
+
+- **Mode sécurisé** pour toutes les opérations bancaires : un code de double authentification récent (10 minutes), lié à la session.
+- **Double authentification obligatoire** pour tout rôle qui lit des données personnelles (annuaire, IBAN, contrats) : le gestionnaire est concerné.
+- **Limite de lecture** de l'annuaire par compte, avec alerte des administrateurs.
+- **Fermeture des sessions inactives** (2 h) pour les comptes qui lisent des données personnelles.
+- Fusionner une fiche qui a un compte demande aussi le droit de gérer les comptes.
+- Le journal ne garde plus la valeur du lieu de naissance, des observations, du contact d'urgence ni des contrats.
+- En-têtes `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`, `X-Robots-Tag`, et HSTS en HTTPS.
+- La page de santé signale une base lisible par les autres comptes du serveur.
+
 ### Modifié
 
 - Les messages après une action restent visibles sous la barre du haut, même quand la page s'ouvre plus bas, et se referment d'un clic.

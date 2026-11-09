@@ -60,7 +60,18 @@ BANK_DATA_KEYS=1:xxxxxxxx…
 - **Sauvegarde :** la base et `BANK_DATA_KEYS` se sauvegardent **séparément**. Une copie de la base seule ne livre aucun IBAN ; perdre la clé les rend tous illisibles.
 - **Démarrage :** l'appli refuse de démarrer s'il existe en base des IBAN chiffrés avec une clé absente de `BANK_DATA_KEYS`, ou si une clé est mal écrite.
 - **Changer de clé :** `flask bank-generate-key` donne une clé numérotée à la suite. Mettez-la en tête (`BANK_DATA_KEYS=2:nouvelle,1:ancienne`), redémarrez, lancez `flask bank-rotate-key`, puis retirez l'ancienne et redémarrez. La clé au numéro le plus haut chiffre ; les autres ne servent qu'à relire.
+- **Mode sécurisé :** toute opération bancaire demande un code de double authentification récent. `ELEVATION_MINUTES` (10 par défaut) règle la durée de la fenêtre.
 - **Limite :** la clé est sur le même serveur que la base. Ce chiffrement protège d'une fuite de la base, d'une sauvegarde ou d'un disque, pas d'une prise de contrôle du serveur.
+
+## Garde-fous des données personnelles
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `ELEVATION_MINUTES` | `10` | Durée du mode sécurisé ouvert par un code TOTP, pour les opérations bancaires. |
+| `DIRECTORY_READ_LIMIT` | `300` | Pages de l'annuaire et des professeurs qu'un compte peut afficher en 15 minutes. Au-delà, il est arrêté et les administrateurs sont prévenus. |
+| `IDLE_TIMEOUT_HOURS` | `2` | Inactivité après laquelle se ferme la session d'un compte qui lit des données personnelles. `0` désactive. |
+
+Gardez la base et le dossier des données réservés au compte qui fait tourner l'appli (`chmod 700` sur le dossier, `600` sur la base) : la page de santé le vérifie.
 
 ## Serveur OIDC
 

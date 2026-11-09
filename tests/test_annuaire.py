@@ -11,7 +11,7 @@ from app.models import (Account, AccountToken, Activity, BankAccount, ExternalRe
 from app.services import bank, directory
 from app.services.directory import DirectoryError
 
-from .conftest import login, make_account
+from .conftest import enroll, login, make_account
 
 G, D = HouseholdMember.GUARDIAN, HouseholdMember.DEPENDENT
 IBAN = "FR7630006000011234567890189"
@@ -324,7 +324,7 @@ def test_create_and_edit_a_person_is_logged(client, admin, app):
     client.post(f"/annuaire/personnes/{jeanne.id}/modifier",
                 data={"first_name": "Jeanne", "last_name": "Dupré", "birth_place": "Caen", "country": "FR"})
     entry = db.session.scalar(db.select(Activity).filter_by(action="person.update"))
-    assert entry.person_id == jeanne.id and entry.changes == {"birth_place": [None, "Caen"]}
+    assert entry.person_id == jeanne.id and entry.changes == {"birth_place": ["(masqué)", "(masqué)"]}  # jamais la valeur au journal
     assert "Fiche modifiée" in client.get(f"/annuaire/personnes/{jeanne.id}").get_data(as_text=True)
 
 
@@ -332,7 +332,7 @@ def test_birth_place_is_only_for_editors(client, app, family):
     family["anne"].birth_place = "Lisieux"
     db.session.add(Role(key="prof", name="Professeur", permissions=["directory.view"]))
     db.session.commit()
-    login(client, make_account("prof", email="prof@asso.test"))
+    login(client, enroll(make_account("prof", email="prof@asso.test")))
     page = client.get(f"/annuaire/personnes/{family['anne'].id}")
     assert page.status_code == 200 and "Lisieux" not in page.get_data(as_text=True)
     assert "Modifier" not in page.get_data(as_text=True)
@@ -525,7 +525,7 @@ def test_household_merge_refuses_three_guardians(family):
 def test_merge_requires_its_right(client, app, family):
     db.session.add(Role(key="sec", name="Secrétariat", permissions=["directory.view", "directory.edit"]))
     db.session.commit()
-    login(client, make_account("sec", email="sec@asso.test"))
+    login(client, enroll(make_account("sec", email="sec@asso.test")))
     copy = person("Zoé")
     db.session.commit()
     assert client.post(f"/annuaire/personnes/{family['zoe'].id}/fusionner", data={"avec": copy.id}).status_code == 403

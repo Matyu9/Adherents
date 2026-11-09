@@ -102,6 +102,33 @@ def check_storage():
     return _check("storage", "Fichiers envoyés", OK, f"Dossier accessible, {_size(free)} libres")
 
 
+def check_permissions():
+    """La base contient l'annuaire : ni elle ni son dossier ne doivent être lisibles par les autres comptes du serveur.
+    (Les IBAN sont chiffrés, mais pas les noms, adresses et téléphones.)"""
+    import os
+    import stat
+
+    if os.name != "posix":
+        return _check("permissions", "Droits des fichiers", OK, "Non vérifiés sur ce système")
+    paths = [Path(current_app.config["DATA_DIR"])]
+    database = db.engine.url.database
+    if database and database != ":memory:":
+        paths += [p for p in (Path(database), Path(database + "-wal")) if p.exists()]
+    exposed = []
+    for path in paths:
+        try:
+            mode = path.stat().st_mode
+        except OSError:
+            continue
+        if mode & (stat.S_IROTH | stat.S_IWOTH | stat.S_IXOTH):
+            exposed.append(f"{path} ({stat.filemode(mode)})")
+    if exposed:
+        return _check("permissions", "Droits des fichiers", WARN,
+                      "Accessibles à tous les comptes du serveur : " + ", ".join(exposed)
+                      + ". Restreignez-les (chmod 700 pour le dossier, 600 pour la base).")
+    return _check("permissions", "Droits des fichiers", OK, "Base et dossier des données réservés à l'appli")
+
+
 def check_scheduler(now=None):
     last = last_scheduler_run()
     if last is None:
@@ -131,7 +158,8 @@ def check_email():
 def report(now=None):
     from .. import __version__
 
-    checks = [check_database(), check_migrations(), check_storage(), check_scheduler(now), check_email()]
+    checks = [check_database(), check_migrations(), check_storage(), check_permissions(), check_scheduler(now),
+              check_email()]
     statuses = {c["status"] for c in checks}
     status = ERROR if ERROR in statuses else WARN if WARN in statuses else OK
     return {"status": status, "version": __version__,

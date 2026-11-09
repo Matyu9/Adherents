@@ -104,6 +104,13 @@ def create_app(config_class=Config):
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "same-origin")
         response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        # Aucune autre origine ne peut garder une référence à nos fenêtres, ni charger nos réponses.
+        response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+        response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+        # Espace privé : rien à indexer, même si une adresse fuit.
+        response.headers.setdefault("X-Robots-Tag", "noindex, nofollow")
+        if request.is_secure:  # en HTTPS (derrière le proxy : TRUST_PROXY=1), le navigateur n'essaiera plus HTTP
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
         # Une réponse qui pose sa propre CSP la garde telle quelle.
         if "Content-Security-Policy" not in response.headers:
             response.headers.setdefault("Content-Security-Policy-Report-Only" if app.config["CSP_REPORT_ONLY"]

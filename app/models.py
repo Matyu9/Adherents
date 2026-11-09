@@ -204,7 +204,8 @@ def load_user(user_id):
         return None
     login.account.session_token = token
     from .services.sessions import touch
-    touch(login)
+    if not touch(login):  # fermée pour inactivité
+        return None
     return login.account
 
 

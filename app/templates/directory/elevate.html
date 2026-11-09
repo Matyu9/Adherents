@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}Mode sécurisé{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>Mode sécurisé</h1>
+  <p>Les coordonnées bancaires demandent de confirmer votre identité. Saisissez un code de votre application de double
+    authentification : vous aurez accès aux opérations bancaires pendant {{ minutes }} minutes, sur cet appareil seulement.</p>
+  <form method="post" novalidate autocomplete="off">
+    {{ form.hidden_tag() }}
+    <input type="hidden" name="suite" value="{{ target }}">
+    {{ field(form.code, inputmode="numeric", autocomplete="one-time-code", autofocus=true) }}
+    <button type="submit">Confirmer</button>
+  </form>
+  <p class="muted small">L'ouverture du mode sécurisé, chaque IBAN affiché et chaque modification sont inscrits au journal.</p>
+  <p class="small"><a href="{{ target }}">Annuler</a></p>
+</article>
+{% endblock %}

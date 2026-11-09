@@ -85,6 +85,14 @@
 
 {% if banker %}
 <h2 id="banque">Coordonnées bancaires</h2>
+{% if secure_left %}
+<div class="secure-mode">
+  <span class="badge badge-ok">Mode sécurisé · encore {{ secure_left }} min</span>
+  {{ post_button(url_for('directory.leave_secure', suite=request.path), "Fermer", "link-button small") }}
+</div>
+{% else %}
+<p class="muted small">Afficher, ajouter ou supprimer des coordonnées bancaires demande un code de double authentification.</p>
+{% endif %}
 {% if household.bank_accounts %}
 {% for b in household.bank_accounts %}
 <section class="card">

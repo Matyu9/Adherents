@@ -53,7 +53,8 @@ ACCESS = {
     **{f"teachers.{name}": TEACHERS for name in ("index", "create", "detail", "edit", "remove")},
     "directory.merge_person": DIR_MERGE, "directory.merge_household": DIR_MERGE,
     **{f"directory.{name}": BANK for name in ("create_bank_account", "reveal_iban", "delete_bank_account",
-                                              "create_mandate", "edit_mandate")},
+                                              "create_mandate", "edit_mandate", "elevate")},
+    "directory.leave_secure": LOGGED_IN,
     **{f"directory.{name}": LINKING for name in ("create_account", "unlink_account", "link_accounts", "link_account",
                                                  "person_from_account")},
 }
@@ -184,6 +185,11 @@ def test_crawl_every_link(app, rich, who):
     """Suit tous les liens depuis l'accueil : aucun lien mort, aucune erreur, et aucune page ne casserait sous la CSP."""
     client = app.test_client()
     login(client, rich[who])
+    if who == A:  # pages bancaires : mode sécurisé ouvert, comme le ferait le trésorier
+        from .conftest import totp_code
+        rich[A].totp_last_counter = None
+        db.session.commit()
+        assert client.post("/annuaire/mode-securise", data={"code": totp_code()}).status_code == 302
     seen, queue, problems = set(), deque(["/"]), []
     while queue:
         path = queue.popleft()

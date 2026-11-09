@@ -87,6 +87,12 @@ def enroll_totp(account, secret=TOTP_SECRET):
     db.session.commit()
 
 
+def enroll(account):
+    """enroll_totp qui renvoie le compte : `login(client, enroll(make_account(...)))`."""
+    enroll_totp(account)
+    return account
+
+
 def totp_code(secret=TOTP_SECRET):
     return pyotp.TOTP(secret).now()
 
@@ -97,7 +103,9 @@ def make_account(role=Role.ADHERENT, email=None, active=True, password=PASSWORD,
     account.set_password(password)
     db.session.add(account)
     db.session.commit()
-    if role == Role.ADMIN:  # comme en vrai : un administrateur n'entre pas sans double authentification
+    # Comme en vrai : l'administrateur et le gestionnaire (annuaire) n'entrent pas sans double authentification.
+    # Les rôles sur mesure restent sans, pour pouvoir tester l'obligation de la configurer.
+    if role in (Role.ADMIN, Role.GESTIONNAIRE):
         enroll_totp(account)
     return account
 

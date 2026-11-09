@@ -52,6 +52,11 @@ class Config:
     # Distinctes de SECRET_KEY, et sauvegardées à part de la base.
     BANK_DATA_KEYS = os.environ.get("BANK_DATA_KEYS", "")
 
+    # Garde-fous des données personnelles (voir services/guard.py).
+    ELEVATION_MINUTES = int(os.environ.get("ELEVATION_MINUTES", "10"))      # mode sécurisé après un code TOTP
+    DIRECTORY_READ_LIMIT = int(os.environ.get("DIRECTORY_READ_LIMIT", "300"))  # pages de l'annuaire en 15 min
+    IDLE_TIMEOUT_HOURS = float(os.environ.get("IDLE_TIMEOUT_HOURS", "2"))     # 0 : jamais
+
     # Content-Security-Policy : appliquée par défaut. « 1 » = Report-Only, pour diagnostiquer sans rien bloquer.
     CSP_REPORT_ONLY = os.environ.get("CSP_REPORT_ONLY", "0") == "1"
 

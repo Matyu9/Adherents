@@ -2,8 +2,11 @@
 
 Toutes ses pages contiennent des données personnelles : le navigateur ne les garde pas (Cache-Control: no-store).
 """
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
-from flask_login import current_user
+from functools import wraps
+from urllib.parse import urlsplit
+
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
 from wtforms import DateField, EmailField, SelectField, StringField, TextAreaField
 from wtforms.validators import DataRequired, Length, Optional, Regexp, ValidationError
@@ -13,7 +16,7 @@ from ..models import (Account, Activity, BankAccount, Household, HouseholdMember
                       SepaMandate)
 from ..permissions import can, require
 from ..services import accounts as accounts_service
-from ..services import bank, directory, throttle
+from ..services import bank, directory, guard, throttle
 from ..services import totp as totp_service
 from ..services.activity import diff, log
 from ..services.directory import DirectoryError
@@ -206,6 +209,16 @@ def _page(query, order):
     page = max(request.args.get("page", 1, type=int), 1)
     items = db.session.scalars(query.order_by(*order).limit(PER_PAGE).offset((page - 1) * PER_PAGE)).all()
     return items, total, page, max((total + PER_PAGE - 1) // PER_PAGE, 1)
+
+
+@bp.before_request
+def count_reads():
+    """Une page lue compte pour la limite de lecture (services/guard.py). Les écritures ont leurs propres droits."""
+    from flask import g
+
+    if request.method == "GET" and current_user.is_authenticated:
+        g.sqlite_immediate = True  # cette lecture écrit un compteur
+        guard.count_read()
 
 
 @bp.after_request
@@ -443,6 +456,16 @@ def _merge_rows(keep, other, fields):
     return rows
 
 
+def _person_merge_problems(keep, other):
+    """En plus des règles de l'annuaire : déplacer un compte de connexion d'une fiche à l'autre change ce qu'il
+    ouvrira (l'espace adhérent de la fiche gardée). C'est une décision sur les comptes, pas seulement sur l'annuaire."""
+    problems = directory.merge_problems(keep, other)
+    if (keep.account or other.account) and not can(current_user, "account.manage"):
+        problems.append("Une des fiches a un compte de connexion : la fusion demande aussi le droit de gérer les "
+                        "comptes.")
+    return problems
+
+
 def _taken(fields):
     """Champs en conflit pour lesquels on a choisi la valeur de l'autre fiche."""
     return {field for field in fields if request.form.get(f"prendre_{field}") == "autre"}
@@ -457,6 +480,9 @@ def merge_person(person_id):
         if other is None:
             abort(400)
         name = other.full_name
+        if problems := _person_merge_problems(keep, other):
+            flash(" ".join(problems), "error")
+            return redirect(url_for(".merge_person", person_id=keep.id, avec=other.id))
         try:
             summary = directory.merge_persons(keep, other, _taken(directory.PERSON_MERGE_FIELDS))
         except DirectoryError as exc:
@@ -476,7 +502,7 @@ def merge_person(person_id):
               if k != "birth_place" or can(current_user, "directory.edit")}
     return render_template("directory/person_merge.html", keep=keep, other=other, q=q, candidates=candidates,
                            rows=_merge_rows(keep, other, fields) if other else [],
-                           problems=directory.merge_problems(keep, other) if other else [])
+                           problems=_person_merge_problems(keep, other) if other else [])
 
 
 # --- Compte de connexion ---------------------------------------------------
@@ -567,6 +593,7 @@ def household(household_id):
                 .order_by(Household.name).distinct()).all()
     return render_template("directory/household.html", household=household, phone_form=PhoneForm(), q=q, found=found,
                            same_iban=same_iban,
+                           secure_left=guard.remaining() if can(current_user, "bank.view") else 0,
                            entries=_history(household=household), roles=HouseholdMember.ROLES,
                            bank_enabled=bank.enabled())
 
@@ -707,8 +734,72 @@ def _bank_account(account_id):
     return db.session.get(BankAccount, account_id) or abort(404)
 
 
+def _safe_next(path):
+    """Adresse de retour après le mode sécurisé : une page de l'annuaire, jamais un autre site."""
+    path = path or ""
+    if path.startswith("/annuaire/") and "//" not in path and "\\" not in path and "\n" not in path:
+        return path
+    return url_for(".index")
+
+
+def _secure(view):
+    """Opération bancaire : il faut être en mode sécurisé (code TOTP récent), sinon on passe par sa page."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if guard.elevated():
+            return view(*args, **kwargs)
+        if request.method == "GET":
+            return redirect(url_for(".elevate", suite=request.full_path.rstrip("?")))
+        flash("Confirmez votre identité, puis recommencez l'opération.", "warning")
+        referrer = urlsplit(request.referrer or "")
+        back = referrer.path if referrer.netloc == request.host else None
+        return redirect(url_for(".elevate", suite=_safe_next(back)))
+    return wrapped
+
+
+@bp.route("/mode-securise", methods=["GET", "POST"])
+@require("bank.view")
+def elevate():
+    """Saisie d'un code TOTP : ouvre le mode sécurisé pour quelques minutes, sur cette session seulement."""
+    target = _safe_next(request.values.get("suite"))
+    if not current_user.totp_enabled:
+        flash("Activez d'abord la double authentification dans Mon compte : elle est exigée pour les données "
+              "bancaires.", "error")
+        return redirect(url_for("account.totp"))
+    if guard.elevated():
+        return redirect(target)
+    form = CodeForm()
+    if form.validate_on_submit():
+        keys = (f"account:{current_user.id}",)
+        if _bank_reveal_failures.blocked(keys) or totp_service.failures.blocked(keys):
+            form.code.errors = ["Trop de tentatives : réessayez dans quelques minutes."]
+        elif totp_service.verify_code(current_user, form.code.data):
+            totp_service.failures.clear(keys)
+            guard.elevate()
+            log("auth.elevate", f"Mode sécurisé ouvert par {current_user.full_name}")
+            db.session.commit()
+            return redirect(target)
+        else:
+            _bank_reveal_failures.hit(keys)
+            totp_service.failures.hit(keys)
+            log("auth.elevate_failed", f"Code refusé pour le mode sécurisé ({current_user.full_name})")
+            db.session.commit()
+            form.code.errors = ["Code incorrect."]
+    return render_template("directory/elevate.html", form=form, target=target,
+                           minutes=current_app.config.get("ELEVATION_MINUTES", 10))
+
+
+@bp.route("/mode-securise/quitter", methods=["POST"])
+@login_required
+def leave_secure():
+    guard.drop_elevation()
+    flash("Mode sécurisé fermé.", "success")
+    return redirect(_safe_next(request.values.get("suite")))
+
+
 @bp.route("/foyers/<int:household_id>/banque/nouveau", methods=["GET", "POST"])
 @require("bank.view")
+@_secure
 def create_bank_account(household_id):
     household = _household(household_id)
     if not bank.enabled():
@@ -736,39 +827,26 @@ def create_bank_account(household_id):
     return render_template("directory/bank_form.html", form=form, household=household)
 
 
-@bp.route("/banque/<int:account_id>/afficher", methods=["GET", "POST"])
+@bp.route("/banque/<int:account_id>/afficher")
 @require("bank.view")
+@_secure
 def reveal_iban(account_id):
-    """L'IBAN en clair, après une nouvelle saisie du code TOTP. Chaque lecture est écrite au journal."""
+    """L'IBAN en clair, en mode sécurisé. Chaque lecture est écrite au journal."""
     account = _bank_account(account_id)
     household = account.household
-    form = CodeForm()
-    iban = None
-    if not current_user.totp_enabled:
-        flash("Activez d'abord la double authentification dans Mon compte : elle est exigée pour lire un IBAN.", "error")
-        return redirect(url_for(".household", household_id=household.id) + "#banque")
-    if form.validate_on_submit():
-        keys = (f"account:{current_user.id}",)
-        if _bank_reveal_failures.blocked(keys) or totp_service.failures.blocked(keys):
-            form.code.errors = ["Trop de tentatives : réessayez dans quelques minutes."]
-        elif totp_service.verify_code(current_user, form.code.data):
-            totp_service.failures.clear(keys)
-            try:
-                iban = bank.group(bank.reveal(account))
-            except bank.BankKeyError as exc:
-                flash(str(exc), "error")
-            log("bank.view", f"IBAN {account.masked_iban} du foyer {household.name} affiché", household=household)
-            db.session.commit()
-        else:
-            _bank_reveal_failures.hit(keys)
-            totp_service.failures.hit(keys)
-            db.session.commit()
-            form.code.errors = ["Code incorrect."]
-    return render_template("directory/bank_reveal.html", account=account, household=household, form=form, iban=iban)
+    try:
+        iban = bank.group(bank.reveal(account))
+    except bank.BankKeyError as exc:
+        flash(str(exc), "error")
+        iban = None
+    log("bank.view", f"IBAN {account.masked_iban} du foyer {household.name} affiché", household=household)
+    db.session.commit()
+    return render_template("directory/bank_reveal.html", account=account, household=household, iban=iban)
 
 
 @bp.route("/banque/<int:account_id>/supprimer", methods=["POST"])
 @require("bank.view")
+@_secure
 def delete_bank_account(account_id):
     account = _bank_account(account_id)
     household = account.household
@@ -785,6 +863,7 @@ MANDATE_FIELDS = ("rum", "signed_on", "first_debit_on", "last_debit_on", "revoke
 
 @bp.route("/banque/<int:account_id>/mandats/nouveau", methods=["GET", "POST"])
 @require("bank.view")
+@_secure
 def create_mandate(account_id):
     account = _bank_account(account_id)
     form = MandateForm(data=None if request.method == "POST" else {"rum": bank.new_rum()})
@@ -801,6 +880,7 @@ def create_mandate(account_id):
 
 @bp.route("/mandats/<int:mandate_id>/modifier", methods=["GET", "POST"])
 @require("bank.view")
+@_secure
 def edit_mandate(mandate_id):
     mandate = db.session.get(SepaMandate, mandate_id) or abort(404)
     account = mandate.bank_account

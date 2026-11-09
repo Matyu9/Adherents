@@ -153,7 +153,7 @@ On ne stocke pas de document de mandat (voir le plan). Le `scheduler` supprimera
 
 - **Une clé dédiée, `BANK_DATA_KEYS`**, distincte de `SECRET_KEY`. Changer `SECRET_KEY` ne doit pas faire perdre les IBAN, et une fuite de l'une ne donne pas l'autre. On y met une liste de clés numérotées, pour pouvoir passer à une nouvelle clé : `flask bank-rotate-key` rechiffre tout, puis on retire l'ancienne. L'appli refuse de démarrer s'il existe des IBAN sans la clé qui les a chiffrés.
 - **Chiffrement AES-GCM** (paquet `cryptography`, déjà installé), avec l'identifiant du foyer en données associées. Un chiffré recopié d'une ligne à l'autre ne se déchiffre plus.
-- **Lecture en clair** réservée au droit `bank.view`, après une nouvelle saisie du TOTP, et chaque lecture est écrite au journal.
+- **Lecture en clair** réservée au droit `bank.view`, en **mode sécurisé** (code TOTP saisi depuis moins de 10 minutes, sur cette session), et chaque lecture est écrite au journal. Ajouter, supprimer un IBAN ou toucher un mandat demande aussi le mode sécurisé.
 - **Jamais en clair ailleurs** : ni dans les claims OIDC, l'API, les emails, les logs, les exports généraux ou le journal (`activity.diff()` les masque déjà).
 - **Sauvegardes** : la base et `BANK_DATA_KEYS` sont sauvegardées **séparément**. Une copie de la base seule ne livre aucun IBAN.
 

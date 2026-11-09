@@ -8,7 +8,10 @@ from ..models import Activity
 # Durée de conservation des connexions au journal : elles contiennent des adresses IP.
 LOGIN_RETENTION_DAYS = 365
 # Champs jamais recopiés dans le journal, même sous forme d'ancienne et de nouvelle valeur.
-SENSITIVE_FIELDS = frozenset({"password_hash", "iban", "bic", "iban_ciphertext"})
+SENSITIVE_FIELDS = frozenset({"password_hash", "iban", "bic", "iban_ciphertext",
+                              # Annuaire : le lieu de naissance est réservé aux gestionnaires, et les observations
+                              # internes ou le contact d'urgence n'ont rien à faire dans un journal lu plus largement.
+                              "birth_place", "notes", "emergency_contact"})
 
 
 def log(action, message, *, changes=None, user=None, target=None, person=None, household=None):
@@ -31,10 +34,11 @@ def purge_expired_logins(now=None):
         Activity.created_at < limit)).rowcount
 
 
-def diff(obj, fields, new_values):
+def diff(obj, fields, new_values, mask=()):
     """Applique `new_values` sur `obj` et renvoie {champ: [ancien, nouveau]} pour ce qui a changé.
 
-    Un champ sensible est bien appliqué, mais le journal note seulement qu'il a changé, sans ses valeurs.
+    Un champ sensible (SENSITIVE_FIELDS, ou `mask` pour cet appel) est bien appliqué, mais le journal note seulement
+    qu'il a changé, sans ses valeurs.
     """
     changes = {}
     for field in fields:
@@ -42,7 +46,7 @@ def diff(obj, fields, new_values):
             continue
         old, new = getattr(obj, field), new_values[field]
         if old != new:
-            changes[field] = ["(masqué)", "(masqué)"] if field in SENSITIVE_FIELDS else [_jsonable(old), _jsonable(new)]
+            changes[field] = ["(masqué)", "(masqué)"] if field in SENSITIVE_FIELDS or field in mask else [_jsonable(old), _jsonable(new)]
             setattr(obj, field, new)
     return changes
 

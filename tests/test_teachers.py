@@ -7,7 +7,7 @@ from app.extensions import db
 from app.models import Activity, HouseholdMember, Membership, Person, Role, Teacher
 from app.services import directory
 
-from .conftest import login, make_account
+from .conftest import enroll, login, make_account
 from .test_annuaire import family, person, season  # noqa: F401
 
 
@@ -55,7 +55,7 @@ def test_teacher_record_links_to_the_contract_only_with_the_right(client, app, f
     family["anne"].teacher = Teacher(status="CDI", notes="salaire confidentiel")
     db.session.add(Role(key="sec", name="Secrétariat", permissions=["directory.view", "directory.edit"]))
     db.session.commit()
-    login(client, make_account("sec", email="sec@asso.test"))
+    login(client, enroll(make_account("sec", email="sec@asso.test")))
     page = client.get(f"/annuaire/personnes/{family['anne'].id}").get_data(as_text=True)
     assert "Professeur" in page and "/professeurs/" not in page and "CDI" not in page
     assert "confidentiel" not in page
@@ -92,7 +92,7 @@ def test_departure_and_list_of_former_teachers(client, admin, app):
     client.post(f"/professeurs/{paul.id}/modifier", data={"status": "CDD", "left_on": "2024-06-30"})
     assert db.session.get(Teacher, paul.id).left_on == date(2024, 6, 30)
     assert db.session.scalar(db.select(Activity).filter_by(action="teacher.update")).changes == {
-        "left_on": [None, "2024-06-30"]}
+        "left_on": ["(masqué)", "(masqué)"]}  # le journal dit ce qui a changé dans le contrat, jamais les valeurs
     assert "PROF Paul" not in client.get("/professeurs").get_data(as_text=True)
     assert "PROF Paul" in client.get("/professeurs?partis=1").get_data(as_text=True)
 

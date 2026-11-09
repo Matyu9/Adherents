@@ -56,8 +56,9 @@ def test_500_page_survives_a_broken_database(crashing, monkeypatch):
     def broken(*_args, **_kwargs):
         raise OperationalError("SELECT", {}, Exception("base illisible"))
 
-    monkeypatch.setattr(db.session, "execute", broken)
-    response = crashing.test_client().get("/_panne")
+    with monkeypatch.context() as patch:  # la base « casse » le temps de la requête, pas pendant le nettoyage
+        patch.setattr(db.session, "execute", broken)
+        response = crashing.test_client().get("/_panne")
     assert response.status_code == 500 and "Référence" in response.get_data(as_text=True)
 
 

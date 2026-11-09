@@ -10,7 +10,7 @@ from app.extensions import db
 from app.models import Activity, BankAccount, Household, Role, SepaMandate
 from app.services import bank, tasks
 
-from .conftest import config_for, enroll_totp, login, make_account, totp_code
+from .conftest import config_for, enroll_totp, fresh_database, login, make_account, release, totp_code
 
 IBAN = "FR7630006000011234567890189"
 OTHER_IBAN = "FR1420041010050500013M02606"
@@ -122,18 +122,18 @@ def test_saving_without_key_is_refused(app):
     assert not bank.enabled()
 
 
-def test_iban_never_appears_in_clear_in_the_database_file(tmp_path):
-    path = tmp_path / "base.db"
-    app = create_app(config_for(tmp_path, SQLALCHEMY_DATABASE_URI=f"sqlite:///{path}"))
-    with app.app_context():
-        db.create_all()
-        bank_account(household())
-        db.session.execute(db.text("PRAGMA wal_checkpoint(TRUNCATE)"))
-        db.session.remove()
-        db.engine.dispose()
-    content = b"".join(p.read_bytes() for p in tmp_path.glob("base.db*"))
+def test_iban_never_appears_in_clear_anywhere_in_the_database(app):
+    """Toutes les lignes de toutes les tables, binaires compris (en hexadécimal) : aucune forme de l'IBAN."""
+    account = bank_account(household())
+    log_entry = Activity(action="test", message=f"Ajout de {account.masked_iban}")
+    db.session.add(log_entry)
+    db.session.commit()
+    rows = []
+    for table in db.metadata.sorted_tables:
+        rows += db.session.scalars(db.text(f'SELECT row_to_json(t)::text FROM "{table.name}" t')).all()
+    dump = " ".join(rows).lower()
     for form in (IBAN, bank.group(IBAN), IBAN[4:], "30006000011234567890"):
-        assert form.encode() not in content and form.encode("utf-16-le") not in content
+        assert form.lower() not in dump and form.encode().hex() not in dump
 
 
 def test_rotation_reencrypts_everything_and_the_old_key_can_go(app):
@@ -160,33 +160,46 @@ def test_reading_with_a_removed_key_fails_clearly(app):
         bank.reveal(account)
 
 
-def _file_app(tmp_path, keys):
-    return config_for(tmp_path, SQLALCHEMY_DATABASE_URI=f"sqlite:///{tmp_path / 'base.db'}", BANK_DATA_KEYS=keys)
+@pytest.fixture
+def database():
+    """Base jetable : l'appli y redémarre plusieurs fois, avec des clés différentes."""
+    with fresh_database() as url:
+        yield url
 
 
-def test_app_refuses_to_start_without_the_key_of_stored_ibans(tmp_path):
-    app = create_app(_file_app(tmp_path, KEY_1))
+def _app_on(tmp_path, url, keys):
+    return config_for(tmp_path, SQLALCHEMY_DATABASE_URI=url, BANK_DATA_KEYS=keys)
+
+
+def test_app_refuses_to_start_without_the_key_of_stored_ibans(tmp_path, database):
+    app = create_app(_app_on(tmp_path, database, KEY_1))
     with app.app_context():
         db.create_all()
         bank_account(household())
-        db.session.remove()
+        release()
     with pytest.raises(bank.BankKeyError, match="refuse de démarrer"):
-        create_app(_file_app(tmp_path, ""))
+        create_app(_app_on(tmp_path, database, ""))
     with pytest.raises(bank.BankKeyError, match="n° 1"):
-        create_app(_file_app(tmp_path, KEY_2))
-    create_app(_file_app(tmp_path, f"{KEY_2},{KEY_1}"))  # la clé est là, même si ce n'est plus la plus haute
+        create_app(_app_on(tmp_path, database, KEY_2))
+    create_app(_app_on(tmp_path, database, f"{KEY_2},{KEY_1}"))  # la clé est là, même si ce n'est plus la plus haute
 
 
-def test_app_starts_without_key_when_no_iban_is_stored(tmp_path):
-    app = create_app(_file_app(tmp_path, ""))
+def test_app_starts_without_key_when_no_iban_is_stored(tmp_path, database):
+    app = create_app(_app_on(tmp_path, database, ""))
     with app.app_context():
         db.create_all()
-    create_app(_file_app(tmp_path, ""))
+        release()
+    create_app(_app_on(tmp_path, database, ""))
+
+
+def test_app_starts_on_an_empty_database(tmp_path, database):
+    """Avant `flask db upgrade`, la table des IBAN n'existe pas : l'appli démarre quand même (pour migrer)."""
+    create_app(_app_on(tmp_path, database, ""))
 
 
 def test_app_refuses_a_malformed_key(tmp_path):
     with pytest.raises(bank.BankKeyError):
-        create_app(_file_app(tmp_path, "1:trop-courte"))
+        create_app(config_for(tmp_path, BANK_DATA_KEYS="1:trop-courte"))
 
 
 # ---------------------------------------------------------------------------

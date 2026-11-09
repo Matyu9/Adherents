@@ -158,8 +158,7 @@ class LoginSession(db.Model):
     """Connexion ouverte sur un appareil. La supprimer invalide ses cookies, même copiés ailleurs."""
     id = db.Column(db.String(64), primary_key=True)  # jeton secret
     # Identifiant public de la session (claim OIDC « sid »), qui peut circuler sans rien donner : jamais `id`.
-    sid = db.Column(db.String(36), nullable=False, unique=True, default=lambda: str(uuid.uuid4()),
-                    server_default=db.text("(lower(hex(randomblob(16))))"))
+    sid = db.Column(db.String(36), nullable=False, unique=True, default=lambda: str(uuid.uuid4()))
     account_id = db.Column(db.ForeignKey("account.id", ondelete="CASCADE"), nullable=False, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
     last_seen_at = db.Column(db.DateTime)
@@ -430,8 +429,7 @@ class Person(AddressMixin, TimestampMixin, db.Model):
     emergency_contact = db.Column(db.String(255))
     notes = db.Column(db.Text)
     archived_at = db.Column(db.DateTime)
-    # Compte de connexion rattaché (0 ou 1). Le lien est ici et non sur `account`, pour ne pas recréer cette
-    # table sous SQLite : toutes les autres en dépendent.
+    # Compte de connexion rattaché (0 ou 1), porté par la fiche : un enfant a une fiche et pas de compte.
     account_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"), unique=True)
 
     account = db.relationship("Account", backref=db.backref("person", uselist=False))

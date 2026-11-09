@@ -197,7 +197,7 @@ Ces tables se brancheront sur `person`, `household` et `season`, sans retoucher 
 
 Décidés en écrivant la phase 1, le 9 novembre 2026 :
 
-- **Le lien compte ↔ fiche est `person.account_id`**, et non `account.person_id`. Ajouter une clé étrangère à `account` aurait obligé à recréer cette table sous SQLite ; avec les clés étrangères actives, sa suppression temporaire aurait vidé en cascade les sessions, les liens et les codes de tous les comptes. Le sens du lien ne change rien d'autre : 0 ou 1 compte par fiche, 0 ou 1 fiche par compte.
+- **Le lien compte ↔ fiche est `person.account_id`**, et non `account.person_id`. Le choix venait d'une limite de SQLite ; il est resté après le passage à PostgreSQL, car le sens du lien ne change rien : 0 ou 1 compte par fiche, 0 ou 1 fiche par compte.
 - **L'empreinte des IBAN** est dérivée de `BANK_DATA_KEYS` plutôt que d'une troisième clé. Elle change donc à chaque rotation, qui la recalcule ; entre l'ajout d'une clé et la rotation, la recherche d'un même IBAN essaie toutes les clés.
 - **L'affichage masqué** est `•••• •••• 1234` : le pays et la clé de contrôle font partie du chiffré.
 - **Le journal note la fiche concernée** (`activity.person_id`, `activity.household_id`), ce qui donne l'historique de chaque fiche et de chaque foyer.

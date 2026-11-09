@@ -6,7 +6,7 @@
 app/
 ├── __init__.py      Fabrique de l'appli, en-têtes de sécurité, CSP
 ├── config.py        Variables d'environnement
-├── extensions.py    SQLAlchemy, CSRF, Login ; fold() et réglages SQLite
+├── extensions.py    SQLAlchemy, CSRF, Login ; fold() et verrou d'écriture PostgreSQL
 ├── models.py        Modèle de données
 ├── permissions.py   Catalogue des droits, can(), @require
 ├── errors.py        Pages d'erreur
@@ -26,7 +26,8 @@ Il n'y a aucune étape de build. Pico et HTMX sont copiés dans `static/vendor/`
 - **Tous les droits passent par `can(user, action)`**, utilisée à la fois par `@require` sur les routes et par les templates pour masquer les boutons. Une action inconnue lève une erreur : une faute de frappe ne peut pas ouvrir un accès en silence.
 - **Pas de JavaScript ni de style en ligne.** Les comportements se déclarent par attributs et sont gérés dans `app.js` : `data-confirm`, `data-autosubmit`, `data-open-nav`, `data-close-nav`.
 - **Toute action qui compte passe par `activity.log()`**, dans la même transaction.
-- **Recherche sans accents :** `fold_contains()` trouve « Lefèvre » en tapant « lefevre ».
+- **Recherche sans accents :** `fold_contains()` trouve « Lefèvre » en tapant « lefevre ». Côté base, `fold()` est une fonction SQL (extension `unaccent`) créée par la migration initiale ; côté Python, `fold()` applique la même règle.
+- **Verrou d'écriture :** une requête qui modifie des données prend un verrou consultatif PostgreSQL au début de sa transaction (`extensions.py`). Les écritures passent donc une par une, ce qui évite qu'un code OIDC soit consommé deux fois ou qu'une limite de tentatives soit dépassée par deux workers à la fois. Les lectures restent concurrentes. Un traitement hors requête qui écrit le demande avec `g.write_lock = True`.
 
 ## Données
 

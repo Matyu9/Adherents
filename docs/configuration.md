@@ -11,9 +11,10 @@ Le nom, le sous-titre, la couleur et le logo se règlent directement dans **Para
 | `SECRET_KEY` | aucun | Signe les cookies et les empreintes de la limitation des tentatives, et chiffre les secrets de double authentification. **Obligatoire en production** : l'appli refuse de démarrer sans elle, ou avec la valeur d'exemple. **La changer rend inutilisables toutes les doubles authentifications et tous les codes de secours** : chaque personne devra la reconfigurer après une réinitialisation par un responsable, et le premier administrateur passera par `flask create-admin`. Sauvegardez-la à part de la base. |
 | `BASE_URL` | `http://localhost:8001` | Adresse publique, utilisée dans les emails. En `https://`, elle active aussi les cookies `Secure`. |
 | `ASSO_NAME` | `Mon association` | Nom par défaut, tant qu'aucun n'est défini dans Paramètres → Apparence. |
-| `DATA_DIR` | `./data` (`/data` dans Docker) | Dossier de la base et des fichiers envoyés. |
+| `DATA_DIR` | `./data` (`/data` dans Docker) | Dossier des fichiers envoyés (logo) et du marqueur du planificateur. La base est dans PostgreSQL. |
 | `OIDC_ISSUER` | `BASE_URL` | Identité du serveur OIDC, inscrite dans les jetons. **À choisir avant de brancher une appli :** la changer oblige à reconfigurer toutes les applis, qui ne reconnaîtraient plus leurs comptes. Un avertissement apparaît au démarrage si elle n'est pas en `https://`, sauf sur `localhost`. |
-| `DATABASE_URL` | `sqlite:///<DATA_DIR>/adherents.db` | Adresse de la base. L'appli est conçue pour SQLite. |
+| `DATABASE_URL` | `postgresql+psycopg:///adherents` | Adresse de la base PostgreSQL (base `adherents` de la machine, par défaut). Avec docker-compose, elle est construite à partir de `POSTGRES_PASSWORD`. |
+| `POSTGRES_PASSWORD` | aucun | Docker uniquement : mot de passe de la base, **obligatoire**. |
 | `TZ` | `Europe/Paris` dans Docker | Fuseau horaire des dates. |
 | `BANK_DATA_KEYS` | aucune | Clés de chiffrement des IBAN, voir [plus bas](#coordonnées-bancaires). Sans elle, l'annuaire marche mais aucun IBAN ne peut être enregistré. |
 

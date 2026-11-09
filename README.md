@@ -42,4 +42,4 @@ Tout est dans [`docs/`](docs/README.md) : plan du projet, installation, configur
 
 ## Technique
 
-Flask, SQLite, Jinja et HTMX, sans étape de build. Déploiement avec Docker Compose. Le socle est copié de l'Inventaire, pas partagé sous forme de paquet : les deux applis évoluent séparément.
+Flask, PostgreSQL, Jinja et HTMX, sans étape de build. Déploiement avec Docker Compose. Le socle est copié de l'Inventaire, pas partagé sous forme de paquet : les deux applis évoluent séparément.

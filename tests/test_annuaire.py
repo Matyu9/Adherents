@@ -697,3 +697,11 @@ def test_messages_can_be_dismissed_and_stay_in_view(client, admin, family):
                            follow_redirects=True)
     page = response.get_data(as_text=True)
     assert '<div class="flashes">' in page and "data-dismiss" in page and "Numéro invalide" in page
+
+
+@pytest.mark.parametrize("url", ["/annuaire/personnes/99999999999999999999", "/annuaire/foyers/99999999999999999999",
+                                 "/annuaire?saison=99999999999999999999", "/professeurs/99999999999999999999",
+                                 "/annuaire/personnes/nouvelle?foyer=99999999999999999999"])
+def test_numbers_too_large_are_a_clean_404(client, admin, url):
+    """PostgreSQL refuse un entier hors limites : l'appli répond « introuvable », jamais une erreur 500."""
+    assert client.get(url).status_code == 404

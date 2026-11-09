@@ -19,7 +19,7 @@ def log(action, message, *, changes=None, user=None, target=None, person=None, h
     `person` et `household` : la fiche de l'annuaire concernée (déjà en base)."""
     if user is None and current_user and current_user.is_authenticated:
         user = current_user
-    entry = Activity(account=user, action=action, message=message, changes=changes or None,
+    entry = Activity(account=user, action=action, message=message[:500], changes=changes or None,
                      target_account_id=target.id if target else None,
                      person_id=person.id if person else None, household_id=household.id if household else None)
     db.session.add(entry)

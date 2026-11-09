@@ -2,9 +2,11 @@
 
 ## Environnement
 
-Il faut Python 3.12 ou plus récent. Docker n'est pas nécessaire.
+Il faut Python 3.12 ou plus récent, et **PostgreSQL** (16 ou plus récent) sur la machine. Docker n'est pas nécessaire.
 
 ```sh
+brew install postgresql@18 && brew services start postgresql@18   # n'écoute que sur localhost
+createdb adherents && createdb adherents_test
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/playwright install chromium   # pour les tests dans un navigateur
@@ -45,6 +47,8 @@ HYPOTHESIS_PROFILE=deep .venv/bin/python -m pytest tests/test_properties.py   # 
 | Les autres | Un fichier par domaine : rôles, compte, journal, paramètres, emails, santé, erreurs, rapports CSP, CLI |
 
 Dans les tests comme en production, un administrateur a la double authentification : `make_account` la configure et `login` saisit le code. Elle n'a pas de réglage pour la désactiver.
+
+**Base de test :** PostgreSQL, base `adherents_test` (ou `TEST_DATABASE_URL`). Le schéma est recréé au début de chaque session, puis les tables sont vidées avant et après chaque test. Les serveurs des tests de bout en bout, les migrations et les redémarrages de l'appli ont chacun une base jetable (`fresh_database()`). Les tests ne doivent donc pas tourner en parallèle sur la même base.
 
 Le client de test (`conftest.py`) oublie l'utilisateur en cache et annule toute écriture non validée après chaque requête. Sans ça, une session révoquée resterait connectée dans les tests et un `commit` oublié passerait inaperçu.
 
@@ -101,9 +105,9 @@ Ouvrez les deux applis par `127.0.0.1`, et non `localhost` : c'est l'adresse dé
 ```
 
 - Un modèle modifié sans migration fait échouer `test_models_match_migrations`.
-- Sous SQLite, modifier une table la recrée. Le test sur base remplie vérifie que les données et les clés étrangères survivent.
-- Pour un statut amené à évoluer, validez dans le code plutôt qu'avec un `CHECK`, difficile à modifier sous SQLite. Gardez `CHECK` pour les vrais invariants.
-- Ajoutez les nouvelles tables aux données de départ (`SEED`) de `test_migrations.py`.
+- Les tests de migration tournent chacun dans une base PostgreSQL jetable, créée puis supprimée.
+- Gardez `CHECK` pour les vrais invariants ; un statut amené à évoluer se valide plutôt dans le code.
+- Ajoutez les contraintes et cascades des nouvelles tables à `test_migrations.py`.
 
 ## Données réelles
 

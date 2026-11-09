@@ -4,6 +4,13 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ## Non publié
 
+### Changé : PostgreSQL remplace SQLite
+
+- **Base PostgreSQL** (16 ou plus récent, 18 conseillé) : `DATABASE_URL`, et un service `db` dans docker-compose (mot de passe dans `POSTGRES_PASSWORD`), jamais exposé hors du réseau Docker.
+- **Migrations remises à zéro** : une migration initiale (`a0000001initial`) remplace celles écrites pour SQLite. Aucune base de production n'existait ; une base SQLite de développement ne se convertit pas, il faut repartir d'une base vide.
+- Recherche sans accents par l'extension `unaccent` ; écritures sérialisées par un verrou consultatif, comme le faisait `BEGIN IMMEDIATE`.
+- Tests sur PostgreSQL (`adherents_test`), avec une base jetable pour les serveurs de bout en bout et les migrations.
+
 ### Ajouté
 
 - **Annuaire** (phase 1) : personnes, foyers avec leurs responsables 1 et 2 et leurs personnes à charge, téléphones, numéros du logiciel de gestion, saisons et adhésions, profils de professeur. Recherche sans accents, filtres (élèves de la saison, anciens adhérents, professeurs, fiches archivées), fusion de deux fiches ou de deux foyers en double, archivage. Chaque fiche a son historique.

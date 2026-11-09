@@ -8,7 +8,7 @@ from app import CSP, create_app
 from app.config import Config, startup_warnings
 from app.extensions import db
 
-from .conftest import config_for, make_account
+from .conftest import TEST_DATABASE_URL, config_for, make_account, release, reset_database
 
 TEMPLATES = Path("app/templates")
 PAGES = [p for p in TEMPLATES.rglob("*.html") if "emails" not in p.parts]
@@ -34,11 +34,10 @@ def test_csp_allows_nothing_inline_or_external():
 def test_report_only_mode_for_diagnosis(tmp_path):
     app = create_app(config_for(tmp_path, CSP_REPORT_ONLY=True))
     with app.app_context():
-        db.create_all()
+        reset_database()
         headers = app.test_client().get("/connexion").headers
         assert "Content-Security-Policy" not in headers and headers["Content-Security-Policy-Report-Only"] == CSP
-        db.session.remove()
-        db.drop_all()
+        release()
 
 
 def test_error_pages_have_the_headers_too(client):
@@ -102,10 +101,9 @@ def test_every_light_token_has_its_dark_value():
 def csrf_app(tmp_path):
     app = create_app(config_for(tmp_path, WTF_CSRF_ENABLED=True))
     with app.app_context():
-        db.create_all()
+        reset_database()
         yield app
-        db.session.remove()
-        db.drop_all()
+        release()
 
 
 def token_of(html):
@@ -136,7 +134,7 @@ def test_csrf_token_does_not_expire_during_a_long_form():
 def test_production_refuses_a_known_secret(tmp_path, monkeypatch, secret):
     monkeypatch.delenv("FLASK_DEBUG", raising=False)
     config = type("Prod", (Config,), {"SECRET_KEY": secret, "DATA_DIR": tmp_path, "UPLOAD_DIR": tmp_path / "u",
-                                      "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+                                      "SQLALCHEMY_DATABASE_URI": TEST_DATABASE_URL})
     with pytest.raises(RuntimeError, match="SECRET_KEY"):
         create_app(config)
 
@@ -144,7 +142,7 @@ def test_production_refuses_a_known_secret(tmp_path, monkeypatch, secret):
 def test_production_starts_with_a_real_secret(tmp_path, monkeypatch):
     monkeypatch.delenv("FLASK_DEBUG", raising=False)
     config = type("Prod", (Config,), {"SECRET_KEY": "x" * 64, "DATA_DIR": tmp_path, "UPLOAD_DIR": tmp_path / "u",
-                                      "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+                                      "SQLALCHEMY_DATABASE_URI": TEST_DATABASE_URL})
     assert create_app(config).config["SECRET_KEY"] == "x" * 64
 
 
@@ -169,13 +167,12 @@ def test_proxy_headers_are_ignored_by_default(client):
 def test_proxy_headers_are_used_when_trusted(tmp_path):
     app = create_app(config_for(tmp_path, TRUST_PROXY=True))
     with app.app_context():
-        db.create_all()
+        reset_database()
         app.test_client().post("/connexion", data={"email": "x@y.z", "password": "x"},
                                headers={"X-Forwarded-For": "1.2.3.4"})
         from app.models import Activity
         assert "1.2.3.4" in db.session.scalar(db.select(Activity.message))
-        db.session.remove()
-        db.drop_all()
+        release()
 
 
 def test_docker_listens_locally_by_default():

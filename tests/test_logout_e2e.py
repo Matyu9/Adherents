@@ -127,11 +127,11 @@ class RelyingParty:
 
 
 @pytest.fixture(scope="module")
-def world(tmp_path_factory):
+def world(tmp_path_factory, module_database):
     tmp = tmp_path_factory.mktemp("logout-e2e")
     port = free_port()
     issuer = f"http://127.0.0.1:{port}"
-    idp = create_app(config_for(tmp, SQLALCHEMY_DATABASE_URI=f"sqlite:///{tmp / 'e2e.db'}", WTF_CSRF_ENABLED=True,
+    idp = create_app(config_for(tmp, SQLALCHEMY_DATABASE_URI=module_database, WTF_CSRF_ENABLED=True,
                                 TESTING=False, PROPAGATE_EXCEPTIONS=False, SECRET_KEY="cle-de-test-e2e-" * 4,
                                 OIDC_ISSUER=issuer, BASE_URL=issuer, BACKCHANNEL_IN_BACKGROUND=True))
     httpd = serve(idp, port)

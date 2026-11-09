@@ -19,7 +19,7 @@ from app.models import (AccessGroup, Account, Activity, LoginSession, OidcClient
                         OidcLogout, OidcSession, OidcToken, Role)
 from app.services import logout, oidc, sessions, tasks
 
-from .conftest import PASSWORD, config_for, login, make_account, stamp_head
+from .conftest import PASSWORD, config_for, login, make_account, release, reset_database, stamp_head
 from .test_oidc import (CB, SECRET_OF, Flow, base64_header, code_of, decode, exchange, follow, make_client,  # noqa: F401
                         members, person, signed_in_code)
 
@@ -746,11 +746,10 @@ def test_unreachable_app_is_a_failure_not_a_crash():
 def test_background_delivery_reaches_the_app(tmp_path, receiver):
     from app import create_app
     from .conftest import Client
-    app = create_app(config_for(tmp_path, BACKCHANNEL_IN_BACKGROUND=True,
-                                SQLALCHEMY_DATABASE_URI=f"sqlite:///{tmp_path / 'bg.db'}"))
+    app = create_app(config_for(tmp_path, BACKCHANNEL_IN_BACKGROUND=True))
     app.test_client_class = Client
     with app.app_context():
-        db.create_all()
+        reset_database()
         stamp_head()
         group = AccessGroup(key="membres", name="Membres")
         account = make_account(email="bg@asso.test")
@@ -771,8 +770,7 @@ def test_background_delivery_reaches_the_app(tmp_path, receiver):
                 break
             time.sleep(0.05)
         assert notices() == []
-        db.session.remove()
-        db.drop_all()
+        release()
 
 
 # ---------------------------------------------------------------------------
@@ -952,7 +950,7 @@ def test_confirmation_needs_csrf(tmp_path):
     from app import create_app
     app = create_app(config_for(tmp_path, WTF_CSRF_ENABLED=True))
     with app.app_context():
-        db.create_all()
+        reset_database()
         account = make_account(email="csrf@asso.test")
         http = app.test_client()
         page = http.get("/connexion").get_data(as_text=True)
@@ -960,8 +958,7 @@ def test_confirmation_needs_csrf(tmp_path):
         http.post("/connexion", data={"email": account.email, "password": PASSWORD, "csrf_token": token})
         response = http.post("/oidc/deconnexion/confirmer", data={"query": "", "decision": "logout"})
         assert response.status_code == 400 and http.get("/").status_code == 200
-        db.session.remove()
-        db.drop_all()
+        release()
 
 
 def test_html_in_the_app_name_is_escaped(browser, members):

@@ -25,9 +25,9 @@ _app = {}
 
 
 @pytest.fixture(scope="module")
-def server(tmp_path_factory):
+def server(tmp_path_factory, module_database):
     tmp = tmp_path_factory.mktemp("e2e")
-    app = create_app(config_for(tmp, SQLALCHEMY_DATABASE_URI=f"sqlite:///{tmp / 'e2e.db'}", WTF_CSRF_ENABLED=True,
+    app = create_app(config_for(tmp, SQLALCHEMY_DATABASE_URI=module_database, WTF_CSRF_ENABLED=True,
                                 TESTING=False, PROPAGATE_EXCEPTIONS=False, SECRET_KEY="cle-de-test-e2e-" * 4))
     with app.app_context():
         db.create_all()

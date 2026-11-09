@@ -18,7 +18,7 @@ from app.models import AccessGroup, Activity, OidcClient, OidcCode, OidcConsent,
 from app.services import oidc, tasks
 from app.services import totp as totp_service
 
-from .conftest import config_for, login, make_account, stamp_head
+from .conftest import config_for, login, make_account, release, reset_database, stamp_head
 
 CB = "https://appli.test/retour"
 SECRET_OF = {}
@@ -218,20 +218,19 @@ def test_post_to_authorize_and_token_work_with_csrf_on(tmp_path):
     """TestConfig coupe le CSRF : sans ce test, oublier l'exemption ne se verrait qu'en production."""
     app = create_app(config_for(tmp_path, WTF_CSRF_ENABLED=True))
     with app.app_context():
-        db.create_all()
+        reset_database()
         stamp_head()
         http = app.test_client()
         assert http.post("/oidc/authorize").status_code == 303
         assert http.post("/oidc/token").status_code == 400
         assert http.post("/oidc/userinfo").status_code == 401
-        db.session.remove()
-        db.drop_all()
+        release()
 
 
 def test_consent_form_is_protected_by_csrf(tmp_path):
     app = create_app(config_for(tmp_path, WTF_CSRF_ENABLED=True))
     with app.app_context():
-        db.create_all()
+        reset_database()
         stamp_head()
         account = make_account(email="c@asso.test")
         http = app.test_client()
@@ -239,8 +238,7 @@ def test_consent_form_is_protected_by_csrf(tmp_path):
         token = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', page).group(1)
         http.post("/connexion", data={"email": account.email, "password": "motdepasse", "csrf_token": token})
         assert http.post("/oidc/consentement", data={"decision": "allow"}).status_code == 400
-        db.session.remove()
-        db.drop_all()
+        release()
 
 
 # ---------------------------------------------------------------------------

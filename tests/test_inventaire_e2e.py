@@ -73,11 +73,11 @@ def wait_for_port(port, process, timeout=30):
 
 
 @pytest.fixture(scope="module")
-def world(tmp_path_factory):
+def world(tmp_path_factory, module_database):
     tmp = tmp_path_factory.mktemp("inventaire-e2e")
     idp_port, inv_port = free_port(), free_port()
     issuer, inventaire = f"http://127.0.0.1:{idp_port}", f"http://127.0.0.1:{inv_port}"
-    idp = create_app(config_for(tmp, SQLALCHEMY_DATABASE_URI=f"sqlite:///{tmp / 'adherents.db'}", WTF_CSRF_ENABLED=True,
+    idp = create_app(config_for(tmp, SQLALCHEMY_DATABASE_URI=module_database, WTF_CSRF_ENABLED=True,
                                 TESTING=False, PROPAGATE_EXCEPTIONS=False, SECRET_KEY="cle-de-test-e2e-" * 4,
                                 OIDC_ISSUER=issuer, BASE_URL=issuer, BACKCHANNEL_IN_BACKGROUND=True))
     httpd = make_server("127.0.0.1", idp_port, idp, threaded=True)

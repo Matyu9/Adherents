@@ -55,7 +55,7 @@ def client_application(discovery, client_id, secret, callback_port_box, scope="o
 
 
 @pytest.fixture(scope="module")
-def world(tmp_path_factory):
+def world(tmp_path_factory, module_database):
     tmp = tmp_path_factory.mktemp("oidc-e2e")
     box = {}
     # Le port de l'émetteur doit être connu avant de créer l'appli : il figure dans la configuration.
@@ -63,7 +63,7 @@ def world(tmp_path_factory):
     port = probe.server_port
     probe.server_close()
     issuer = f"http://127.0.0.1:{port}"
-    idp = create_app(config_for(tmp, SQLALCHEMY_DATABASE_URI=f"sqlite:///{tmp / 'e2e.db'}", WTF_CSRF_ENABLED=True,
+    idp = create_app(config_for(tmp, SQLALCHEMY_DATABASE_URI=module_database, WTF_CSRF_ENABLED=True,
                                 TESTING=False, PROPAGATE_EXCEPTIONS=False, SECRET_KEY="cle-de-test-e2e-" * 4,
                                 OIDC_ISSUER=issuer, BASE_URL=issuer))
     httpd = make_server("127.0.0.1", port, idp, threaded=True)

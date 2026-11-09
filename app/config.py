@@ -11,7 +11,10 @@ UNSAFE_SECRETS = (DEFAULT_SECRET, "change-moi")
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY") or DEFAULT_SECRET
     DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).resolve().parent.parent / "data"))
-    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or f"sqlite:///{DATA_DIR / 'adherents.db'}"
+    # PostgreSQL. Par défaut, la base « adherents » de la machine, par le socket local (développement).
+    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or "postgresql+psycopg:///adherents"
+    # Connexions vérifiées avant usage : un redémarrage de PostgreSQL ne fait pas échouer la requête suivante.
+    SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_DIR = DATA_DIR / "uploads"
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024
@@ -78,7 +81,7 @@ def startup_warnings(config):
 
 class TestConfig(Config):
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_DATABASE_URI = os.environ.get("TEST_DATABASE_URL") or "postgresql+psycopg:///adherents_test"
     WTF_CSRF_ENABLED = False
     MAIL_IN_BACKGROUND = False
     BACKCHANNEL_IN_BACKGROUND = False

@@ -1,4 +1,6 @@
 import os
+import secrets
+from contextlib import contextmanager
 from datetime import datetime
 from functools import partial
 
@@ -7,7 +9,8 @@ import pytest
 from flask import g
 from flask.testing import FlaskClient
 from hypothesis import settings
-from sqlalchemy import text
+from sqlalchemy import create_engine, make_url, text
+from sqlalchemy.pool import NullPool
 from werkzeug.security import generate_password_hash
 
 import app.models as models
@@ -60,6 +63,75 @@ def stamp_head():
     db.session.commit()
 
 
+# ---------------------------------------------------------------------------
+# Base PostgreSQL de test (TEST_DATABASE_URL, par défaut « adherents_test » sur le socket local)
+# ---------------------------------------------------------------------------
+
+TEST_DATABASE_URL = TestConfig.SQLALCHEMY_DATABASE_URI
+_SCHEMA_READY = []
+
+
+def _empty_tables(connection):
+    tables = ", ".join(f'"{table.name}"' for table in db.metadata.sorted_tables)
+    connection.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+    connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def blank_test_database():
+    """Début de session : schéma vierge, avant qu'une appli ne démarre (elle vérifie les IBAN déjà en base)."""
+    engine = create_engine(TEST_DATABASE_URL, poolclass=NullPool)
+    with engine.begin() as connection:
+        connection.execute(text("DROP SCHEMA public CASCADE"))
+        connection.execute(text("CREATE SCHEMA public"))
+    engine.dispose()
+
+
+def reset_database():
+    """Schéma créé une fois par session, puis tables vidées avant chaque test : bien plus rapide que de tout
+    recréer à chaque fois."""
+    if not _SCHEMA_READY:
+        db.create_all()  # crée aussi l'extension unaccent et fold() (app/extensions.py)
+        _SCHEMA_READY.append(True)
+    _empty_tables(db.session)
+    db.session.commit()
+
+
+def release():
+    """Fin d'un test : vide les tables (l'appli suivante ne doit rien trouver en démarrant) et ferme les connexions,
+    sinon PostgreSQL finit par les refuser."""
+    db.session.rollback()
+    if _SCHEMA_READY and db.engine.url.database == make_url(TEST_DATABASE_URL).database:
+        _empty_tables(db.session)
+        db.session.commit()
+    db.session.remove()
+    db.engine.dispose()
+
+
+@contextmanager
+def fresh_database():
+    """Base vide et jetable, pour ce qui ne doit pas partager la base de test : serveurs lancés dans un thread,
+    migrations, redémarrages de l'appli. Renvoie son adresse."""
+    url = make_url(TEST_DATABASE_URL)
+    name = f"{url.database}_{secrets.token_hex(4)}"
+    admin = create_engine(url.set(database="postgres"), isolation_level="AUTOCOMMIT", poolclass=NullPool)
+    with admin.connect() as connection:
+        connection.exec_driver_sql(f'CREATE DATABASE "{name}"')
+    try:
+        yield url.set(database=name).render_as_string(hide_password=False)
+    finally:
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        admin.dispose()
+
+
+@pytest.fixture(scope="module")
+def module_database():
+    """Base jetable pour les serveurs des tests de bout en bout (un par module)."""
+    with fresh_database() as url:
+        yield url
+
+
 def config_for(tmp_path, **overrides):
     return type("Cfg", (TestConfig,), {"DATA_DIR": tmp_path, "UPLOAD_DIR": tmp_path / "uploads", **overrides})
 
@@ -69,11 +141,10 @@ def app(tmp_path):
     app = create_app(config_for(tmp_path))
     app.test_client_class = Client
     with app.app_context():
-        db.create_all()
+        reset_database()
         stamp_head()
         yield app
-        db.session.remove()
-        db.drop_all()
+        release()
 
 
 @pytest.fixture

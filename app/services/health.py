@@ -50,15 +50,15 @@ def last_scheduler_run():
 
 def check_database():
     try:
-        db.session.execute(text("SELECT 1"))
-        mode = db.session.execute(text("PRAGMA journal_mode")).scalar()
+        version = db.session.execute(text("SHOW server_version")).scalar()
+        size = db.session.execute(text("SELECT pg_database_size(current_database())")).scalar()
+        unaccent = db.session.execute(text("SELECT 1 FROM pg_extension WHERE extname = 'unaccent'")).scalar()
     except Exception as exc:  # noqa: BLE001
         return _check("database", "Base de données", ERROR, f"Inaccessible : {exc}")
-    path = db.engine.url.database
-    size = f", {_size(Path(path).stat().st_size)}" if path and path != ":memory:" and Path(path).exists() else ""
-    if str(mode).lower() != "wal":
-        return _check("database", "Base de données", WARN, f"Accessible, journal en mode {mode} (WAL attendu){size}")
-    return _check("database", "Base de données", OK, f"Accessible, mode WAL{size}")
+    if not unaccent:
+        return _check("database", "Base de données", ERROR, "Extension unaccent absente : la recherche sans accents "
+                      "ne marche pas (flask db upgrade).")
+    return _check("database", "Base de données", OK, f"PostgreSQL {version}, {_size(size)}")
 
 
 def migration_heads():
@@ -103,17 +103,14 @@ def check_storage():
 
 
 def check_permissions():
-    """La base contient l'annuaire : ni elle ni son dossier ne doivent être lisibles par les autres comptes du serveur.
-    (Les IBAN sont chiffrés, mais pas les noms, adresses et téléphones.)"""
+    """Le dossier des données (logo, fichiers envoyés, marqueur du planificateur) ne doit pas être lisible par les
+    autres comptes du serveur. La base, elle, est protégée par PostgreSQL."""
     import os
     import stat
 
     if os.name != "posix":
         return _check("permissions", "Droits des fichiers", OK, "Non vérifiés sur ce système")
     paths = [Path(current_app.config["DATA_DIR"])]
-    database = db.engine.url.database
-    if database and database != ":memory:":
-        paths += [p for p in (Path(database), Path(database + "-wal")) if p.exists()]
     exposed = []
     for path in paths:
         try:
@@ -125,8 +122,8 @@ def check_permissions():
     if exposed:
         return _check("permissions", "Droits des fichiers", WARN,
                       "Accessibles à tous les comptes du serveur : " + ", ".join(exposed)
-                      + ". Restreignez-les (chmod 700 pour le dossier, 600 pour la base).")
-    return _check("permissions", "Droits des fichiers", OK, "Base et dossier des données réservés à l'appli")
+                      + ". Restreignez-les (chmod 700).")
+    return _check("permissions", "Droits des fichiers", OK, "Dossier des données réservé à l'appli")
 
 
 def check_scheduler(now=None):

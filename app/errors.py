@@ -4,9 +4,13 @@ from urllib.parse import urlsplit
 
 from flask import current_app, jsonify, render_template, request
 from flask_wtf.csrf import CSRFError
+from sqlalchemy.exc import DataError
 from werkzeug.exceptions import HTTPException, InternalServerError
 
 from .extensions import db
+
+# Codes SQLSTATE « hors limites » : valeur numérique (22003) ou date (22008).
+OUT_OF_RANGE = {"22003", "22008"}
 
 # code → (icône, titre, explication)
 MESSAGES = {
@@ -70,6 +74,14 @@ def register_error_handlers(app):
         # Identifiant, page ou date hors limites (ex. /notifications/99999999999999999999) : rien ne peut correspondre.
         db.session.rollback()
         return _json(404, MESSAGES[404][1]) if _is_api() else _page(404, *MESSAGES[404])
+
+    @app.errorhandler(DataError)
+    def out_of_range(e):
+        # La même chose vue par PostgreSQL : nombre ou date hors des limites de la colonne. Toute autre erreur de
+        # donnée reste une vraie erreur, traitée comme les autres (page 500 avec sa référence).
+        if getattr(e.orig, "sqlstate", None) in OUT_OF_RANGE:
+            return overflow(e)
+        return app.handle_exception(e)
 
     @app.errorhandler(InternalServerError)
     def server_error(_e):

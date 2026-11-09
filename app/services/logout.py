@@ -180,12 +180,12 @@ def _claim(row, now):
 
 def deliver_pending(now=None):
     """Envoie les avis dus. Renvoie (reçus, en échec, abandonnés). Valide la base après chaque avis."""
-    immediate = g.get("sqlite_immediate", False)
-    g.sqlite_immediate = True  # chaque transaction d'ici lit puis écrit : elle prend le verrou d'écriture d'emblée
+    immediate = g.get("write_lock", False)
+    g.write_lock = True  # chaque transaction d'ici lit puis écrit : elle prend le verrou d'écriture d'emblée
     try:
         return _deliver(now or datetime.now())
     finally:
-        g.sqlite_immediate = immediate
+        g.write_lock = immediate
 
 
 def _deliver(now):

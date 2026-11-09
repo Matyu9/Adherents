@@ -217,7 +217,7 @@ def count_reads():
     from flask import g
 
     if request.method == "GET" and current_user.is_authenticated:
-        g.sqlite_immediate = True  # cette lecture écrit un compteur
+        g.write_lock = True  # cette lecture écrit un compteur
         guard.count_read()
 
 

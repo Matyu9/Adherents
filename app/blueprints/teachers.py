@@ -82,7 +82,7 @@ def count_reads():
     from ..services import guard
 
     if request.method == "GET" and current_user.is_authenticated:
-        g.sqlite_immediate = True
+        g.write_lock = True
         guard.count_read()
 
 

@@ -8,6 +8,7 @@ from ..models import (Account, Activity, AppSetting, BankAccount, Household, Hou
 from . import bank
 
 CURRENT_SEASON_KEY = "current_season"
+ACCOUNT_MIN_AGE = 16  # en dessous, le responsable gère la fiche depuis son propre compte
 PERSON_FIELDS = ("civility", "first_name", "last_name", "birth_name", "sex", "birth_date", "birth_place", "email",
                  "emergency_contact", "notes")
 ADDRESS_FIELDS = ("address_recipient", "address_street", "postal_code", "city", "country")
@@ -226,22 +227,54 @@ def restore(record):
 # Fusion
 # ---------------------------------------------------------------------------
 
-def _fill(keep, drop, fields):
-    """Complète les champs vides de `keep` avec ceux de `drop`. Renvoie les champs repris."""
-    taken = []
+# Champs comparés à la fusion, dans l'ordre de l'écran. « adresse » regroupe ADDRESS_FIELDS.
+PERSON_MERGE_FIELDS = {"civility": "Civilité", "first_name": "Prénom", "last_name": "Nom",
+                       "birth_name": "Nom de naissance", "sex": "Sexe", "birth_date": "Date de naissance",
+                       "birth_place": "Lieu de naissance", "email": "Email", "adresse": "Adresse",
+                       "emergency_contact": "Contact d'urgence"}
+HOUSEHOLD_MERGE_FIELDS = {"name": "Nom du foyer", "adresse": "Adresse"}
+
+
+def _value(record, field):
+    if field == "adresse":
+        return tuple(getattr(record, f) for f in ADDRESS_FIELDS) if record.has_address else None
+    value = getattr(record, field)
+    return None if value == "" else value
+
+
+def _comparable(value):
+    """« Léa » et « LEA », ou deux adresses à la casse près, ne sont pas un conflit : la fiche gardée l'emporte."""
+    if isinstance(value, tuple):
+        return tuple(_comparable(v) for v in value)
+    return " ".join(fold(value).split()) if isinstance(value, str) else value
+
+
+def merge_plan(keep, drop, fields):
+    """Pour chaque champ : (champ, valeur gardée, valeur de l'autre, conflit). Il n'y a conflit que si les deux fiches
+    ont une valeur différente : c'est alors à quelqu'un de choisir. Sinon la valeur remplie l'emporte."""
+    plan = []
     for field in fields:
-        if field == "notes":
+        kept, other = _value(keep, field), _value(drop, field)
+        plan.append((field, kept, other, kept is not None and other is not None and _comparable(kept) != _comparable(other)))
+    return plan
+
+
+def _fill(keep, drop, fields, take=()):
+    """Mélange les deux fiches dans `keep` : un champ vide d'un côté prend la valeur de l'autre, et en cas de conflit
+    la valeur de `keep` reste, sauf pour les champs de `take`. Les notes s'additionnent. Renvoie les champs repris."""
+    taken = []
+    for field, kept, other, conflict in merge_plan(keep, drop, fields):
+        if other is None or (kept is not None and not (conflict and field in take)):
             continue
-        if getattr(keep, field) in (None, "") and getattr(drop, field) not in (None, ""):
-            setattr(keep, field, getattr(drop, field))
-            taken.append(field)
-    if drop.notes:
+        if field == "adresse":
+            for name in ADDRESS_FIELDS:
+                setattr(keep, name, getattr(drop, name))
+        else:
+            setattr(keep, field, other)
+        taken.append(field)
+    if drop.notes and drop.notes != keep.notes:
         keep.notes = f"{keep.notes}\n\n{drop.notes}" if keep.notes else drop.notes
         taken.append("notes")
-    if not keep.has_address and drop.has_address:
-        for field in ADDRESS_FIELDS:
-            setattr(keep, field, getattr(drop, field))
-        taken.append("adresse")
     return taken
 
 
@@ -256,12 +289,12 @@ def merge_problems(keep, drop):
     return problems
 
 
-def merge_persons(keep, drop):
+def merge_persons(keep, drop, take=()):
     """Rattache tout ce qui concerne `drop` à `keep`, puis supprime `drop`. Renvoie un résumé lisible."""
     if problems := merge_problems(keep, drop):
         raise DirectoryError(" ".join(problems))
     summary = []
-    if taken := _fill(keep, drop, PERSON_FIELDS):
+    if taken := _fill(keep, drop, PERSON_MERGE_FIELDS, take):
         summary.append("champs repris : " + ", ".join(taken))
 
     in_keep = {link.household_id for link in keep.household_links}
@@ -332,11 +365,11 @@ def household_merge_problems(keep, drop):
     return problems
 
 
-def merge_households(keep, drop):
+def merge_households(keep, drop, take=()):
     if problems := household_merge_problems(keep, drop):
         raise DirectoryError(" ".join(problems))
     summary = []
-    if taken := _fill(keep, drop, ("name", "notes")):
+    if taken := _fill(keep, drop, HOUSEHOLD_MERGE_FIELDS, take):
         summary.append("champs repris : " + ", ".join(taken))
     keep_people = {m.person_id for m in keep.members}
     for member in list(drop.members):
@@ -427,16 +460,23 @@ def account_problems(person):
         return "La fiche est archivée."
     if not person.email:
         return "La fiche n'a pas d'adresse email."
-    if person.is_minor:
-        return "Un mineur n'a pas de compte : son responsable gère sa fiche depuis le sien."
+    if person.age() is not None and person.age() < ACCOUNT_MIN_AGE:
+        return f"Pas de compte avant {ACCOUNT_MIN_AGE} ans : son responsable gère sa fiche depuis le sien."
     if db.session.scalar(db.select(Account.id).filter_by(email=person.email.strip().lower())) is not None:
         return f"L'adresse {person.email} est déjà celle d'un autre compte : rattachez-le plutôt."
     return None
 
 
-def create_account(person, role=Role.ADHERENT):
+def needs_guardian_consent(person):
+    """Un mineur de 16 ou 17 ans peut avoir son compte, avec l'accord d'un responsable légal (décidé le 9 novembre 2026)."""
+    return person.is_minor
+
+
+def create_account(person, role=Role.ADHERENT, guardian_consent=False):
     if problem := account_problems(person):
         raise DirectoryError(problem)
+    if needs_guardian_consent(person) and not guardian_consent:
+        raise DirectoryError(f"{person.full_name} est mineur(e) : confirmez qu'un responsable légal a donné son accord.")
     account = Account(first_name=person.first_name, last_name=person.last_name, email=person.email.strip().lower(),
                       role=role, active=True)
     db.session.add(account)

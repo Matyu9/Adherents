@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "directory/_macros.html" import address, phones, history, post_button %}
+{% from "directory/_macros.html" import address, phones, history, post_button, csrf %}
 {% block title %}{{ person.full_name }}{% endblock %}
 {% block content %}
 {% set edit = can(current_user, "directory.edit") %}
@@ -95,6 +95,12 @@
 <p class="muted">Aucun compte.</p>
 {% if can_account %}
   {% if account_problem %}<p class="muted small">{{ account_problem }}</p>
+  {% elif needs_consent %}
+  <form method="post" action="{{ url_for('directory.create_account', person_id=person.id) }}" data-confirm="Créer un compte pour {{ person.email }} et lui envoyer une invitation ?">
+    {{ csrf() }}
+    <label class="form-check"><input type="checkbox" name="accord" value="1" required> Un responsable légal a donné son accord ({{ person.first_name }} a {{ person.age() }} ans)</label>
+    <button type="submit" class="secondary small">Créer son compte et l'inviter</button>
+  </form>
   {% else %}{{ post_button(url_for('directory.create_account', person_id=person.id), "Créer son compte et l'inviter", "secondary small", "Créer un compte pour " ~ person.email ~ " et lui envoyer une invitation ?") }}{% endif %}
   <p class="small"><a href="{{ url_for('directory.link_accounts') }}">Rattacher un compte existant</a></p>
 {% endif %}

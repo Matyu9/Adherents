@@ -201,6 +201,6 @@ Décidés en écrivant la phase 1, le 9 novembre 2026 :
 - **L'empreinte des IBAN** est dérivée de `BANK_DATA_KEYS` plutôt que d'une troisième clé. Elle change donc à chaque rotation, qui la recalcule ; entre l'ajout d'une clé et la rotation, la recherche d'un même IBAN essaie toutes les clés.
 - **L'affichage masqué** est `•••• •••• 1234` : le pays et la clé de contrôle font partie du chiffré.
 - **Le journal note la fiche concernée** (`activity.person_id`, `activity.household_id`), ce qui donne l'historique de chaque fiche et de chaque foyer.
-- **Pas de compte pour un mineur** : la création d'un compte depuis une fiche est refusée avant 18 ans. À revoir si un élève de 16 ou 17 ans doit avoir le sien.
-- **Fusion** : la fiche gardée l'emporte ; ses champs vides sont complétés par l'autre, une adhésion en double sur la même saison est abandonnée, et deux fiches qui ont chacune un compte ne fusionnent pas.
+- **Compte dès 16 ans** (décidé le 9 novembre 2026) : avant 16 ans, pas de compte, le responsable gère la fiche depuis le sien. À 16 et 17 ans, la personne qui crée le compte confirme qu'un responsable légal a donné son accord, et le journal le note. La gestion des comptes sera retravaillée bientôt.
+- **Fusion** : les deux fiches se mélangent. Un champ rempli d'un seul côté est repris ; quand les deux ont une valeur différente, l'écran demande laquelle garder (sans choix, celle de la fiche gardée). Une différence d'accent ou de casse n'est pas un conflit. Foyers, téléphones, adhésions et notes s'additionnent ; une adhésion en double sur la même saison est abandonnée, et deux fiches qui ont chacune un compte ne fusionnent pas.
 

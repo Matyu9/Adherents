@@ -111,9 +111,10 @@ class MembershipForm(FlaskForm):
     school_level = StringField("Niveau scolaire", validators=[Optional(), Length(max=40)])
     school_class = StringField("Classe", validators=[Optional(), Length(max=40)])
 
-    def validate_withdrawn_on(self, field):
-        if self.status.data == Membership.ACTIVE and field.data:
-            raise ValidationError("Une adhésion active n'a pas de date d'abandon.")
+    @property
+    def withdrawn_date(self):
+        """La date d'abandon ne compte que pour un abandon : masquée sinon, on ne garde pas ce qui y traînerait."""
+        return self.withdrawn_on.data if self.status.data == Membership.WITHDRAWN else None
 
 
 class TeacherForm(FlaskForm):
@@ -289,7 +290,8 @@ def person(person_id):
                            entries=_history(person=person), current=directory.current_season(),
                            can_account=can_account,
                            season_count=len(directory.seasons()),
-                           account_problem=directory.account_problems(person) if can_account else None)
+                           account_problem=directory.account_problems(person) if can_account else None,
+                           needs_consent=directory.needs_guardian_consent(person))
 
 
 @bp.route("/personnes/<int:person_id>/modifier", methods=["GET", "POST"])
@@ -394,7 +396,7 @@ def create_membership(person_id):
         return redirect(url_for(".person", person_id=person.id))
     if form.validate_on_submit():
         membership = Membership(person=person, season_id=form.season_id.data, status=form.status.data,
-                                withdrawn_on=form.withdrawn_on.data, category=_blank(form.category.data),
+                                withdrawn_on=form.withdrawn_date, category=_blank(form.category.data),
                                 school_level=_blank(form.school_level.data), school_class=_blank(form.school_class.data))
         db.session.add(membership)
         db.session.flush()
@@ -414,7 +416,7 @@ def edit_membership(membership_id):
     if form.validate_on_submit():
         changes = diff(membership, ("season_id", "status", "withdrawn_on", "category", "school_level", "school_class"),
                        {"season_id": form.season_id.data, "status": form.status.data,
-                        "withdrawn_on": form.withdrawn_on.data if form.status.data == Membership.WITHDRAWN else None,
+                        "withdrawn_on": form.withdrawn_date,
                         "category": _blank(form.category.data), "school_level": _blank(form.school_level.data),
                         "school_class": _blank(form.school_class.data)})
         if changes:
@@ -465,6 +467,35 @@ def delete_teacher(person_id):
 
 # --- Fusion ----------------------------------------------------------------
 
+def _shown(field, value):
+    """Valeur lisible d'un champ comparé à la fusion."""
+    if value is None:
+        return ""
+    if field == "adresse":
+        recipient, street, postal_code, city, country = value
+        parts = [recipient, (street or "").replace("\n", ", "), " ".join(p for p in (postal_code, city) if p)]
+        return ", ".join(p for p in parts if p) + (f" ({country})" if country and country != "FR" else "")
+    if field == "sex":
+        return Person.SEXES.get(value, value)
+    if hasattr(value, "strftime"):
+        return value.strftime("%d/%m/%Y")
+    return str(value)
+
+
+def _merge_rows(keep, other, fields):
+    rows = []
+    for field, kept, theirs, conflict in directory.merge_plan(keep, other, fields):
+        rows.append({"field": field, "label": fields[field], "kept": _shown(field, kept),
+                     "other": _shown(field, theirs), "conflict": conflict,
+                     "result": _shown(field, kept if kept is not None else theirs)})
+    return rows
+
+
+def _taken(fields):
+    """Champs en conflit pour lesquels on a choisi la valeur de l'autre fiche."""
+    return {field for field in fields if request.form.get(f"prendre_{field}") == "autre"}
+
+
 @bp.route("/personnes/<int:person_id>/fusionner", methods=["GET", "POST"])
 @require("directory.merge")
 def merge_person(person_id):
@@ -475,7 +506,7 @@ def merge_person(person_id):
             abort(400)
         name = other.full_name
         try:
-            summary = directory.merge_persons(keep, other)
+            summary = directory.merge_persons(keep, other, _taken(directory.PERSON_MERGE_FIELDS))
         except DirectoryError as exc:
             flash(str(exc), "error")
             return redirect(url_for(".merge_person", person_id=keep.id, avec=other.id))
@@ -489,7 +520,10 @@ def merge_person(person_id):
     if other is None:
         query = directory.search(db.select(Person), q or keep.last_name).where(Person.id != keep.id)
         candidates = db.session.scalars(query.order_by(Person.last_name, Person.first_name).limit(30)).all()
+    fields = {k: v for k, v in directory.PERSON_MERGE_FIELDS.items()
+              if k != "birth_place" or can(current_user, "directory.edit")}
     return render_template("directory/person_merge.html", keep=keep, other=other, q=q, candidates=candidates,
+                           rows=_merge_rows(keep, other, fields) if other else [],
                            problems=directory.merge_problems(keep, other) if other else [])
 
 
@@ -500,12 +534,14 @@ def merge_person(person_id):
 @require("directory.edit")
 def create_account(person_id):
     person = _person(person_id)
+    consent = request.form.get("accord") == "1"
     try:
-        account = directory.create_account(person)
+        account = directory.create_account(person, guardian_consent=consent)
     except DirectoryError as exc:
         flash(str(exc), "error")
-        return redirect(url_for(".person", person_id=person.id))
-    log("account.create", f"Compte créé depuis l'annuaire : {account.full_name} ({account.role_label})",
+        return redirect(url_for(".person", person_id=person.id) + "#compte")
+    log("account.create", f"Compte créé depuis l'annuaire : {account.full_name} ({account.role_label})"
+        + (", avec l'accord d'un responsable légal (mineur)" if directory.needs_guardian_consent(person) else ""),
         target=account, person=person)
     from .accounts import _grant_access
     return _grant_access(account)
@@ -569,7 +605,16 @@ def household(household_id):
         present = [m.person_id for m in household.members]
         query = directory.search(db.select(Person), q).where(Person.archived_at.is_(None), Person.id.not_in(present))
         found = db.session.scalars(query.order_by(Person.last_name, Person.first_name).limit(20)).all()
+    # Même IBAN sur d'autres foyers : affiché en permanence, pas seulement au moment de l'ajout.
+    same_iban = {}
+    if can(current_user, "bank.view"):
+        for account in household.bank_accounts:
+            same_iban[account.id] = db.session.scalars(
+                db.select(Household).join(BankAccount).where(BankAccount.iban_fingerprint == account.iban_fingerprint,
+                                                             BankAccount.id != account.id)
+                .order_by(Household.name).distinct()).all()
     return render_template("directory/household.html", household=household, phone_form=PhoneForm(), q=q, found=found,
+                           same_iban=same_iban,
                            entries=_history(household=household), roles=HouseholdMember.ROLES,
                            bank_enabled=bank.enabled())
 
@@ -682,7 +727,7 @@ def merge_household(household_id):
             abort(400)
         name = other.name
         try:
-            summary = directory.merge_households(keep, other)
+            summary = directory.merge_households(keep, other, _taken(directory.HOUSEHOLD_MERGE_FIELDS))
         except (DirectoryError, bank.BankKeyError) as exc:
             db.session.rollback()
             flash(str(exc), "error")
@@ -698,6 +743,7 @@ def merge_household(household_id):
         query = directory.household_query(q or keep.name.split()[-1]).where(Household.id != keep.id)
         candidates = db.session.scalars(query.order_by(Household.name).limit(30)).all()
     return render_template("directory/household_merge.html", keep=keep, other=other, q=q, candidates=candidates,
+                           rows=_merge_rows(keep, other, directory.HOUSEHOLD_MERGE_FIELDS) if other else [],
                            problems=directory.household_merge_problems(keep, other) if other else [])
 
 

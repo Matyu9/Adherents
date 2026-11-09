@@ -92,9 +92,17 @@ def test_a_household_from_start_to_iban(session):
 
     page.goto(f"/annuaire/personnes/{person_id}")
     page.click("text=+ Ajouter une adhésion")
+    assert not page.is_visible("#withdrawn_on")  # date d'abandon masquée tant que l'adhésion est active
+    page.select_option("#status", "withdrawn")
+    assert page.is_visible("#withdrawn_on")
+    page.select_option("#status", "active")
+    assert not page.is_visible("#withdrawn_on")
     page.fill("#category", "Scolaire")
     page.click("main form[method=post] button[type=submit]")
     page.wait_for_url(f"**/annuaire/personnes/{person_id}*")
+    assert page.is_visible(".flashes")
+    page.click(".flash-close")
+    assert page.locator(".flashes").count() == 0  # message refermé
     shot(page, "personne")
     page.goto("/annuaire?statut=eleves")
     assert "LEFÈVRE Léon" in page.content() and "LEFÈVRE Hélène" not in page.content()

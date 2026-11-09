@@ -408,13 +408,13 @@ def test_membership_form(client, admin, family):
     zoe = family["zoe"]
     page = client.get(f"/annuaire/personnes/{zoe.id}/adhesions/nouvelle").get_data(as_text=True)
     assert re.search(rf'<option selected value="{s.id}">', page)
-    response = client.post(f"/annuaire/personnes/{zoe.id}/adhesions/nouvelle",
-                           data={"season_id": s.id, "status": "active", "withdrawn_on": "2026-10-01"})
-    assert "pas de date d'abandon" in response.get_data(as_text=True).replace("&#39;", "'")
+    assert 'data-show-when="status" data-show-value="withdrawn"' in page  # date d'abandon masquée si active
+    # Une date restée dans le champ masqué n'est pas gardée pour une adhésion active.
     client.post(f"/annuaire/personnes/{zoe.id}/adhesions/nouvelle",
-                data={"season_id": s.id, "status": "active", "category": "Scolaire", "school_class": "6e"})
+                data={"season_id": s.id, "status": "active", "withdrawn_on": "2026-10-01", "category": "Scolaire",
+                      "school_class": "6e"})
     (m,) = db.session.get(Person, zoe.id).memberships
-    assert m.category == "Scolaire" and m.school_class == "6e" and m.school_level is None
+    assert m.category == "Scolaire" and m.school_class == "6e" and m.school_level is None and m.withdrawn_on is None
     # Plus de saison libre : le formulaire renvoie vers la fiche.
     assert client.get(f"/annuaire/personnes/{zoe.id}/adhesions/nouvelle").status_code == 302
     client.post(f"/annuaire/adhesions/{m.id}/modifier", data={"season_id": s.id, "status": "withdrawn",
@@ -596,7 +596,7 @@ def test_inviting_an_adult_from_their_record(client, admin, family):
     assert db.session.scalar(db.select(AccountToken).filter_by(account_id=account.id, purpose="invite")) is not None
 
 
-@pytest.mark.parametrize("case, message", [("minor", "mineur"), ("no_email", "pas d'adresse"),
+@pytest.mark.parametrize("case, message", [("minor", "avant 16 ans"), ("no_email", "pas d'adresse"),
                                            ("taken", "déjà celle d'un autre compte"), ("archived", "archivée")])
 def test_no_account_when_it_would_be_wrong(family, case, message):
     target = family["anne"]
@@ -624,3 +624,91 @@ def test_linking_needs_both_rights(client, manager, family):
     assert client.get("/annuaire/rattachement").status_code == 403
     assert client.post(f"/annuaire/personnes/{family['marc'].id}/compte").status_code == 403
     assert family["marc"].account is None
+
+
+def test_a_teenager_gets_an_account_with_guardian_consent(client, admin, family):
+    today = date.today()
+    zoe = family["zoe"]
+    zoe.birth_date = today.replace(year=today.year - 16)
+    zoe.email = "zoe@asso.test"
+    db.session.commit()
+    page = client.get(f"/annuaire/personnes/{zoe.id}").get_data(as_text=True)
+    assert 'name="accord"' in page and "16 ans" in page
+    with pytest.raises(DirectoryError, match="accord"):
+        directory.create_account(zoe)
+    response = client.post(f"/annuaire/personnes/{zoe.id}/compte", follow_redirects=True)
+    assert "accord" in response.get_data(as_text=True) and db.session.get(Person, zoe.id).account is None
+    client.post(f"/annuaire/personnes/{zoe.id}/compte", data={"accord": "1"})
+    assert db.session.get(Person, zoe.id).account.email == "zoe@asso.test"
+    entry = db.session.scalar(db.select(Activity).filter_by(action="account.create", person_id=zoe.id))
+    assert "accord d'un responsable légal" in entry.message
+
+
+def test_an_adult_needs_no_consent(family):
+    assert not directory.needs_guardian_consent(family["anne"])
+    assert directory.create_account(family["anne"]).email == "anne@asso.test"
+
+
+def test_merge_mixes_both_records_and_asks_only_on_conflicts(client, manager, family):
+    anne = family["anne"]
+    anne.birth_name = "Durand"
+    copy = person("Anne", "Martin", email="anne.martin@autre.test", birth_date=date(1980, 1, 2),
+                  emergency_contact="Sœur : 06 00 00 00 00", city="Rouen", postal_code="76000")
+    db.session.commit()
+    page = client.get(f"/annuaire/personnes/{anne.id}/fusionner?avec={copy.id}").get_data(as_text=True)
+    # Email différent des deux côtés : on choisit. Le reste est repris ou gardé sans question.
+    assert 'name="prendre_email"' in page and 'name="prendre_birth_name"' not in page
+    assert 'name="prendre_emergency_contact"' not in page and "repris" in page
+    client.post(f"/annuaire/personnes/{anne.id}/fusionner", data={"avec": copy.id, "prendre_email": "autre"})
+    anne = db.session.get(Person, anne.id)
+    assert anne.email == "anne.martin@autre.test"            # conflit : la valeur choisie
+    assert anne.birth_name == "Durand"                        # rempli d'un seul côté (la fiche gardée)
+    assert anne.emergency_contact == "Sœur : 06 00 00 00 00"  # rempli d'un seul côté (l'autre)
+    assert anne.city == "Rouen"                               # adresse reprise en bloc
+
+
+def test_accents_and_case_are_not_a_conflict(family):
+    copy = person("LEA", "martin", city="ROUEN")
+    family["zoe"].city = "Rouen"
+    plan = {field: conflict for field, _, _, conflict in directory.merge_plan(
+        family["zoe"], copy, directory.PERSON_MERGE_FIELDS)}
+    assert not plan["last_name"] and not plan["adresse"]
+    directory.merge_persons(family["zoe"], copy)
+    assert family["zoe"].last_name == "Martin"
+
+
+def test_merge_keeps_the_kept_value_by_default(family):
+    copy = person("Annie", "Martin", email="annie@autre.test")
+    directory.merge_persons(family["anne"], copy)
+    assert family["anne"].first_name == "Anne" and family["anne"].email == "anne@asso.test"
+
+
+def test_household_merge_can_take_the_other_name(client, admin, family):
+    copy = home("Famille Martin-Durand")
+    db.session.commit()
+    client.post(f"/annuaire/foyers/{family['home'].id}/fusionner", data={"avec": copy.id, "prendre_name": "autre"})
+    assert db.session.get(Household, family["home"].id).name == "Famille Martin-Durand"
+
+
+def test_same_iban_stays_visible_on_the_household(client, admin, family):
+    other = home("Famille Durand")
+    for household in (family["home"], other):
+        account = BankAccount(household_id=household.id, holder_name="X")
+        bank.set_iban(account, IBAN)
+        db.session.add(account)
+    db.session.commit()
+    page = client.get(f"/annuaire/foyers/{family['home'].id}").get_data(as_text=True)
+    assert "Le même IBAN est aussi enregistré pour" in page and "Famille Durand" in page
+    alone = home("Famille Seule")
+    account = BankAccount(household_id=alone.id, holder_name="Y")
+    bank.set_iban(account, "FR1420041010050500013M02606")
+    db.session.add(account)
+    db.session.commit()
+    assert "même IBAN" not in client.get(f"/annuaire/foyers/{alone.id}").get_data(as_text=True)
+
+
+def test_messages_can_be_dismissed_and_stay_in_view(client, admin, family):
+    response = client.post(f"/annuaire/foyers/{family['home'].id}/telephones", data={"number": "06 12"},
+                           follow_redirects=True)
+    page = response.get_data(as_text=True)
+    assert '<div class="flashes">' in page and "data-dismiss" in page and "Numéro invalide" in page

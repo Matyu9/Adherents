@@ -9,7 +9,14 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 - **Annuaire** (phase 1) : personnes, foyers avec leurs responsables 1 et 2 et leurs personnes à charge, téléphones, numéros du logiciel de gestion, saisons et adhésions, profils de professeur. Recherche sans accents, filtres (élèves de la saison, anciens adhérents, professeurs, fiches archivées), fusion de deux fiches ou de deux foyers en double, archivage. Chaque fiche a son historique.
 - **Saison en cours** choisie dans Annuaire → Saisons, sans la déduire de la date.
 - **Coordonnées bancaires** : IBAN chiffrés (AES-GCM) avec une clé dédiée, `BANK_DATA_KEYS`, et mandats SEPA. Lecture en clair avec le droit `bank.view` et un nouveau code de double authentification, inscrite au journal. `flask bank-generate-key` et `flask bank-rotate-key`. Les mandats sont supprimés 13 mois après leur dernier prélèvement.
-- **Rattachement des comptes** à leur fiche, avec des propositions (même email, même nom) qu'une personne valide une à une ; création d'une fiche depuis un compte, et d'un compte avec invitation depuis la fiche d'un adulte.
+- **Rattachement des comptes** à leur fiche, avec des propositions (même email, même nom) qu'une personne valide une à une ; création d'une fiche depuis un compte, et d'un compte avec invitation depuis la fiche d'une personne de 16 ans ou plus (accord d'un responsable légal avant 18 ans).
+- **Fusion champ par champ** : ce qui n'est rempli que d'un côté est repris, et l'écran demande quoi garder quand les deux fiches diffèrent.
+- Un IBAN présent sur plusieurs foyers est signalé en permanence sur chacun d'eux.
+
+### Modifié
+
+- Les messages après une action restent visibles sous la barre du haut, même quand la page s'ouvre plus bas, et se referment d'un clic.
+- La date d'abandon d'une adhésion n'apparaît que si le statut est « Abandon ».
 - Nouveaux droits `directory.view`, `directory.edit`, `directory.merge` et `bank.view`. Le gestionnaire reçoit les trois premiers ; `bank.view` rend la double authentification obligatoire.
 
 - **Groupes d'un rôle** (écran Rôles) : chaque compte du rôle fait partie de ces groupes sans qu'on les coche sur sa fiche. Ils ouvrent les applis et y sont transmis comme les autres. Changer le rôle d'un compte, ou les groupes d'un rôle, prévient les applis concernées.

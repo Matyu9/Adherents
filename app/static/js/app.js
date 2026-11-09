@@ -59,3 +59,29 @@
     show("Connexion au serveur impossible : vérifiez votre réseau puis réessayez.");
   });
 })();
+
+// <button data-dismiss> : referme le message qui le contient.
+// <div data-show-when="champ" data-show-value="valeur"> : visible seulement quand ce champ du même formulaire vaut
+// cette valeur (date d'abandon d'une adhésion…). Sans JavaScript, tout reste affiché.
+(function () {
+  document.addEventListener("click", function (event) {
+    const button = event.target.closest("[data-dismiss]");
+    if (!button) return;
+    const box = button.closest(".flash");
+    const list = box && box.parentElement;
+    if (box) box.remove();
+    if (list && list.classList.contains("flashes") && !list.children.length) list.remove();
+  });
+  function refresh(form) {
+    form.querySelectorAll("[data-show-when]").forEach(function (block) {
+      const field = form.elements[block.dataset.showWhen];
+      block.hidden = !!field && field.value !== block.dataset.showValue;
+    });
+  }
+  document.addEventListener("change", function (event) {
+    if (event.target.form) refresh(event.target.form);
+  });
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("form").forEach(refresh);
+  });
+})();

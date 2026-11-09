@@ -34,6 +34,7 @@ Adhérents a deux missions :
 | Adhésion (9 novembre 2026) | Chaque élève est adhérent et paie son adhésion, une par saison. Un élève de moins de 16 ans est représenté à l'assemblée générale par un responsable, qui ne paie pas d'adhésion. |
 | Accès des professeurs (9 novembre 2026) | Un professeur ne voit que ses élèves et leurs responsables, à partir des inscriptions. |
 | Date de bascule (9 novembre 2026) | Aucune : on construit au fil de l'eau, et la date se décidera quand l'appli couvrira tout. |
+| Comptes des mineurs (9 novembre 2026) | Dès 16 ans, avec l'accord d'un responsable légal confirmé à la création et noté au journal. Avant, le responsable gère la fiche depuis son compte. La gestion des comptes sera retravaillée. |
 | Règlements (9 novembre 2026) | Trois voies : prélèvement SEPA généré par l'appli, paiement en ligne sur HelloAsso, et saisie manuelle par le secrétariat (chèque, espèces, ANCV…). |
 | Ordre des phases (6 novembre 2026) | Sans exports du logiciel de gestion pour l'instant : les comptes et l'OIDC passent d'abord (2 → 3 → 4 → 5), l'annuaire ensuite. |
 | Comptes des adhérents (6 novembre 2026) | Le système de comptes se construit dès maintenant, mais les adhérents ne sont invités qu'une fois l'annuaire en place, pour que leurs comptes soient créés déjà rattachés à leur fiche. |

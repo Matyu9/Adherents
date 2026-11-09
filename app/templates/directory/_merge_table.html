@@ -1,0 +1,23 @@
+{#- Comparaison de deux fiches avant fusion. Un champ rempli d'un seul côté est repris ; s'ils diffèrent, on choisit. -#}
+<div class="overflow-auto"><table class="striped responsive merge-table">
+  <thead><tr><th></th><th>{{ kept_label }}</th><th>{{ other_label }}</th><th>Après fusion</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+  <tr{% if row.conflict %} class="conflict"{% endif %}>
+    <th>{{ row.label }}</th>
+    {% if row.conflict %}
+    <td data-label="{{ kept_label }}"><label class="choice"><input type="radio" name="prendre_{{ row.field }}" value="garder" checked>{{ row.kept }}</label></td>
+    <td data-label="{{ other_label }}"><label class="choice"><input type="radio" name="prendre_{{ row.field }}" value="autre">{{ row.other }}</label></td>
+    <td data-label="Après fusion"><small class="muted">au choix</small></td>
+    {% else %}
+    <td data-label="{{ kept_label }}">{{ row.kept or "—" }}</td>
+    <td data-label="{{ other_label }}">{{ row.other or "—" }}</td>
+    <td data-label="Après fusion">{% if row.result %}{{ row.result }}{% if not row.kept %} <span class="badge">repris</span>{% endif %}{% else %}—{% endif %}</td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+  {% for label, kept, other in extra %}
+  <tr><th>{{ label }}</th><td data-label="{{ kept_label }}">{{ kept or "—" }}</td><td data-label="{{ other_label }}">{{ other or "—" }}</td><td data-label="Après fusion">{% if kept or other %}<small class="muted">réunis</small>{% else %}—{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>

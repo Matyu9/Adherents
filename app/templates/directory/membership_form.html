@@ -7,7 +7,7 @@
   <form method="post" novalidate>
     {{ form.hidden_tag() }}
     {{ field(form.season_id) }}
-    <div class="grid"><div>{{ field(form.status) }}</div><div>{{ field(form.withdrawn_on) }}</div></div>
+    <div class="grid"><div>{{ field(form.status) }}</div><div data-show-when="status" data-show-value="withdrawn">{{ field(form.withdrawn_on) }}</div></div>
     {{ field(form.category) }}
     <div class="grid"><div>{{ field(form.school_level) }}</div><div>{{ field(form.school_class) }}</div></div>
     <button type="submit">Enregistrer</button>

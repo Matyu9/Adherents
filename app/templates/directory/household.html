@@ -89,6 +89,9 @@
 {% for b in household.bank_accounts %}
 <section class="card">
   <p><strong>{{ b.masked_iban }}</strong> · {{ b.holder_name }}{% if b.bic %} · <small>{{ b.bic }}</small>{% endif %}</p>
+  {% if same_iban.get(b.id) %}
+  <p class="flash flash-warning">Le même IBAN est aussi enregistré pour {% for h in same_iban[b.id] %}<a href="{{ url_for('directory.household', household_id=h.id) }}#banque">{{ h.name }}</a>{{ ", " if not loop.last }}{% endfor %}.</p>
+  {% endif %}
   <div class="actions">
     <a href="{{ url_for('directory.reveal_iban', account_id=b.id) }}">Afficher l'IBAN</a>
     <a href="{{ url_for('directory.create_mandate', account_id=b.id) }}">+ Mandat</a>

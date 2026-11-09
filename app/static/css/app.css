@@ -417,3 +417,13 @@ progress { height: .6rem; border-radius: 999px; }
 .wide-form { max-width: 40rem; }
 .iban { font-size: 1.15rem; letter-spacing: .04em; user-select: all; }
 section.card + section.card { margin-top: .75rem; }
+
+/* Messages après une action : collés sous la barre du haut, refermables. */
+.flashes { position: sticky; top: calc(var(--topbar-h) + .5rem); z-index: 15; }
+.flashes .flash { flex-direction: row; box-shadow: var(--shadow-lg); align-items: flex-start; }
+.flashes .flash > span { flex: 1; }
+.flash-close { all: unset; cursor: pointer; padding: 0 .25rem; line-height: 1; font-size: 1.2rem; opacity: .7; }
+.flash-close:hover, .flash-close:focus-visible { opacity: 1; }
+.flash-close:focus-visible { outline: 2px solid currentColor; border-radius: 4px; }
+.merge-table tr.conflict > * { background: var(--warn-bg); }
+.merge-table .choice { margin: 0; }

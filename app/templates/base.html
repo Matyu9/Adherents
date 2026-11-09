@@ -81,10 +81,15 @@
     </header>
 
     <main class="content">
+      {#- Messages collés sous la barre du haut : visibles même quand la page s'ouvre sur une ancre (#banque…). -#}
       {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flashes">
         {% for category, message in messages %}
-          <div class="flash flash-{{ category }}" role="alert">{{ message }}</div>
+          <div class="flash flash-{{ category }}" role="alert"><span>{{ message }}</span><button type="button" class="flash-close" data-dismiss aria-label="Fermer ce message">×</button></div>
         {% endfor %}
+        </div>
+        {% endif %}
       {% endwith %}
       {% block content %}{% endblock %}
     </main>

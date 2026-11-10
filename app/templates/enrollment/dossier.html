@@ -38,8 +38,8 @@
       <div><h3>{{ registration.student_name(s, data) or "Nouvel élève" }}{% if s.guardian is not none %} <small class="muted">(responsable)</small>{% endif %}</h3>
         {% if s.enrolled %}<p class="small">{% for cid in s.courses %}{% set c = courses.get(cid) %}{% if c %}{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}{% endif %}</small>{% endif %}{% endif %}{{ " · " if not loop.last }}{% else %}<span class="error">aucun cours choisi</span>{% endfor %}</p>
         {% else %}<p class="small muted">Ne se réinscrit pas cette saison.</p>{% endif %}</div>
-      {% if editable %}<div class="actions"><a href="{{ url_for('enrollment.student', uuid=dossier.uuid, key=s.key) }}">Modifier</a>
-        {% if not s.person_id or s.guardian is not none %}{{ post_button(url_for('enrollment.remove_student', uuid=dossier.uuid, key=s.key), "Retirer", "link-button", "Retirer cet élève du dossier ?") }}{% endif %}</div>{% endif %}
+      {% if editable %}<div class="actions"><a href="{{ url_for('enrollment.student', uuid=dossier.uuid, student_key=s.key) }}">Modifier</a>
+        {% if not s.person_id or s.guardian is not none %}{{ post_button(url_for('enrollment.remove_student', uuid=dossier.uuid, student_key=s.key), "Retirer", "link-button", "Retirer cet élève du dossier ?") }}{% endif %}</div>{% endif %}
     </div>
   </div>
   {% else %}<p class="muted">Aucun élève pour l'instant.</p>{% endfor %}

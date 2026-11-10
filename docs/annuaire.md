@@ -108,7 +108,7 @@ Une table plutôt qu'une colonne, car une même personne peut avoir deux numéro
 - **Création :** à l'import, une ligne par élève de l'export des inscriptions, en `withdrawn` en cas d'abandon. En phase 6, la validation d'un dossier crée la ligne de la nouvelle saison.
 - **Historique :** une ligne par saison, jamais supprimée. Un **ancien adhérent** est une personne sans adhésion active sur la saison en cours.
 - **Sans effet sur l'accès :** l'adhésion ne coupe aucun compte (voir le [plan](plan.md#principes-proposés-à-confirmer)).
-- **Plus tard :** les inscriptions aux disciplines pointeront vers l'adhésion de la saison.
+- **Inscriptions aux cours :** table `enrollment`, rattachée à l'adhésion de la saison (voir [inscriptions.md](inscriptions.md)).
 
 **Décidé le 9 novembre 2026 :** chaque élève est adhérent et paie son adhésion. Un élève de moins de 16 ans est représenté à l'assemblée générale par un responsable, qui ne paie pas d'adhésion. La liste des votants se déduit donc des adhésions, de la date de naissance et des responsables, sans table de plus. Reste à savoir quel responsable vote, et si un parent de plusieurs enfants a plusieurs voix.
 
@@ -166,7 +166,7 @@ Le tableau des décisions du [plan](plan.md) prévoyait de supprimer les IBAN ap
 Ces tables se brancheront sur `person`, `household` et `season`, sans retoucher l'annuaire :
 
 - **catalogue** : disciplines, niveaux, cours avec leur horaire, leur salle et leur professeur (fait le 10 novembre 2026, voir [catalogue.md](catalogue.md)) ;
-- **inscriptions** : une personne inscrite à une discipline et à un niveau pour une saison, avec son statut ;
+- **inscriptions** : une personne inscrite à un cours pour une saison, avec son statut (fait le 10 novembre 2026, voir [inscriptions.md](inscriptions.md)) ;
 - **tarifs** : éléments de cotisation et grille **par saison**. Les codes d'éléments changent d'une saison à l'autre, donc aucun code ne sert de clé durable ;
 - **situation fiscale du foyer par saison** : tranche de quotient familial (A, B, C), et le quotient seulement si nécessaire ;
 - **cotisations appelées et règlements**, rattachés au foyer ;

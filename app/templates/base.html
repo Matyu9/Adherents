@@ -36,7 +36,7 @@
       {{ navlink("notifications.index", "Notifications", "bell", ["notifications"]) }}
       {{ navlink("enrollment.index", "Inscriptions", "clipboard") }}
       {% if current_user.person and current_user.person.teacher %}{{ navlink("enrollment.my_students", "Mes élèves", "music") }}{% endif %}
-      {% if can(current_user, "directory.view") or can(current_user, "teacher.manage") %}
+      {% if can(current_user, "directory.view") or can(current_user, "teacher.manage") or can(current_user, "directory.anonymize") %}
       <p class="nav-title">Annuaire</p>
       {% if can(current_user, "directory.view") %}
       {{ navlink("directory.index", "Personnes", "users") }}
@@ -45,6 +45,7 @@
       {% if can(current_user, "teacher.manage") %}{{ navlink("teachers.index", "Professeurs", "music", ["teachers"]) }}{% endif %}
       {% if can(current_user, "directory.edit") %}{{ navlink("directory.seasons", "Saisons", "calendar") }}{% endif %}
       {% if can(current_user, "directory.edit") and can(current_user, "account.manage") %}{{ navlink("directory.link_accounts", "Rattachement", "user-check") }}{% endif %}
+      {% if can(current_user, "directory.anonymize") %}{{ navlink("retention.index", "Conservation", "clock", ["retention"]) }}{% endif %}
       {% endif %}
       {% if can(current_user, "catalog.view") or can(current_user, "registration.view") %}
       <p class="nav-title">Enseignement</p>

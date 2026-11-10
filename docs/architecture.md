@@ -76,6 +76,19 @@ Décrit dans [catalogue.md](catalogue.md) :
 
 Les règles (copie de saison, professeur parti, chevauchements) sont dans `services/catalog.py`.
 
+### Inscriptions (phase 6)
+
+Décrites dans [inscriptions.md](inscriptions.md) :
+
+| Table | Rôle |
+|---|---|
+| `campaign`, `campaign_consent` | Campagne d'une saison et consentements demandés |
+| `dossier` | Dossier d'un foyer : la saisie de la famille reste en JSON jusqu'à la validation, l'IBAN y est chiffré |
+| `enrollment` | Inscription d'un élève à un cours, rattachée à son adhésion |
+| `consent` | Réponse datée, avec le texte affiché |
+
+Le parcours est dans `services/registration.py`, la conservation dans `services/retention.py`. Côté écrans : `blueprints/enrollment.py` pour les familles (et « Mes élèves »), `blueprints/campaigns.py` pour le secrétariat.
+
 `Account` ne devient pas la fiche d'une personne : un enfant a une fiche sans compte, son responsable la voit depuis le sien. Le journal (`activity`) note aussi la fiche concernée (`person_id`, `household_id`), ce qui donne l'historique de chaque fiche.
 
 ## Rôles et droits
@@ -83,7 +96,7 @@ Les règles (copie de saison, professeur parti, chevauchements) sont dans `servi
 | Rôle de base | Droits par défaut |
 |---|---|
 | Administrateur | Tous, sans qu'on puisse les lui retirer, plus la gestion des rôles |
-| Gestionnaire | Voir le journal ; consulter, modifier et fusionner l'annuaire (ni les IBAN, ni les contrats des professeurs) ; consulter et modifier le catalogue |
+| Gestionnaire | Voir le journal ; consulter, modifier et fusionner l'annuaire (ni les IBAN, ni les contrats des professeurs) ; consulter et modifier le catalogue ; gérer les campagnes et valider les dossiers |
 | Adhérent | Aucun droit d'administration |
 
 Les rôles se modifient et se créent dans **Administration → Rôles**. Ajouter un droit se fait dans `PERMISSION_GROUPS` (`permissions.py`).

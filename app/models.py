@@ -429,6 +429,7 @@ class Person(AddressMixin, TimestampMixin, db.Model):
     emergency_contact = db.Column(db.String(255))
     notes = db.Column(db.Text)
     archived_at = db.Column(db.DateTime)
+    anonymized_at = db.Column(db.DateTime)  # fiche vidée de ce qui identifie la personne (services/retention.py)
     # Compte de connexion rattaché (0 ou 1), porté par la fiche : un enfant a une fiche et pas de compte.
     account_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"), unique=True)
 

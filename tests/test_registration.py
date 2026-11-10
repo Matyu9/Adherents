@@ -6,7 +6,7 @@ import sqlalchemy as sa
 
 from app.extensions import db
 from app.models import (BankAccount, Campaign, CampaignConsent, Consent, Course, Discipline, Dossier, Enrollment,
-                        Household, Level, Membership, Person, Teacher)
+                        Level, Membership, Teacher)
 from app.services import bank, directory, registration
 from app.services.bank import BankKeyError
 from app.services.registration import RegistrationError
@@ -169,7 +169,7 @@ def test_changes_shown_before_validation(world):
     dossier = submitted(world, school_class="6e")
     rows = registration.changes(dossier)
     assert ("Responsable 1 : Anne Martin", "Email", "anne@asso.test", "anne.martin@asso.test") in rows
-    assert ("Responsable 1 : Anne Martin", "Téléphone", "+33612345678", "07 00 00 00 01") in rows
+    assert ("Responsable 1 : Anne Martin", "Téléphone", "06 12 34 56 78", "07 00 00 00 01") in rows
     assert ("Élève : Zoé Martin", "Cours", None, "Flûte · Cycle 1") in rows
     assert ("Famille Martin", "IBAN", None, "•••• 0189 (Anne Martin)") in rows
 

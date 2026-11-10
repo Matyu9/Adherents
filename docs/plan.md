@@ -31,6 +31,7 @@ Adhérents a deux missions :
 | IBAN (8 novembre 2026) | Conservés dans l'appli, chiffrés avec une clé dédiée. Voir [annuaire.md](annuaire.md#iban-et-mandats-sepa). Remplace la décision de les supprimer après transfert. |
 | Modèle de l'annuaire | [annuaire.md](annuaire.md), mis en place le 9 novembre 2026 (migration `a0000006annuaire`). |
 | Modèle du catalogue | [catalogue.md](catalogue.md), mis en place le 10 novembre 2026 (migration `a0000002catalogue`). |
+| Inscriptions | [inscriptions.md](inscriptions.md), mises en place le 10 novembre 2026 (migrations `a0000003inscriptions` et `a0000004conservation`). L'annuaire ne change qu'à la validation d'un dossier. |
 | Mandat SEPA (8 novembre 2026) | Suivi dans l'appli : RUM, date de signature, premier et dernier prélèvement. Pas de dépôt du document signé : son lieu de conservation reste à préciser. |
 | Adhésion (9 novembre 2026) | Chaque élève est adhérent et paie son adhésion, une par saison. Un élève de moins de 16 ans est représenté à l'assemblée générale par un responsable, qui ne paie pas d'adhésion. |
 | Accès des professeurs (9 novembre 2026) | Un professeur ne voit que ses élèves et leurs responsables, à partir des inscriptions. |
@@ -174,7 +175,15 @@ Modèle : voir [annuaire.md](annuaire.md), qui liste aussi les écarts avec la p
   - le bouton « Se connecter avec… » redirigeait après un formulaire. C'était signalé sans être bloqué, car la CSP de l'Inventaire est en mode rapport par défaut, mais il aurait cassé sous Chrome en mode bloquant. Il passe maintenant par une page intermédiaire.
 - **Pas fait :** la preuve avec une appli tierce réelle, car il faudrait l'installer, donc Docker ou un service externe. Les tests utilisent une appli cliente Authlib générique, qui ne connaît d'Adhérents que son adresse de découverte. Reste à choisir l'appli (Nextcloud, Gitea, Grafana…).
 
-### Phase 6 : campagnes d'inscription
+### Phase 6 : campagnes d'inscription (écrite le 10 novembre 2026, branche `phase-6-campagnes`)
+
+Fonctionnement : voir [inscriptions.md](inscriptions.md).
+
+- **Fait :** campagnes avec leurs consentements, dossier pré-rempli des familles, formulaire public des nouvelles familles avec vérification de l'email, revue et validation qui recopient le dossier dans l'annuaire (adhésions, inscriptions aux cours, consentements datés, IBAN), fichier de report vers le logiciel de gestion, relances hebdomadaires, « Mes élèves » pour les professeurs, durée de conservation et anonymisation.
+- **Décidé en l'écrivant :** l'annuaire ne change qu'à la validation, par le secrétariat ; la famille saisit dans le dossier. La durée de conservation n'a pas de valeur par défaut : rien n'est anonymisé tant que la direction ne l'a pas fixée.
+- **Pas fait :** mandat SEPA, cotisations, liste d'attente, heure de passage, format définitif du fichier de report (il attend le modèle d'import du logiciel de gestion).
+
+Prévu au départ :
 
 1. Un admin ouvre la campagne de la saison, avec ses dates.
 2. Le parent retrouve son dossier pré-rempli depuis le logiciel de gestion.

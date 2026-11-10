@@ -326,13 +326,13 @@ def _student_consents(dossier):
     return [c for c in dossier.campaign.consents if c.scope == CampaignConsent.STUDENT]
 
 
-@bp.route("/dossier/<uuid>/eleves/<key>", methods=["GET", "POST"])
+@bp.route("/dossier/<uuid>/eleves/<student_key>", methods=["GET", "POST"])
 @_with_dossier
-def student(dossier, key):
+def student(dossier, student_key):
     if locked := _refuse_if_locked(dossier):
         return locked
     data = _data(dossier)
-    s = _student(data, key)
+    s = _student(data, student_key)
     courses, counts = registration.offered_courses(dossier.campaign)
     full = [c.id for c in courses if c.is_full(counts.get(c.id, 0))]
     is_guardian = s.get("guardian") is not None
@@ -383,17 +383,17 @@ def add_student(dossier):
     data["students"].append({"key": key, "enrolled": True, "courses": [], "consents": {}, **entry})
     registration.save(dossier, data)
     db.session.commit()
-    return redirect(url_for(".student", uuid=dossier.uuid, key=key))
+    return redirect(url_for(".student", uuid=dossier.uuid, student_key=key))
 
 
-@bp.route("/dossier/<uuid>/eleves/<key>/retirer", methods=["POST"])
+@bp.route("/dossier/<uuid>/eleves/<student_key>/retirer", methods=["POST"])
 @_with_dossier
-def remove_student(dossier, key):
+def remove_student(dossier, student_key):
     """Seul un élève ajouté dans ce dossier se retire ; un élève de l'annuaire se décoche (« ne se réinscrit pas »)."""
     if locked := _refuse_if_locked(dossier):
         return locked
     data = _data(dossier)
-    s = _student(data, key)
+    s = _student(data, student_key)
     if s.get("person_id") and s.get("guardian") is None:
         flash("Cet élève est déjà connu : décochez plutôt « Inscrire cet élève cette saison ».", "error")
     else:

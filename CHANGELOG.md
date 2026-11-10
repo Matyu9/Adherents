@@ -13,6 +13,14 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ### Ajouté
 
+- **Campagnes d'inscription** (phase 6) : le secrétariat ouvre une campagne par saison, avec ses dates et ses consentements. Chaque responsable retrouve le dossier de son foyer pré-rempli depuis l'annuaire, avec les cours qui prolongent ceux de l'an dernier ; il corrige, choisit les cours (un cours complet est grisé), répond aux consentements, indique un IBAN s'il le souhaite, puis envoie. Voir [docs/inscriptions.md](docs/inscriptions.md).
+- **Revue des dossiers** : ce que la validation changera dans l'annuaire, champ par champ ; renvoi à la famille avec un message, ou validation, qui crée les adhésions, les inscriptions aux cours, les consentements datés (avec leur texte) et le compte bancaire. Nouveaux droits `registration.view` et `registration.manage`, donnés au gestionnaire.
+- **Nouvelles familles** : formulaire public, si la campagne l'autorise, avec un lien d'accès envoyé par email.
+- **Report vers le logiciel de gestion** : fichier des changements, sans IBAN ou, en mode sécurisé, avec ; dossiers notés comme reportés.
+- **Relances** hebdomadaires des familles qui n'ont pas envoyé leur dossier.
+- **Mes élèves** : un professeur voit les élèves de ses cours et leurs responsables.
+- **Conservation des données** : durée en saisons, à fixer ; anonymisation des anciens adhérents décidée à l'écran (droit `directory.anonymize`) et suppression des anciens dossiers.
+- Le catalogue affiche le nombre d'inscrits de chaque cours ; un cours qui a des élèves ne se supprime plus.
 - **Catalogue** (phase 8) : disciplines, niveaux, sites et salles communs à toutes les saisons ; cours de chaque saison avec leur professeur, leur créneau, leur salle et leur effectif maximum ; disciplines enseignées par chaque professeur, par saison. Les chevauchements de salle ou de professeur sont signalés, un cours peut être fermé aux inscriptions, et un professeur parti n'est plus proposé. Nouveaux droits `catalog.view` et `catalog.edit`, donnés au gestionnaire. Voir [docs/catalogue.md](docs/catalogue.md).
 - **Copie d'une saison** sur une saison vide, avec un aperçu de ce qui sera repris, laissé de côté ou à compléter.
 - La fiche d'un professeur montre ses cours et ses disciplines de la saison en cours.

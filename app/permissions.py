@@ -22,6 +22,7 @@ PERMISSION_GROUPS = [
         ("directory.merge", "Fusionner deux fiches en double"),
         ("teacher.manage", "Gérer les professeurs et voir leurs contrats"),
         ("bank.view", "Voir et modifier les coordonnées bancaires (IBAN), après une nouvelle saisie du code TOTP"),
+        ("directory.anonymize", "Fixer la durée de conservation et anonymiser les anciens adhérents"),
     ]),
     ("Catalogue", [
         ("catalog.view", "Consulter le catalogue : disciplines, niveaux, lieux et cours des saisons"),

@@ -323,9 +323,11 @@ def recipients(dossier):
 # Différences avec l'annuaire, pour la revue et le report
 # ---------------------------------------------------------------------------
 
-def _shown(value):
+def _shown(value, field=None):
     if value in (None, ""):
         return None
+    if field == "phone":
+        return directory.display_phone(value)
     return value.isoformat() if isinstance(value, date) else str(value)
 
 
@@ -335,8 +337,8 @@ def changes(dossier):
     household = dossier.household
     title = data["household"].get("name") or "Foyer"
     for f in (*HOUSEHOLD_FIELDS, "phone"):
-        new = _shown(data["household"].get(f))
-        old = _shown(_phone(household) if f == "phone" else getattr(household, f)) if household else None
+        new = _shown(data["household"].get(f), f)
+        old = _shown(_phone(household) if f == "phone" else getattr(household, f), f) if household else None
         if new != old and (new or old):
             found.append((title, LABELS[f], old, new))
     for index, g in enumerate(data.get("guardians", []), start=1):
@@ -345,8 +347,8 @@ def changes(dossier):
         if person is None:
             found.append((name, "Fiche", None, "nouvelle"))
         for f in (*GUARDIAN_FIELDS, "phone"):
-            new = _shown(g.get(f))
-            old = _shown((None if person is None else _phone(person) if f == "phone" else getattr(person, f)))
+            new = _shown(g.get(f), f)
+            old = _shown(None if person is None else _phone(person) if f == "phone" else getattr(person, f), f)
             if new != old and (new or old) and (person is not None or new):
                 found.append((name, LABELS[f], old, new))
     for s in enrolled_students(dossier):

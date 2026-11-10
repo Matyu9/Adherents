@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% from "directory/_macros.html" import csrf, post_button %}
+{% block title %}Conservation des données{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Conservation des données</h1>
+    <p class="muted">Les anciens adhérents ne sont pas gardés indéfiniment. L'anonymisation efface ce qui identifie une personne ; ses adhésions et inscriptions passées restent, sans nom, pour les statistiques.</p>
+  </div>
+</div>
+<section class="card settings-block">
+  <form method="post" novalidate class="narrow">
+    {{ form.hidden_tag() }}
+    {{ field(form.seasons) }}<small class="muted">{{ form.seasons.description }}</small>
+    <button type="submit" class="secondary">Enregistrer</button>
+  </form>
+</section>
+{% if not kept %}
+<p class="flash flash-info">La durée n'est pas encore décidée : rien n'est proposé à l'anonymisation. Elle doit figurer au registre des traitements.</p>
+{% elif not limit %}
+<p class="flash flash-info">Il n'y a pas encore {{ kept }} saisons commencées : personne n'a dépassé la durée de conservation.</p>
+{% else %}
+<section class="card settings-block">
+  <h2>Personnes à anonymiser</h2>
+  <p class="muted small">Sans adhésion depuis la saison {{ limit.label }}, sans compte, sans profil de professeur, et dont aucun membre du foyer n'a d'adhésion récente.</p>
+  {% if candidates %}
+  <form method="post" action="{{ url_for('retention.anonymize') }}" data-confirm="Anonymiser les fiches cochées ? C'est définitif.">
+    {{ csrf() }}
+    <ul class="plain-list">
+      {% for p in candidates %}<li><label><input type="checkbox" name="personne" value="{{ p.id }}" checked> {{ p.sort_name }}{% if p.birth_date %} <small class="muted">{{ p.birth_date.year }}</small>{% endif %}</label></li>{% endfor %}
+    </ul>
+    <button type="submit" class="contrast">Anonymiser</button>
+  </form>
+  {% else %}<p class="muted">Personne.</p>{% endif %}
+</section>
+<section class="card settings-block">
+  <h2>Anciens dossiers d'inscription</h2>
+  <p class="muted small">{{ dossiers }} dossier(s) de campagnes plus anciennes que la saison {{ limit.label }}. Leur contenu a été recopié dans l'annuaire à la validation, ou n'a jamais abouti.</p>
+  {% if dossiers %}{{ post_button(url_for('retention.purge_dossiers'), "Supprimer ces dossiers", "secondary", "Supprimer définitivement ces dossiers ?") }}{% endif %}
+</section>
+{% endif %}
+{% endblock %}

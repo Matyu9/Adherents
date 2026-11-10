@@ -60,6 +60,7 @@ ACCESS = {
                                                     "validate", "send_back", "mark_transferred", "report",
                                                     "report_csv", "report_done")},
     "campaigns.report_csv_iban": REG_IBAN,
+    **{f"retention.{name}": "directory.anonymize" for name in ("index", "anonymize", "purge_dossiers")},
     "enrollment.index": LOGGED_IN, "enrollment.start": LOGGED_IN, "enrollment.my_students": LOGGED_IN,
     # Un dossier s'ouvre par son compte ou par le lien reçu par email : un identifiant inconnu donne 404.
     **{f"enrollment.{name}": PUBLIC for name in ("new_family", "access", "dossier", "household", "student",
@@ -77,12 +78,13 @@ ACCESS = {
 }
 HOLDERS = {SETTINGS: {A}, JOURNAL: {A, G}, ADMIN_ONLY: {A}, HIDDEN: {A}, ACCOUNTS: {A}, GROUPS: {A}, CLIENTS: {A},
            DIR_VIEW: {A, G}, DIR_EDIT: {A, G}, DIR_MERGE: {A, G}, BANK: {A}, LINKING: {A}, TEACHERS: {A},
-           CAT_VIEW: {A, G}, CAT_EDIT: {A, G}, REG_VIEW: {A, G}, REG_MANAGE: {A, G}, REG_IBAN: {A}}
+           CAT_VIEW: {A, G}, CAT_EDIT: {A, G}, REG_VIEW: {A, G}, REG_MANAGE: {A, G}, REG_IBAN: {A},
+           "directory.anonymize": {A}}
 ARGUMENTS = {"filename": "css/app.css", "key": "adherent", "sid": "inconnue", "name": "absent",
              "account_id": 1, "group_id": 999, "token": "inconnu", "client_pk": 999, "person_id": 999,
              "household_id": 999, "phone_id": 999, "membership_id": 999, "season_id": 999, "mandate_id": 999,
              "course_id": 999, "kind": "disciplines", "item_id": 999, "campaign_id": 999, "dossier_id": 999,
-             "consent_id": 999, "uuid": "inconnu", "key": "inconnue"}
+             "consent_id": 999, "uuid": "inconnu", "student_key": "inconnue"}
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
 SENDS_TO_LOGIN = {"auth.logout", "auth.two_factor", "auth.token_link", "oidc.end_session", "enrollment.access"}
 

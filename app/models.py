@@ -607,6 +607,154 @@ class Teacher(db.Model):
     def active(self):
         return self.left_on is None or self.left_on > date.today()
 
+    def teaches_during(self, season):
+        """Arrivé avant la fin de la saison et pas parti avant son début : on peut lui confier un cours."""
+        return ((self.started_on is None or self.started_on <= season.ends_on)
+                and (self.left_on is None or self.left_on > season.starts_on))
+
+    def leaves_during(self, season):
+        """Parti avant la fin de la saison : ses cours de cette saison sont à reprendre."""
+        return self.left_on is not None and self.left_on <= season.ends_on
+
+
+# ---------------------------------------------------------------------------
+# Catalogue : disciplines, niveaux, lieux, cours (voir docs/catalogue.md)
+# ---------------------------------------------------------------------------
+
+class ArchivableMixin:
+    """Une valeur du catalogue qui a servi ne se supprime pas : on l'archive, et elle n'est plus proposée."""
+    archived_at = db.Column(db.DateTime)
+
+    @property
+    def archived(self):
+        return self.archived_at is not None
+
+
+class Discipline(ArchivableMixin, db.Model):
+    """Discipline enseignée (« Flûte traversière », « Formation musicale »…), commune à toutes les saisons."""
+    CATEGORIES = ("Instrument", "Formation musicale", "Pratique collective", "Éveil", "Autre")
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False, unique=True)
+    category = db.Column(db.String(40))  # type de discipline, pour regrouper les listes
+
+    def __repr__(self):
+        return f"<Discipline {self.name}>"
+
+
+class Level(ArchivableMixin, db.Model):
+    """Niveau (« Cycle 1 - 2e année », « Débutant »…), commun à toutes les disciplines et saisons."""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(60), nullable=False, unique=True)
+    position = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # ordre dans les listes
+
+    def __repr__(self):
+        return f"<Level {self.name}>"
+
+
+class Site(ArchivableMixin, db.Model):
+    """Lieu d'enseignement : l'école, une salle municipale, un collège…"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False, unique=True)
+    address = db.Column(db.String(255))
+
+    rooms = db.relationship("Room", back_populates="site", order_by="Room.name")
+
+    def __repr__(self):
+        return f"<Site {self.name}>"
+
+
+class Room(ArchivableMixin, db.Model):
+    __table_args__ = (db.UniqueConstraint("site_id", "name"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    # Un site qui a des salles ne se supprime pas.
+    site_id = db.Column(db.ForeignKey("site.id", ondelete="RESTRICT"), nullable=False, index=True)
+    name = db.Column(db.String(80), nullable=False)
+
+    site = db.relationship("Site", back_populates="rooms")
+
+    @property
+    def label(self):
+        return f"{self.name} ({self.site.name})"
+
+    def __repr__(self):
+        return f"<Room {self.label}>"
+
+
+class Course(TimestampMixin, db.Model):
+    """Cours d'une saison : un créneau d'un professeur, pour une discipline et un niveau.
+
+    Un cours individuel regroupe plusieurs élèves à des heures de passage différentes : l'horaire est celui du créneau.
+    """
+    WEEKDAYS = ("Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche")
+    __table_args__ = (
+        db.CheckConstraint("weekday BETWEEN 0 AND 6", name="ck_course_weekday"),
+        db.CheckConstraint("(starts_at IS NULL) = (ends_at IS NULL)", name="ck_course_times_together"),
+        db.CheckConstraint("ends_at > starts_at", name="ck_course_times_order"),
+        db.CheckConstraint("capacity > 0", name="ck_course_capacity"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    # Une saison, une discipline, un niveau ou une salle qui ont des cours ne se suppriment pas.
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="RESTRICT"), nullable=False, index=True)
+    discipline_id = db.Column(db.ForeignKey("discipline.id", ondelete="RESTRICT"), nullable=False, index=True)
+    level_id = db.Column(db.ForeignKey("level.id", ondelete="RESTRICT"), index=True)
+    # Vide : professeur à trouver. Un profil de professeur retiré (erreur de saisie) libère ses cours.
+    teacher_id = db.Column(db.ForeignKey("teacher.person_id", ondelete="SET NULL"), index=True)
+    room_id = db.Column(db.ForeignKey("room.id", ondelete="RESTRICT"), index=True)
+    group_label = db.Column(db.String(80))  # « groupe A », « ados »…
+    weekday = db.Column(db.SmallInteger)  # 0 = lundi
+    starts_at = db.Column(db.Time)
+    ends_at = db.Column(db.Time)
+    capacity = db.Column(db.Integer)  # effectif maximum ; vide : pas de limite (cours individuel)
+    # Fermé aux inscriptions à la main. Les inscriptions (phase 6) le rendront complet aussi une fois l'effectif atteint.
+    marked_full = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    notes = db.Column(db.Text)
+
+    season = db.relationship("Season")
+    discipline = db.relationship("Discipline")
+    level = db.relationship("Level")
+    teacher = db.relationship("Teacher", backref=db.backref("courses", passive_deletes=True))
+    room = db.relationship("Room")
+
+    @property
+    def weekday_name(self):
+        return self.WEEKDAYS[self.weekday] if self.weekday is not None else None
+
+    @property
+    def title(self):
+        parts = [self.discipline.name]
+        if self.level is not None:
+            parts.append(self.level.name)
+        if self.group_label:
+            parts.append(self.group_label)
+        return " · ".join(parts)
+
+    def is_full(self, enrolled=0):
+        """Complet : fermé à la main, ou effectif maximum atteint par `enrolled` inscrits."""
+        return self.marked_full or (self.capacity is not None and enrolled >= self.capacity)
+
+    def overlaps(self, other):
+        """Même jour, horaires qui se chevauchent (un cours qui finit à 18 h et un qui commence à 18 h ne se gênent pas)."""
+        return (self.weekday is not None and self.weekday == other.weekday
+                and self.starts_at is not None and other.starts_at is not None
+                and self.starts_at < other.ends_at and other.starts_at < self.ends_at)
+
+    def __repr__(self):
+        return f"<Course {self.id}>"
+
+
+class TeacherDiscipline(db.Model):
+    """Discipline enseignée par un professeur pendant une saison."""
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="RESTRICT"), primary_key=True)
+    teacher_id = db.Column(db.ForeignKey("teacher.person_id", ondelete="CASCADE"), primary_key=True, index=True)
+    discipline_id = db.Column(db.ForeignKey("discipline.id", ondelete="RESTRICT"), primary_key=True, index=True)
+
+    season = db.relationship("Season")
+    teacher = db.relationship("Teacher", backref=db.backref("taught", cascade="all, delete-orphan", passive_deletes=True))
+    discipline = db.relationship("Discipline")
+
 
 class BankAccount(TimestampMixin, db.Model):
     """Coordonnées bancaires d'un foyer. L'IBAN est chiffré (services/bank.py) : seuls ses 4 derniers caractères

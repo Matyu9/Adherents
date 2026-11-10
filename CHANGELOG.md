@@ -13,6 +13,9 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ### Ajouté
 
+- **Catalogue** (phase 8) : disciplines, niveaux, sites et salles communs à toutes les saisons ; cours de chaque saison avec leur professeur, leur créneau, leur salle et leur effectif maximum ; disciplines enseignées par chaque professeur, par saison. Les chevauchements de salle ou de professeur sont signalés, un cours peut être fermé aux inscriptions, et un professeur parti n'est plus proposé. Nouveaux droits `catalog.view` et `catalog.edit`, donnés au gestionnaire. Voir [docs/catalogue.md](docs/catalogue.md).
+- **Copie d'une saison** sur une saison vide, avec un aperçu de ce qui sera repris, laissé de côté ou à compléter.
+- La fiche d'un professeur montre ses cours et ses disciplines de la saison en cours.
 - **Annuaire** (phase 1) : personnes, foyers avec leurs responsables 1 et 2 et leurs personnes à charge, téléphones, numéros du logiciel de gestion, saisons et adhésions, profils de professeur. Recherche sans accents, filtres (élèves de la saison, anciens adhérents, professeurs, fiches archivées), fusion de deux fiches ou de deux foyers en double, archivage. Chaque fiche a son historique.
 - **Saison en cours** choisie dans Annuaire → Saisons, sans la déduire de la date.
 - **Coordonnées bancaires** : IBAN chiffrés (AES-GCM) avec une clé dédiée, `BANK_DATA_KEYS`, et mandats SEPA. Lecture en clair avec le droit `bank.view` et un nouveau code de double authentification, inscrite au journal. `flask bank-generate-key` et `flask bank-rotate-key`. Les mandats sont supprimés 13 mois après leur dernier prélèvement.

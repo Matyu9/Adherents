@@ -64,6 +64,18 @@ Le modèle est décrit et justifié dans [annuaire.md](annuaire.md). En bref :
 | `teacher` | Profil de professeur |
 | `bank_account`, `sepa_mandate` | IBAN chiffrés (`services/bank.py`) et mandats SEPA |
 
+### Catalogue (phase 8)
+
+Décrit dans [catalogue.md](catalogue.md) :
+
+| Table | Rôle |
+|---|---|
+| `discipline`, `level`, `site`, `room` | Listes de référence communes à toutes les saisons, archivées plutôt que supprimées |
+| `course` | Cours d'une saison : discipline, niveau, professeur, créneau, salle, effectif maximum |
+| `teacher_discipline` | Disciplines enseignées par un professeur pendant une saison |
+
+Les règles (copie de saison, professeur parti, chevauchements) sont dans `services/catalog.py`.
+
 `Account` ne devient pas la fiche d'une personne : un enfant a une fiche sans compte, son responsable la voit depuis le sien. Le journal (`activity`) note aussi la fiche concernée (`person_id`, `household_id`), ce qui donne l'historique de chaque fiche.
 
 ## Rôles et droits
@@ -71,7 +83,7 @@ Le modèle est décrit et justifié dans [annuaire.md](annuaire.md). En bref :
 | Rôle de base | Droits par défaut |
 |---|---|
 | Administrateur | Tous, sans qu'on puisse les lui retirer, plus la gestion des rôles |
-| Gestionnaire | Voir le journal ; consulter, modifier et fusionner l'annuaire (ni les IBAN, ni les contrats des professeurs) |
+| Gestionnaire | Voir le journal ; consulter, modifier et fusionner l'annuaire (ni les IBAN, ni les contrats des professeurs) ; consulter et modifier le catalogue |
 | Adhérent | Aucun droit d'administration |
 
 Les rôles se modifient et se créent dans **Administration → Rôles**. Ajouter un droit se fait dans `PERMISSION_GROUPS` (`permissions.py`).

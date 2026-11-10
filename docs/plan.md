@@ -30,6 +30,7 @@ Adhérents a deux missions :
 | Remplacement du logiciel de gestion (8 novembre 2026) | À terme, Adhérents le remplace : saisons, inscriptions, tarifs et cotisations entreront dans l'appli. Le logiciel de gestion reste la référence jusqu'à la bascule. |
 | IBAN (8 novembre 2026) | Conservés dans l'appli, chiffrés avec une clé dédiée. Voir [annuaire.md](annuaire.md#iban-et-mandats-sepa). Remplace la décision de les supprimer après transfert. |
 | Modèle de l'annuaire | [annuaire.md](annuaire.md), mis en place le 9 novembre 2026 (migration `a0000006annuaire`). |
+| Modèle du catalogue | [catalogue.md](catalogue.md), mis en place le 10 novembre 2026 (migration `a0000002catalogue`). |
 | Mandat SEPA (8 novembre 2026) | Suivi dans l'appli : RUM, date de signature, premier et dernier prélèvement. Pas de dépôt du document signé : son lieu de conservation reste à préciser. |
 | Adhésion (9 novembre 2026) | Chaque élève est adhérent et paie son adhésion, une par saison. Un élève de moins de 16 ans est représenté à l'assemblée générale par un responsable, qui ne paie pas d'adhésion. |
 | Accès des professeurs (9 novembre 2026) | Un professeur ne voit que ses élèves et leurs responsables, à partir des inscriptions. |
@@ -199,13 +200,17 @@ Une fois cette phase faite, chaque professeur voit ses élèves.
 - Une fois les phases 9 et 10 faites : ses cotisations, ses règlements et son solde, et un lien de paiement HelloAsso.
 - **Tests :** un parent ne voit que son foyer, y compris en modifiant l'identifiant dans l'URL.
 
-### Phase 8 : catalogue
+### Phase 8 : catalogue (écrite le 10 novembre 2026, branche `phase-8-catalogue`)
 
-- Disciplines, niveaux, sites et salles, communs à toutes les saisons.
-- Cours d'une saison : discipline, niveau, professeur, jour, horaires, salle, effectif maximum.
-- Disciplines enseignées par chaque professeur, par saison.
-- Copie du catalogue d'une saison sur la suivante, pour ne pas tout ressaisir.
-- **Tests :** copie de saison, cours complet, professeur parti.
+Modèle : voir [catalogue.md](catalogue.md).
+
+- Disciplines, niveaux, sites et salles, communs à toutes les saisons. Ce qui a servi s'archive au lieu de se supprimer.
+- Cours d'une saison : discipline, niveau, groupe, professeur, jour, horaires, salle, effectif maximum, fermeture à la main. Chevauchements de salle ou de professeur signalés.
+- Disciplines enseignées par chaque professeur, par saison ; confier un cours ajoute sa discipline.
+- Copie du catalogue d'une saison sur une saison vide, avec un aperçu avant d'écrire.
+- Droits `catalog.view` et `catalog.edit`, donnés au gestionnaire.
+- **Tests :** copie de saison, cours complet, professeur parti, valeurs archivées, chevauchements, fusion de deux fiches de professeur, contraintes de la migration.
+- **Pas fait :** l'import des cours (avec celui de la phase 1), le remplaçant et l'accompagnateur d'un cours.
 
 ### Phase 9 : tarifs et cotisations
 

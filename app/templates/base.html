@@ -44,6 +44,10 @@
       {% if can(current_user, "directory.edit") %}{{ navlink("directory.seasons", "Saisons", "calendar") }}{% endif %}
       {% if can(current_user, "directory.edit") and can(current_user, "account.manage") %}{{ navlink("directory.link_accounts", "Rattachement", "user-check") }}{% endif %}
       {% endif %}
+      {% if can(current_user, "catalog.view") %}
+      <p class="nav-title">Enseignement</p>
+      {{ navlink("catalog.index", "Catalogue", "clipboard", ["catalog"]) }}
+      {% endif %}
       {% if current_user.is_admin or can(current_user, "account.manage") or can(current_user, "group.manage") or can(current_user, "client.manage") or can(current_user, "settings.manage") or can(current_user, "activity.view") %}
       <p class="nav-title">Administration</p>
       {% if can(current_user, "account.manage") %}{{ navlink("accounts.index", "Comptes", "users", ["accounts"]) }}{% endif %}

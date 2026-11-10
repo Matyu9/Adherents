@@ -46,6 +46,7 @@ def create_app(config_class=Config):
     from .blueprints.accounts import bp as accounts_bp
     from .blueprints.applications import bp as applications_bp
     from .blueprints.auth import bp as auth_bp
+    from .blueprints.catalog import bp as catalog_bp
     from .blueprints.csp import bp as csp_bp
     from .blueprints.dashboard import bp as dashboard_bp
     from .blueprints.directory import bp as directory_bp
@@ -67,6 +68,7 @@ def create_app(config_class=Config):
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(directory_bp)
     app.register_blueprint(teachers_bp)
+    app.register_blueprint(catalog_bp)
     app.register_blueprint(account_bp)
     app.register_blueprint(accounts_bp)
     app.register_blueprint(groups_bp)

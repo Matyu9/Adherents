@@ -13,7 +13,7 @@ from wtforms.validators import DataRequired, Length, Optional, ValidationError
 from ..extensions import db
 from ..models import Person, Teacher
 from ..permissions import require
-from ..services import directory
+from ..services import catalog, directory
 from ..services.activity import diff, log
 from ..services.directory import DirectoryError
 from .directory import EMAIL, _blank, _strip, _text
@@ -145,7 +145,11 @@ def create():
 @require("teacher.manage")
 def detail(person_id):
     person = _teacher(person_id)
-    return render_template("teachers/detail.html", person=person, teacher=person.teacher)
+    season = directory.current_season()
+    courses = catalog.sorted_courses(c for c in person.teacher.courses if season and c.season_id == season.id)
+    taught = catalog.disciplines_of(person.teacher, season) if season else []
+    return render_template("teachers/detail.html", person=person, teacher=person.teacher, season=season,
+                           courses=courses, taught=taught)
 
 
 @bp.route("/<int:person_id>/modifier", methods=["GET", "POST"])
@@ -168,8 +172,10 @@ def edit(person_id):
 def remove(person_id):
     """Pour une erreur de saisie seulement : un départ s'indique par sa date, et l'historique reste."""
     person = _teacher(person_id)
+    freed = len(person.teacher.courses)
     person.teacher = None
     log("teacher.delete", f"{person.full_name} n'est plus enregistré(e) comme professeur", person=person)
     db.session.commit()
-    flash("Ce n'est plus un professeur. Sa fiche de l'annuaire est conservée.", "success")
+    flash("Ce n'est plus un professeur. Sa fiche de l'annuaire est conservée."
+          + (f" {freed} cours sont maintenant sans professeur." if freed else ""), "success")
     return redirect(url_for(".index"))

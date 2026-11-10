@@ -23,6 +23,10 @@ PERMISSION_GROUPS = [
         ("teacher.manage", "Gérer les professeurs et voir leurs contrats"),
         ("bank.view", "Voir et modifier les coordonnées bancaires (IBAN), après une nouvelle saisie du code TOTP"),
     ]),
+    ("Catalogue", [
+        ("catalog.view", "Consulter le catalogue : disciplines, niveaux, lieux et cours des saisons"),
+        ("catalog.edit", "Modifier le catalogue, les disciplines des professeurs et copier une saison"),
+    ]),
     ("Comptes", [
         ("account.manage", "Gérer les comptes : créer, inviter, couper, fermer les sessions"),
         ("group.manage", "Gérer les groupes, qui donnent accès aux applis de l'association"),
@@ -38,7 +42,7 @@ PERMISSIONS = {key: label for _, perms in PERMISSION_GROUPS for key, label in pe
 # Droits des rôles de base tant qu'ils n'ont pas été modifiés (et à la création de la base).
 DEFAULT_PERMISSIONS = {
     A: set(PERMISSIONS),
-    G: {"activity.view", "directory.view", "directory.edit", "directory.merge"},
+    G: {"activity.view", "directory.view", "directory.edit", "directory.merge", "catalog.view", "catalog.edit"},
     H: set(),
 }
 

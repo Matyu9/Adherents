@@ -6,6 +6,7 @@ from ..extensions import db, fold, fold_contains
 from ..models import (Account, Activity, AppSetting, BankAccount, Household, HouseholdMember, Membership, Person,
                       Phone, Role, Season, Teacher)
 from . import bank
+from .catalog import move_teaching
 
 CURRENT_SEASON_KEY = "current_season"
 ACCOUNT_MIN_AGE = 16  # en dessous, le responsable gère la fiche depuis son propre compte
@@ -332,7 +333,10 @@ def merge_persons(keep, drop, take=()):
             old = drop.teacher
             keep.teacher = Teacher(status=old.status, started_on=old.started_on, left_on=old.left_on,
                                    work_email=old.work_email, notes=old.notes)
+            db.session.flush()
             summary.append("profil de professeur repris")
+        if moved := move_teaching(drop.teacher, keep.teacher):
+            summary.append(f"{moved} cours repris")
         drop.teacher = None
 
     if drop.account is not None:

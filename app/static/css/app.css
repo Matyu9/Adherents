@@ -433,3 +433,8 @@ section.card + section.card { margin-top: .75rem; }
 a.badge:hover { text-decoration: none; border-color: var(--brand); }
 .secure-mode { display: flex; align-items: center; gap: .5rem; margin-bottom: .75rem; }
 .secure-mode .button-form { margin: 0; }
+
+/* Onglets du catalogue */
+.tabs { display: flex; flex-wrap: wrap; gap: .25rem; margin: 0 0 1rem; border-bottom: 1px solid var(--border); }
+.tabs a { padding: .45rem .8rem; color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: .92rem; }
+.tabs a[aria-current="page"] { color: var(--brand); border-bottom-color: var(--brand); font-weight: 600; }

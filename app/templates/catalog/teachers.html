@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "catalog/_season_picker.html" import season_picker, tabs %}
+{% block title %}Professeurs de la saison{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Professeurs{% if season %} {{ season.label }}{% endif %}</h1>
+    <p class="muted">Disciplines enseignées par chaque professeur pendant la saison. Un cours confié à un professeur ajoute sa discipline d'office.</p>
+  </div>
+  {{ season_picker(seasons, season, "catalog.teachers") }}
+</div>
+{% if season %}
+{{ tabs("profs", season) }}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Professeur</th><th>Disciplines</th><th>Cours</th>{% if can(current_user, "catalog.edit") %}<th></th>{% endif %}</tr></thead>
+  <tbody>
+  {% for teacher, disciplines, count in rows %}
+  <tr>
+    <td data-label="Professeur"><span>{{ teacher.person.sort_name }}{% if teacher.leaves_during(season) %} <span class="badge health-warn">parti le {{ teacher.left_on | date_fr }}</span>{% endif %}</span></td>
+    <td data-label="Disciplines"><small>{{ disciplines | map(attribute="name") | join(", ") or "—" }}</small></td>
+    <td data-label="Cours">{% if count %}<a href="{{ url_for('catalog.index', saison=season.id, prof=teacher.person_id) }}">{{ count }}</a>{% else %}0{% endif %}</td>
+    {% if can(current_user, "catalog.edit") %}<td data-label=""><a href="{{ url_for('catalog.teacher_disciplines', person_id=teacher.person_id, saison=season.id) }}">Disciplines</a></td>{% endif %}
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">Aucun professeur pendant cette saison.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}<p class="muted">Aucune saison pour l'instant.</p>{% endif %}
+{% endblock %}

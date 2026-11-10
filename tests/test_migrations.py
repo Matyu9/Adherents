@@ -207,3 +207,59 @@ def test_directory_on_the_real_schema(migrated):
         [(0,)], [(0,)], [(None,)], [(1,)]]
     run_sql(migrated, "DELETE FROM person WHERE id = 1")
     assert run_sql(migrated, "SELECT count(*) FROM teacher") == [[(0,)]]
+
+
+CATALOG = (
+    "INSERT INTO person (id, uuid, first_name, last_name, country, created_at, updated_at) "
+    "VALUES (1, 'u1', 'Élodie', 'Martin', 'FR', now(), now())",
+    "INSERT INTO teacher (person_id, status) VALUES (1, 'CDI')",
+    "INSERT INTO season (id, label, starts_on, ends_on) VALUES (1, '2026-2027', '2026-09-01', '2027-08-31')",
+    "INSERT INTO discipline (id, name) VALUES (1, 'Flûte')",
+    "INSERT INTO level (id, name) VALUES (1, 'Cycle 1')",
+    "INSERT INTO site (id, name) VALUES (1, 'École')",
+    "INSERT INTO room (id, site_id, name) VALUES (1, 1, 'Salle A')",
+    "INSERT INTO course (id, season_id, discipline_id, level_id, teacher_id, room_id, weekday, starts_at, ends_at, "
+    "capacity) VALUES (1, 1, 1, 1, 1, 1, 2, '17:00', '18:00', 8)",
+    "INSERT INTO teacher_discipline (season_id, teacher_id, discipline_id) VALUES (1, 1, 1)",
+)
+
+
+def test_catalog_on_the_real_schema(migrated):
+    """Contraintes et cascades du catalogue, telles que la migration les crée."""
+    upgrade(MIGRATIONS)
+    run_sql(migrated, *CATALOG)
+    assert run_sql(migrated, "SELECT marked_full FROM course") == [[(False,)]]
+    for statement in (
+        "INSERT INTO discipline (name) VALUES ('Flûte')",
+        "INSERT INTO room (site_id, name) VALUES (1, 'Salle A')",
+        "INSERT INTO course (season_id, discipline_id, weekday) VALUES (1, 1, 7)",
+        "INSERT INTO course (season_id, discipline_id, starts_at) VALUES (1, 1, '17:00')",
+        "INSERT INTO course (season_id, discipline_id, starts_at, ends_at) VALUES (1, 1, '18:00', '17:00')",
+        "INSERT INTO course (season_id, discipline_id, capacity) VALUES (1, 1, 0)",
+        "INSERT INTO teacher_discipline (season_id, teacher_id, discipline_id) VALUES (1, 1, 1)",
+        "INSERT INTO teacher_discipline (season_id, teacher_id, discipline_id) VALUES (1, 99, 1)",
+        # Ce qui a servi ne se supprime pas.
+        "DELETE FROM season WHERE id = 1",
+        "DELETE FROM discipline WHERE id = 1",
+        "DELETE FROM level WHERE id = 1",
+        "DELETE FROM room WHERE id = 1",
+        "DELETE FROM site WHERE id = 1",
+    ):
+        assert_fails(migrated, statement)
+    # Un profil de professeur retiré libère ses cours et efface ses disciplines.
+    run_sql(migrated, "DELETE FROM teacher WHERE person_id = 1")
+    assert run_sql(migrated, "SELECT teacher_id FROM course", "SELECT count(*) FROM teacher_discipline") == [
+        [(None,)], [(0,)]]
+
+
+def test_saved_manager_role_gets_the_catalogue_rights(migrated):
+    upgrade(MIGRATIONS, revision="a0000001initial")
+    run_sql(migrated, "INSERT INTO role (key, name, permissions) VALUES "
+                      "('gestionnaire', 'Gestionnaire', '[\"directory.view\"]'), ('regie', 'Régie', '[\"activity.view\"]')")
+    upgrade(MIGRATIONS)
+    (rows,) = run_sql(migrated, "SELECT key, permissions::text FROM role ORDER BY key")
+    assert rows == [("gestionnaire", '["directory.view", "catalog.view", "catalog.edit"]'),
+                    ("regie", '["activity.view"]')]
+    downgrade(MIGRATIONS, revision="a0000001initial")
+    (rows,) = run_sql(migrated, "SELECT key, permissions::text FROM role ORDER BY key")
+    assert rows == [("gestionnaire", '["directory.view"]'), ("regie", '["activity.view"]')]

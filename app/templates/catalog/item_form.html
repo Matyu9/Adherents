@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ spec.title }}{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>{{ ("Modifier " ~ (item.label if kind == "salles" else item.name)) if item else ("Nouveau" if kind in ("niveaux", "sites") else "Nouvelle") ~ " " ~ spec.one }}</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {% for f in form if f.name != "csrf_token" %}
+    {{ field(f) }}
+    {% if f.description %}<small class="muted">{{ f.description }}</small>{% endif %}
+    {% endfor %}
+    <button type="submit">Enregistrer</button>
+  </form>
+  <p class="small"><a href="{{ url_for('catalog.references') }}#{{ kind }}">Annuler</a></p>
+</article>
+{% endblock %}

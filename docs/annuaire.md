@@ -122,7 +122,7 @@ Une table plutôt qu'une colonne, car une même personne peut avoir deux numéro
 | `work_email` | adresse professionnelle, prioritaire ; l'adresse personnelle reste sur `person.email` |
 | `notes` | |
 
-Une personne à la fois professeur et élève a une seule fiche, avec un profil `teacher`, une adhésion et deux numéros externes. Les disciplines enseignées viendront avec le catalogue, par saison. Les droits dans l'appli passent par le compte (rôle ou groupe « Professeurs »), pas par cette table.
+Une personne à la fois professeur et élève a une seule fiche, avec un profil `teacher`, une adhésion et deux numéros externes. Les disciplines enseignées, par saison, sont dans le [catalogue](catalogue.md) (table `teacher_discipline`). Les droits dans l'appli passent par le compte (rôle ou groupe « Professeurs »), pas par cette table.
 
 ## IBAN et mandats SEPA
 
@@ -165,12 +165,12 @@ Le tableau des décisions du [plan](plan.md) prévoyait de supprimer les IBAN ap
 
 Ces tables se brancheront sur `person`, `household` et `season`, sans retoucher l'annuaire :
 
-- **catalogue** : disciplines, niveaux, cours avec leur horaire, leur salle et leur professeur ;
+- **catalogue** : disciplines, niveaux, cours avec leur horaire, leur salle et leur professeur (fait le 10 novembre 2026, voir [catalogue.md](catalogue.md)) ;
 - **inscriptions** : une personne inscrite à une discipline et à un niveau pour une saison, avec son statut ;
 - **tarifs** : éléments de cotisation et grille **par saison**. Les codes d'éléments changent d'une saison à l'autre, donc aucun code ne sert de clé durable ;
 - **situation fiscale du foyer par saison** : tranche de quotient familial (A, B, C), et le quotient seulement si nécessaire ;
 - **cotisations appelées et règlements**, rattachés au foyer ;
-- **disciplines des professeurs**, par saison.
+- **disciplines des professeurs**, par saison (fait avec le catalogue).
 
 ## Non repris
 

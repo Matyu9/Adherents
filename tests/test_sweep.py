@@ -1,5 +1,6 @@
 """Balayage systématique : toutes les routes × tous les rôles, puis tous les liens de toutes les pages."""
 import re
+from datetime import datetime
 from collections import deque
 from urllib.parse import urljoin, urlsplit
 
@@ -21,6 +22,7 @@ ACCOUNTS, GROUPS, CLIENTS = "account.manage", "group.manage", "client.manage"
 DIR_VIEW, DIR_EDIT, DIR_MERGE, BANK = "directory.view", "directory.edit", "directory.merge", "bank.view"
 LINKING = "account.manage+directory.edit"
 TEACHERS = "teacher.manage"
+CAT_VIEW, CAT_EDIT = "catalog.view", "catalog.edit"
 ACCESS = {
     "static": PUBLIC, "auth.login": PUBLIC, "csp.report": PUBLIC, "settings.logo_file": PUBLIC,
     "auth.two_factor": PUBLIC, "auth.forgot": PUBLIC, "auth.token_link": PUBLIC,
@@ -51,6 +53,10 @@ ACCESS = {
         "edit_household", "archive_household", "restore_household", "add_member", "update_member", "remove_member",
         "swap_guardians", "seasons", "create_season", "edit_season", "set_current_season", "delete_season")},
     **{f"teachers.{name}": TEACHERS for name in ("index", "create", "detail", "edit", "remove")},
+    **{f"catalog.{name}": CAT_VIEW for name in ("index", "teachers", "references")},
+    **{f"catalog.{name}": CAT_EDIT for name in ("create_course", "edit_course", "delete_course", "copy",
+                                                "teacher_disciplines", "create_item", "edit_item", "archive_item",
+                                                "restore_item", "delete_item")},
     "directory.merge_person": DIR_MERGE, "directory.merge_household": DIR_MERGE,
     **{f"directory.{name}": BANK for name in ("create_bank_account", "reveal_iban", "delete_bank_account",
                                               "create_mandate", "edit_mandate", "elevate")},
@@ -59,10 +65,12 @@ ACCESS = {
                                                  "person_from_account")},
 }
 HOLDERS = {SETTINGS: {A}, JOURNAL: {A, G}, ADMIN_ONLY: {A}, HIDDEN: {A}, ACCOUNTS: {A}, GROUPS: {A}, CLIENTS: {A},
-           DIR_VIEW: {A, G}, DIR_EDIT: {A, G}, DIR_MERGE: {A, G}, BANK: {A}, LINKING: {A}, TEACHERS: {A}}
+           DIR_VIEW: {A, G}, DIR_EDIT: {A, G}, DIR_MERGE: {A, G}, BANK: {A}, LINKING: {A}, TEACHERS: {A},
+           CAT_VIEW: {A, G}, CAT_EDIT: {A, G}}
 ARGUMENTS = {"filename": "css/app.css", "key": "adherent", "sid": "inconnue", "name": "absent",
              "account_id": 1, "group_id": 999, "token": "inconnu", "client_pk": 999, "person_id": 999,
-             "household_id": 999, "phone_id": 999, "membership_id": 999, "season_id": 999, "mandate_id": 999}
+             "household_id": 999, "phone_id": 999, "membership_id": 999, "season_id": 999, "mandate_id": 999,
+             "course_id": 999, "kind": "disciplines", "item_id": 999}
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
 SENDS_TO_LOGIN = {"auth.logout", "auth.two_factor", "auth.token_link", "oidc.end_session"}
 
@@ -82,7 +90,8 @@ def test_every_route_is_declared(app):
 
 def test_every_declared_permission_exists():
     from app.permissions import PERMISSIONS
-    assert {SETTINGS, JOURNAL, ACCOUNTS, GROUPS, CLIENTS, DIR_VIEW, DIR_EDIT, DIR_MERGE, BANK} <= set(PERMISSIONS)
+    assert {SETTINGS, JOURNAL, ACCOUNTS, GROUPS, CLIENTS, DIR_VIEW, DIR_EDIT, DIR_MERGE, BANK, TEACHERS, CAT_VIEW,
+            CAT_EDIT} <= set(PERMISSIONS)
 
 
 @pytest.mark.parametrize("who", [ANONYMOUS, H, G, A])
@@ -174,6 +183,30 @@ def _directory(accounts):
     db.session.add(account)
     db.session.add(SepaMandate(bank_account=account, rum="ADH-2026-ABC", signed_on=date(2026, 9, 1)))
     log("person.update", "Fiche <em>modifiée</em>", user=accounts[A], person=parent)
+    _catalog(season, old, teacher.teacher)
+
+
+def _catalog(season, old, teacher):
+    """Un catalogue sur deux saisons, avec du HTML dans chaque nom, un chevauchement et un cours complet."""
+    from datetime import time
+
+    from app.models import Course, Discipline, Level, Room, Site
+    from app.services import catalog
+
+    discipline = Discipline(name="Flûte <b>", category="Instrument")
+    archived = Discipline(name="Cor <i>", archived_at=datetime(2026, 1, 1))
+    level = Level(name="Cycle <b>1</b>")
+    site = Site(name="École <b>", address="<i>place</i>")
+    room = Room(site=site, name="Salle <script>")
+    db.session.add_all([discipline, archived, level, site, room])
+    for s in (season, old):
+        db.session.add(Course(season=s, discipline=discipline, level=level, teacher=teacher, room=room, weekday=2,
+                              starts_at=time(17), ends_at=time(18), capacity=8, marked_full=True,
+                              group_label="<b>A</b>", notes="<script>"))
+    db.session.add(Course(season=season, discipline=archived, room=room, weekday=2, starts_at=time(17, 30),
+                          ends_at=time(18, 30)))
+    db.session.flush()
+    catalog.set_disciplines(teacher, season, [discipline])
 
 
 INLINE = re.compile(r"""<[a-z][^>]*\son[a-z]+\s*=|<[a-z][^>]*\sstyle\s*=|<style\b|<script\b(?![^>]*\ssrc=)|href\s*=\s*["']javascript:""", re.I)
@@ -205,7 +238,7 @@ def test_crawl_every_link(app, rich, who):
         html = response.get_data(as_text=True)
         if match := INLINE.search(html):
             problems.append(f"{path} : contenu en ligne interdit par la CSP : {match.group(0)!r}")
-        if "<script>" in html or "<b>à compléter" in html or "<em>modifiée" in html:
+        if "<script>" in html or "<b>à compléter" in html or "<em>modifiée" in html or "Flûte <b>" in html:
             problems.append(f"{path} : une donnée n'a pas été échappée")
         for link in LINK.findall(html):
             target = urlsplit(urljoin(path, link.replace("&amp;", "&")))
@@ -226,6 +259,9 @@ def test_crawl_every_link(app, rich, who):
     assert any(p.startswith("/annuaire/personnes/") for p in seen) == (who in (A, G))
     assert any(p.endswith("/afficher") for p in seen) == (who == A)
     assert any(p.endswith("/fusionner") for p in seen) == (who in (A, G))
+    assert ("/catalogue" in seen) == (who in (A, G)) and ("/catalogue/referentiels" in seen) == (who in (A, G))
+    assert any(p.startswith("/catalogue/cours/") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/catalogue/copier") for p in seen) == (who in (A, G))
 
 
 def test_custom_role_gets_exactly_its_rights(app, rich):

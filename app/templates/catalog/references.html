@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import post_button %}
+{% from "catalog/_season_picker.html" import tabs %}
+{% block title %}Disciplines, niveaux et lieux{% endblock %}
+{% macro row_actions(kind, item, label) %}
+{% if can(current_user, "catalog.edit") %}
+<a href="{{ url_for('catalog.edit_item', kind=kind, item_id=item.id) }}">Modifier</a>
+{% if item.archived %}
+{{ post_button(url_for('catalog.restore_item', kind=kind, item_id=item.id), "Rouvrir", "link-button") }}
+{% else %}
+{{ post_button(url_for('catalog.archive_item', kind=kind, item_id=item.id), "Archiver", "link-button", "Ne plus proposer " ~ label ~ " pour les nouveaux cours ?") }}
+{% endif %}
+{% if not usage(item) %}{{ post_button(url_for('catalog.delete_item', kind=kind, item_id=item.id), "Supprimer", "link-button", "Supprimer " ~ label ~ " ?") }}{% endif %}
+{% endif %}
+{% endmacro %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Disciplines, niveaux et lieux</h1>
+    <p class="muted">Communs à toutes les saisons. Ce qui a servi ne se supprime pas : on l'archive, et il n'est plus proposé pour les nouveaux cours.</p>
+  </div>
+</div>
+{{ tabs("refs", none) }}
+
+<section id="disciplines" class="settings-block">
+  <div class="page-head"><h2>Disciplines</h2>{% if can(current_user, "catalog.edit") %}<a href="{{ url_for('catalog.create_item', kind='disciplines') }}" role="button" class="secondary small">+ Discipline</a>{% endif %}</div>
+  <div class="overflow-auto"><table class="striped responsive">
+    <thead><tr><th>Discipline</th><th>Type</th><th></th></tr></thead>
+    <tbody>
+    {% for d in lists.disciplines %}
+    <tr><td data-label="Discipline">{{ d.name }}{% if d.archived %} <span class="badge">archivée</span>{% endif %}</td>
+      <td data-label="Type"><small>{{ d.category or "—" }}</small></td>
+      <td data-label="" class="actions">{{ row_actions("disciplines", d, d.name) }}</td></tr>
+    {% else %}<tr><td colspan="3" class="muted">Aucune discipline.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section id="niveaux" class="settings-block">
+  <div class="page-head"><h2>Niveaux</h2>{% if can(current_user, "catalog.edit") %}<a href="{{ url_for('catalog.create_item', kind='niveaux') }}" role="button" class="secondary small">+ Niveau</a>{% endif %}</div>
+  <div class="overflow-auto"><table class="striped responsive">
+    <thead><tr><th>Niveau</th><th>Ordre</th><th></th></tr></thead>
+    <tbody>
+    {% for lv in lists.niveaux %}
+    <tr><td data-label="Niveau">{{ lv.name }}{% if lv.archived %} <span class="badge">archivé</span>{% endif %}</td>
+      <td data-label="Ordre"><small>{{ lv.position }}</small></td>
+      <td data-label="" class="actions">{{ row_actions("niveaux", lv, lv.name) }}</td></tr>
+    {% else %}<tr><td colspan="3" class="muted">Aucun niveau.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section id="sites" class="settings-block">
+  <div class="page-head"><h2>Sites et salles</h2>{% if can(current_user, "catalog.edit") %}<a href="{{ url_for('catalog.create_item', kind='sites') }}" role="button" class="secondary small">+ Site</a>{% endif %}</div>
+  {% for s in lists.sites %}
+  <div class="card settings-block" id="site-{{ s.id }}">
+    <div class="page-head">
+      <div><h3>{{ s.name }}{% if s.archived %} <span class="badge">archivé</span>{% endif %}</h3>{% if s.address %}<p class="muted small">{{ s.address }}</p>{% endif %}</div>
+      <div class="actions">{{ row_actions("sites", s, s.name) }}</div>
+    </div>
+    <ul class="plain-list">
+      {% for r in s.rooms %}
+      <li>{{ r.name }}{% if r.archived %} <span class="badge">archivée</span>{% endif %} <span class="actions">{{ row_actions("salles", r, r.label) }}</span></li>
+      {% else %}<li class="muted">Aucune salle.</li>{% endfor %}
+    </ul>
+    {% if can(current_user, "catalog.edit") and not s.archived %}<a href="{{ url_for('catalog.create_item', kind='salles', site=s.id) }}" class="small">+ Salle</a>{% endif %}
+  </div>
+  {% else %}<p class="muted">Aucun site.</p>{% endfor %}
+</section>
+{% endblock %}

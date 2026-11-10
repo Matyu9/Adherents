@@ -30,6 +30,16 @@
     {% if can(current_user, "directory.view") %}<p class="small"><a href="{{ url_for('directory.person', person_id=person.id) }}">Fiche complète dans l'annuaire</a>{% if person.memberships or person.household_links %} (aussi adhérent ou parent){% endif %}</p>{% endif %}
   </section>
 </div>
+{% if season %}
+<section class="card settings-block">
+  <h2>Enseignement en {{ season.label }}</h2>
+  <dl class="props">
+    <dt>Disciplines</dt><dd>{{ taught | map(attribute="name") | join(", ") or "—" }}</dd>
+    <dt>Cours</dt><dd>{% for c in courses %}{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}</small>{% endif %}<br>{% else %}—{% endfor %}</dd>
+  </dl>
+  {% if can(current_user, "catalog.view") %}<p class="small"><a href="{{ url_for('catalog.index', saison=season.id, prof=person.id) }}">Ses cours dans le catalogue</a></p>{% endif %}
+</section>
+{% endif %}
 <p class="muted small">Un départ s'indique par sa date : la fiche et l'historique restent. Ne retirez le statut de professeur qu'en cas d'erreur de saisie.</p>
 {{ post_button(url_for('teachers.remove', person_id=person.id), "Ce n'est pas un professeur (erreur de saisie)", "contrast outline small", "Retirer " ~ person.full_name ~ " des professeurs ? Son contrat est effacé, sa fiche de l'annuaire reste.") }}
 {% endblock %}

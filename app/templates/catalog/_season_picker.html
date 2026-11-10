@@ -1,0 +1,19 @@
+{#- Choix de la saison affichée, et onglets du catalogue. -#}
+{% macro season_picker(seasons, season, endpoint) -%}
+{% if seasons | length > 1 %}
+<form method="get" action="{{ url_for(endpoint) }}" class="inline-form">
+  <select name="saison" aria-label="Saison" data-autosubmit>
+    {% for s in seasons %}<option value="{{ s.id }}" {{ "selected" if season and season.id == s.id }}>{{ s.label }}</option>{% endfor %}
+  </select>
+  <noscript><button type="submit" class="secondary small">Voir</button></noscript>
+</form>
+{% endif %}
+{%- endmacro %}
+
+{% macro tabs(active, season) -%}
+<nav class="tabs" aria-label="Catalogue">
+  <a href="{{ url_for('catalog.index', saison=season.id if season) }}"{% if active == "cours" %} aria-current="page"{% endif %}>Cours</a>
+  <a href="{{ url_for('catalog.teachers', saison=season.id if season) }}"{% if active == "profs" %} aria-current="page"{% endif %}>Professeurs</a>
+  <a href="{{ url_for('catalog.references') }}"{% if active == "refs" %} aria-current="page"{% endif %}>Disciplines, niveaux et lieux</a>
+</nav>
+{%- endmacro %}

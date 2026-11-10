@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Disciplines de {{ teacher.person.full_name }}{% endblock %}
+{% block content %}
+<article class="narrow wide-form">
+  <h1>Disciplines de {{ teacher.person.full_name }}</h1>
+  <p class="muted">Saison {{ season.label }}.{% if teacher.leaves_during(season) %} Parti(e) le {{ teacher.left_on | date_fr }}.{% endif %}</p>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <fieldset class="mapping-grid">
+      <legend>Disciplines enseignées</legend>
+      {% for option in form.disciplines %}<label>{{ option() }} {{ option.label.text }}</label>{% endfor %}
+    </fieldset>
+    {% if form.disciplines.errors %}<small class="error">{{ form.disciplines.errors | join(" ") }}</small>{% endif %}
+    <button type="submit">Enregistrer</button>
+  </form>
+  {% if courses %}
+  <h2>Ses cours en {{ season.label }}</h2>
+  <ul class="plain-list">{% for c in courses %}<li>{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}{% endif %}</small>{% endif %}</li>{% endfor %}</ul>
+  {% endif %}
+  <p class="small"><a href="{{ url_for('catalog.teachers', saison=season.id) }}">Annuler</a></p>
+</article>
+{% endblock %}

@@ -2,6 +2,7 @@
 
 | Document | Pour qui | Contenu |
 |---|---|---|
+| [Guide d'utilisation](guide-utilisateur.md) | Familles, professeurs, secrétariat, administrateurs | Chaque écran : Mon espace, inscriptions, Mes élèves, annuaire, catalogue, campagnes, report, conservation des données |
 | [Plan du projet](plan.md) | Tout le monde | Objectifs, décisions prises, phases, questions ouvertes |
 | [Installation et exploitation](installation.md) | Personne qui héberge l'appli | Docker, reverse proxy, premier compte, sauvegarde, mise à jour, secours |
 | [Configuration](configuration.md) | Personne qui héberge l'appli | Toutes les variables d'environnement |

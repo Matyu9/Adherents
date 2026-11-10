@@ -1,23 +1,23 @@
 # Adhérents
 
-Plateforme de l'association pour les adhérents. Elle aura deux rôles :
+Plateforme de l'association pour les adhérents. Elle a deux rôles :
 
-- **servir d'interface entre le logiciel de gestion et les adhérents**, surtout au moment des inscriptions et réinscriptions ;
+- **servir d'interface entre le logiciel de gestion et les adhérents**, surtout au moment des inscriptions et réinscriptions, **puis le remplacer** : catalogue, cotisations et règlements ;
 - **gérer les comptes et servir de fournisseur de connexion (OIDC)** pour toutes les applis de l'association, à commencer par l'Inventaire.
-
-Elle ne gère pas les paiements.
 
 ## État du projet
 
 Déjà en place :
 
 - **le socle** : connexion, Mon compte, notifications, journal, rôles, paramètres, état de l'installation ;
-- **les comptes** : invitations, mot de passe oublié, groupes, sessions révocables, double authentification obligatoire pour qui administre ;
-- **le serveur OIDC** : les applis de l'association s'y connectent (Authorization Code avec PKCE), et sont prévenues quand une session se ferme (Back-Channel Logout).
+- **les comptes** : invitations, mot de passe oublié, groupes, sessions révocables, double authentification obligatoire pour qui administre ou lit des données personnelles ;
+- **le serveur OIDC** : les applis de l'association s'y connectent (Authorization Code avec PKCE), et sont prévenues quand une session se ferme (Back-Channel Logout) ;
+- **l'annuaire** : personnes, foyers, téléphones, saisons et adhésions, professeurs, fusion des doublons, IBAN chiffrés et mandats SEPA, rattachement des comptes à leur fiche ;
+- **le catalogue** : disciplines, niveaux, sites et salles, cours de chaque saison, disciplines des professeurs, copie d'une saison sur la suivante ;
+- **les inscriptions** : campagnes, dossier pré-rempli des familles, formulaire public des nouvelles familles, revue et validation par le secrétariat, report vers le logiciel de gestion, relances, « Mes élèves » pour les professeurs, conservation et anonymisation ;
+- **l'espace adhérent** : chaque famille voit son foyer, ses cours, ses dossiers et les instruments prêtés (lus dans l'Inventaire).
 
-- **l'annuaire** : personnes, foyers, téléphones, saisons et adhésions, professeurs, fusion des doublons, IBAN chiffrés et mandats SEPA, rattachement des comptes à leur fiche.
-
-Pas encore : l'import depuis le logiciel de gestion, qui attend ses exports, puis le catalogue, les inscriptions et l'espace adhérent. La suite est décrite dans le [plan du projet](docs/plan.md).
+Pas encore : l'import depuis le logiciel de gestion, qui attend ses exports, puis les tarifs et cotisations et les règlements. La suite est décrite dans le [plan du projet](docs/plan.md).
 
 ## Démarrage rapide (développement)
 
@@ -38,7 +38,7 @@ Pour la mise en service avec Docker, voir [Installation et exploitation](docs/in
 
 ## Documentation
 
-Tout est dans [`docs/`](docs/README.md) : plan du projet, installation, configuration, architecture et développement.
+Tout est dans [`docs/`](docs/README.md) : le [guide d'utilisation](docs/guide-utilisateur.md), le plan du projet, l'installation, la configuration, l'architecture et le développement.
 
 ## Technique
 

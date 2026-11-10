@@ -29,7 +29,7 @@ ACCESS = {
     "auth.two_factor": PUBLIC, "auth.forgot": PUBLIC, "auth.token_link": PUBLIC,
     "oidc.discovery": PUBLIC, "oidc.jwks": PUBLIC, "oidc.authorize": PUBLIC, "oidc.resume": PUBLIC, "oidc.token": PUBLIC,
     "oidc.userinfo": PUBLIC, "oidc.consent": LOGGED_IN, "oidc.end_session": PUBLIC, "oidc.end_session_confirm": PUBLIC,
-    "oidc.directory": PUBLIC,
+    "oidc.directory": PUBLIC, "oidc.persons": PUBLIC, "member.index": LOGGED_IN,
     **{f"applications.{name}": CLIENTS for name in ("index", "create", "detail", "edit", "new_secret", "toggle", "delete",
                                                     "rotate_key", "export_accounts")},
     "account.revoke_consent": LOGGED_IN,
@@ -300,6 +300,7 @@ def test_crawl_every_link(app, rich, who):
     assert ("/campagnes" in seen) == (who in (A, G))
     assert any(p.startswith("/campagnes/dossiers/") for p in seen) == (who in (A, G))
     assert any(p.startswith("/inscription/dossier/") for p in seen) == (who == H)  # le compte d'Anne, responsable
+    assert ("/mon-espace" in seen) == (who == H)
 
 
 def test_custom_role_gets_exactly_its_rights(app, rich):

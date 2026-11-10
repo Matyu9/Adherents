@@ -55,6 +55,11 @@ class Config:
     # Distinctes de SECRET_KEY, et sauvegardées à part de la base.
     BANK_DATA_KEYS = os.environ.get("BANK_DATA_KEYS", "")
 
+    # Espace adhérent : instruments prêtés, lus dans l'API de l'Inventaire avec le jeton de son compte de service
+    # (`flask jeton-espace-adherent` dans l'Inventaire). Vide : l'espace adhérent ne montre pas les instruments.
+    INVENTAIRE_API_URL = os.environ.get("INVENTAIRE_API_URL", "").strip().rstrip("/")
+    INVENTAIRE_API_TOKEN = os.environ.get("INVENTAIRE_API_TOKEN", "").strip()
+
     # Garde-fous des données personnelles (voir services/guard.py).
     ELEVATION_MINUTES = int(os.environ.get("ELEVATION_MINUTES", "10"))      # mode sécurisé après un code TOTP
     DIRECTORY_READ_LIMIT = int(os.environ.get("DIRECTORY_READ_LIMIT", "300"))  # pages de l'annuaire en 15 min

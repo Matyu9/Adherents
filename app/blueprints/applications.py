@@ -24,7 +24,8 @@ class ApplicationForm(FlaskForm):
     backchannel_logout_uri = StringField("Adresse des avis de déconnexion (Back-Channel Logout, facultatif)",
                                          validators=[Optional(), Length(max=oidc.MAX_REDIRECT_URI)])
     first_party = BooleanField("Appli de l'association : ne pas demander de consentement")
-    directory_access = BooleanField("Peut récupérer la liste des comptes qui y ont accès (avec son identifiant et son secret)")
+    directory_access = BooleanField("Peut récupérer la liste des comptes qui y ont accès (avec son identifiant et son "
+                                    "secret) et, pour une appli de l'association, les personnes de l'annuaire")
 
     def __init__(self, *args, current=None, **kwargs):
         super().__init__(*args, **kwargs)

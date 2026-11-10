@@ -34,6 +34,7 @@
       <p class="nav-title">Au quotidien</p>
       {{ navlink("dashboard.index", "Tableau de bord", "home") }}
       {{ navlink("notifications.index", "Notifications", "bell", ["notifications"]) }}
+      {% if current_user.person %}{{ navlink("member.index", "Mon espace", "home") }}{% endif %}
       {{ navlink("enrollment.index", "Inscriptions", "clipboard") }}
       {% if current_user.person and current_user.person.teacher %}{{ navlink("enrollment.my_students", "Mes élèves", "music") }}{% endif %}
       {% if can(current_user, "directory.view") or can(current_user, "teacher.manage") or can(current_user, "directory.anonymize") %}

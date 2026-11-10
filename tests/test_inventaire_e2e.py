@@ -119,7 +119,7 @@ def world(tmp_path_factory, module_database):
     try:
         wait_for_port(inv_port, server)
         yield {"idp": idp, "issuer": issuer, "inventaire": inventaire, "db": data / "inventaire.db",
-               "group_id": group_id, "elise_sub": elise_sub, "tmp": tmp}
+               "group_id": group_id, "elise_sub": elise_sub, "tmp": tmp, "env": env}
     finally:
         server.terminate()
         output, _ = server.communicate(timeout=10)
@@ -275,3 +275,71 @@ def test_7_inventaire_refuses_a_forged_notice(world):
     with pytest.raises(urllib.error.HTTPError) as error:
         urllib.request.urlopen(request, timeout=5)
     assert error.value.code == 400
+
+
+LOAN = """
+from datetime import datetime
+from app import create_app
+from app.extensions import db
+from app.models import Category, Item, Loan, LoanLine, LoanStatus, LoanType, User
+app = create_app()
+with app.app_context():
+    leo = db.session.scalar(db.select(User).filter_by(first_name="Léo"))
+    admin = db.session.scalar(db.select(User).filter_by(email="ada@inventaire.test"))
+    loan = Loan(type=LoanType.GARDE, status=LoanStatus.EN_COURS, borrower=leo, requested_by=admin,
+                start=datetime(2026, 9, 5, 18, 0))
+    item = Item(code="E2E-SAX", name="Saxophone alto e2e", category=Category(name="Bois e2e"))
+    loan.lines = [LoanLine(item=item, quantity=1)]
+    db.session.add(loan)
+    db.session.commit()
+"""
+
+
+def test_8_member_area_shows_the_instruments_from_the_real_inventaire(page, world):
+    """Phase 7 : fiches rattachées à l'annuaire dans l'Inventaire, compte de service, puis l'espace adhérent."""
+    from app.models import Household, Person
+    from app.services import directory
+    with world["idp"].app_context():
+        sophie_account = db.session.scalar(db.select(Account).filter_by(email="famille@e2e.test"))
+        household = Household(name="Famille Durand")
+        sophie = Person(first_name="Sophie", last_name="Durand", account=sophie_account)
+        leo = Person(first_name="Léo", last_name="Durand")
+        db.session.add_all([household, sophie, leo])
+        db.session.flush()
+        directory.add_member(household, sophie, "guardian")
+        directory.add_member(household, leo, "dependent")
+        db.session.commit()
+        leo_uuid = leo.uuid
+
+    page.goto(world["inventaire"] + "/connexion?local=1")
+    page.fill("input[name=email]", "ada@inventaire.test")
+    page.fill("input[name=password]", ADMIN_PASSWORD)
+    page.click("form[method=post] button[type=submit]")
+    page.wait_for_url(lambda url: "/connexion" not in url)
+    page.goto(world["inventaire"] + "/utilisateurs/rattachement-annuaire")
+    page.click("text=Récupérer les personnes depuis Adhérents")  # lit /oidc/personnes, déduite de OIDC_ACCOUNTS_URL
+    page.wait_for_selector("table")
+    row = page.locator("tr", has_text="Léo Durand").locator("input[type=checkbox]")
+    assert not row.is_checked()  # même nom seulement : à vérifier
+    row.check()
+    page.click("text=Rattacher les fiches cochées")
+    page.wait_for_selector("text=1 fiche(s) rattachée(s)")
+    assert inventaire_rows(world, "SELECT external_id FROM user WHERE first_name = 'Léo'") == [(leo_uuid,)]
+
+    for command in ([str(FLASK), "jeton-espace-adherent"], [str(PYTHON), "-c", LOAN]):
+        result = subprocess.run(command, cwd=INVENTAIRE, env=world["env"], capture_output=True, text=True, timeout=60)
+        assert result.returncode == 0, result.stdout + result.stderr
+    # Un nouveau jeton annule le précédent : c'est lui qu'on recopie dans Adhérents.
+    token = subprocess.run([str(FLASK), "jeton-espace-adherent"], cwd=INVENTAIRE, env=world["env"],
+                           capture_output=True, text=True, timeout=60).stdout.strip().splitlines()[-1]
+    assert token.startswith("ohn_")
+    world["idp"].config.update(INVENTAIRE_API_URL=world["inventaire"] + "/api/v1", INVENTAIRE_API_TOKEN=token)
+
+    page.goto(world["issuer"] + "/connexion")
+    sign_in_at_adherents(page, "famille@e2e.test")
+    page.wait_for_url(lambda url: "/connexion" not in url)
+    page.goto(world["issuer"] + "/mon-espace")
+    content = page.content()
+    assert "Léo Durand" in content and "Saxophone alto e2e" in content and "en cours depuis le 2026-09-05" in content
+    assert page.blocked == []
+    world["idp"].config.update(INVENTAIRE_API_URL="", INVENTAIRE_API_TOKEN="")

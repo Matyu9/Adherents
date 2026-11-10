@@ -383,3 +383,26 @@ def directory():
     response = jsonify(data)
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@bp.route("/oidc/personnes")
+def persons():
+    """Personnes de l'annuaire, pour une appli de l'association qui relie ses fiches (Inventaire). Même accès que
+    /oidc/comptes, et seulement pour une appli de l'association."""
+    keys = [f"ip:{request.remote_addr}"]
+    if _directory_failures.blocked(keys):
+        return _directory_refused(429, "slow_down")
+    auth = request.authorization
+    client = oidc.find_client(auth.username) if auth is not None and auth.type == "basic" else None
+    if client is None or not client.check_client_secret(auth.password or ""):
+        _directory_failures.hit(keys)
+        db.session.commit()
+        return _directory_refused(401, "invalid_client")
+    if not client.directory_access or not client.first_party:
+        return _directory_refused(403, "access_denied")
+    data = oidc.persons(client)
+    log("oidc.directory", f"{client.name} a récupéré la liste des personnes de l'annuaire ({len(data['persons'])})")
+    db.session.commit()
+    response = jsonify(data)
+    response.headers["Cache-Control"] = "no-store"
+    return response

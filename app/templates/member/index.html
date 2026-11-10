@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Mon espace{% endblock %}
+{% macro courses_of(person, seasons) %}
+{% for membership, courses in seasons %}
+<p class="small"><strong>{{ membership.season.label }}</strong>{% if current and membership.season_id == current.id %} <span class="badge badge-ok">saison en cours</span>{% endif %}
+  {% if membership.status != active %}<span class="badge">abandon</span>{% endif %}{% if membership.category %} · {{ membership.category }}{% endif %}{% if membership.school_class %} · {{ membership.school_class }}{% endif %}</p>
+{% if courses %}
+<ul class="plain-list">
+  {% for c in courses %}<li>{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}{% if c.room %} · {{ c.room.label }}{% endif %}</small>{% endif %}{% if c.teacher %} <small class="muted">avec {{ c.teacher.person.full_name }}</small>{% endif %}</li>{% endfor %}
+</ul>
+{% endif %}
+{% else %}<p class="small muted">Pas d'adhésion enregistrée.</p>{% endfor %}
+{% endmacro %}
+{% macro instruments(person) %}
+{% if inventory_on %}
+{% if loans is none %}<p class="small muted">Instruments prêtés : indisponible pour le moment.</p>
+{% else %}
+{% for loan in loans.get(person.uuid, []) %}
+<p class="small">Prêt : {% for item in loan["items"] %}<strong>{{ item.name }}</strong>{% if item.quantity > 1 %} × {{ item.quantity }}{% endif %}{{ ", " if not loop.last }}{% endfor %}
+  <small class="muted">{{ loan.status_label | lower }} depuis le {{ loan.start }}{% if loan.end %}, jusqu'au {{ loan.end }}{% endif %}</small></p>
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endmacro %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Mon espace</h1><p class="muted">Ce que l'association sait de votre foyer. Pour corriger une information, passez par votre dossier d'inscription ou par le secrétariat.</p></div>
+  <a href="{{ url_for('enrollment.index') }}" role="button" class="secondary">Inscriptions</a>
+</div>
+{% if not person %}
+<p class="empty">Votre compte n'est pas encore relié à votre fiche d'adhérent : contactez le secrétariat.</p>
+{% endif %}
+
+{% for block in blocks %}
+{% set h = block.household %}
+<section class="card settings-block">
+  <h2>{{ h.name }}</h2>
+  <div class="detail-grid">
+    <div>
+      <h3>Adresse</h3>
+      <p>{% if h.address_recipient %}{{ h.address_recipient }}<br>{% endif %}{% for line in (h.address_street or "").splitlines() %}{{ line }}<br>{% endfor %}{{ h.postal_code or "" }} {{ h.city or "" }}</p>
+      {% for p in h.phones %}<p class="small">{{ p.label or "Téléphone" }} : {{ p.number | phone }}</p>{% endfor %}
+    </div>
+    <div>
+      <h3>Prélèvement</h3>
+      {% for account in h.bank_accounts %}<p class="small">{{ account.masked_iban }} · {{ account.holder_name }}{% if account.mandates %} <span class="badge badge-ok">mandat signé</span>{% endif %}</p>
+      {% else %}<p class="small muted">Aucune coordonnée bancaire.</p>{% endfor %}
+    </div>
+  </div>
+  {% for p, seasons in block.members %}
+  <div class="settings-block">
+    <h3>{{ p.full_name }} <small class="muted">{{ "responsable" if p in (h.guardians | map(attribute="person") | list) else "à charge" }}</small></h3>
+    {% if p in (h.guardians | map(attribute="person") | list) %}<p class="small muted">{{ p.email or "" }}{% for ph in p.phones %} · {{ ph.number | phone }}{% endfor %}</p>{% endif %}
+    {{ courses_of(p, seasons) }}
+    {{ instruments(p) }}
+  </div>
+  {% endfor %}
+  {% if block.dossiers %}
+  <h3>Dossiers d'inscription</h3>
+  <ul class="plain-list">{% for d in block.dossiers %}<li><a href="{{ url_for('enrollment.dossier', uuid=d.uuid) }}">{{ d.campaign.title }}</a> <span class="badge{{ ' badge-ok' if d.status in ('validated', 'transferred') }}">{{ d.status_label }}</span></li>{% endfor %}</ul>
+  {% endif %}
+  {% if block.consents %}
+  <h3>Engagements</h3>
+  <ul class="plain-list">{% for c in block.consents %}<li class="small">{{ c.season.label }} · {{ c.label }} : <strong>{{ "oui" if c.granted else "non" }}</strong> <small class="muted">le {{ c.given_at | date_fr }}</small></li>{% endfor %}</ul>
+  {% endif %}
+  {% set student_consents = block.members | map(attribute=0) | map(attribute="consents") | sum(start=[]) %}
+  {% if student_consents %}
+  <ul class="plain-list">{% for c in student_consents %}<li class="small">{{ c.season.label }} · {{ c.person.first_name }} · {{ c.label }} : <strong>{{ "oui" if c.granted else "non" }}</strong> <small class="muted">le {{ c.given_at | date_fr }}</small></li>{% endfor %}</ul>
+  {% endif %}
+</section>
+{% endfor %}
+
+{% if own %}
+<section class="card settings-block">
+  <h2>Mes cours</h2>
+  {{ courses_of(own[0], own[1]) }}
+  {{ instruments(own[0]) }}
+</section>
+{% endif %}
+{% endblock %}

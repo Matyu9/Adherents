@@ -322,6 +322,25 @@ def directory(client):
     return {"issuer": issuer(), "application": client.name, "accounts": rows}
 
 
+def persons(client):
+    """Personnes de l'annuaire, pour qu'une appli de l'association relie ses fiches (Inventaire : `external_id`).
+
+    Réservé aux applis de l'association : une appli tierce n'a pas à connaître des enfants sans compte. Le minimum
+    pour reconnaître quelqu'un : identifiant public, nom, année de naissance, et l'identité de connexion (`sub`) si la
+    personne a un compte qui entre dans cette appli. Ni email, ni adresse, ni date de naissance complète.
+    """
+    from ..models import Person
+    rows = []
+    for person in db.session.scalars(db.select(Person).where(Person.archived_at.is_(None))
+                                     .order_by(db.func.fold(Person.last_name), db.func.fold(Person.first_name),
+                                               Person.id)):
+        account = person.account
+        rows.append({"uuid": person.uuid, "first_name": person.first_name, "last_name": person.last_name,
+                     "birth_year": person.birth_date.year if person.birth_date else None,
+                     "sub": account.sub if account is not None and may_access(client, account) else None})
+    return {"issuer": issuer(), "application": client.name, "persons": rows}
+
+
 def find_token(raw):
     """Jeton encore valable, pour une personne qui a toujours accès à cette appli, sinon None."""
     token = db.session.get(OidcToken, digest(raw)) if raw else None

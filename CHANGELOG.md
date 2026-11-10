@@ -13,6 +13,8 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ### Ajouté
 
+- **Mon espace** (phase 7) : chaque responsable voit son foyer (adresse, téléphones, IBAN masqués), les adhésions et les cours de chaque membre, ses dossiers d'inscription et les consentements donnés ; un élève de 16 ans ou plus avec son compte voit ses cours. Les **instruments prêtés** viennent de l'Inventaire, par un compte de service (`INVENTAIRE_API_URL`, `INVENTAIRE_API_TOKEN`).
+- **`/oidc/personnes`** : les personnes de l'annuaire (identifiant public, nom, année de naissance, `sub` si elles ont un compte qui entre dans l'appli), pour une appli de l'association qui relie ses fiches. Même accès que `/oidc/comptes`, refusé aux applis tierces.
 - **Campagnes d'inscription** (phase 6) : le secrétariat ouvre une campagne par saison, avec ses dates et ses consentements. Chaque responsable retrouve le dossier de son foyer pré-rempli depuis l'annuaire, avec les cours qui prolongent ceux de l'an dernier ; il corrige, choisit les cours (un cours complet est grisé), répond aux consentements, indique un IBAN s'il le souhaite, puis envoie. Voir [docs/inscriptions.md](docs/inscriptions.md).
 - **Revue des dossiers** : ce que la validation changera dans l'annuaire, champ par champ ; renvoi à la famille avec un message, ou validation, qui crée les adhésions, les inscriptions aux cours, les consentements datés (avec leur texte) et le compte bancaire. Nouveaux droits `registration.view` et `registration.manage`, donnés au gestionnaire.
 - **Nouvelles familles** : formulaire public, si la campagne l'autorise, avec un lien d'accès envoyé par email.

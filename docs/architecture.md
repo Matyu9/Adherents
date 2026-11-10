@@ -87,6 +87,8 @@ Décrites dans [inscriptions.md](inscriptions.md) :
 | `enrollment` | Inscription d'un élève à un cours, rattachée à son adhésion |
 | `consent` | Réponse datée, avec le texte affiché |
 
+L'espace adhérent est dans `blueprints/member.py` ; les instruments viennent de l'API de l'Inventaire (`services/inventory.py`), qui ne reçoit que les identifiants publics (`person.uuid`) des personnes du foyer.
+
 Le parcours est dans `services/registration.py`, la conservation dans `services/retention.py`. Côté écrans : `blueprints/enrollment.py` pour les familles (et « Mes élèves »), `blueprints/campaigns.py` pour le secrétariat.
 
 `Account` ne devient pas la fiche d'une personne : un enfant a une fiche sans compte, son responsable la voit depuis le sien. Le journal (`activity`) note aussi la fiche concernée (`person_id`, `household_id`), ce qui donne l'historique de chaque fiche.

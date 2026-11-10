@@ -3,8 +3,8 @@ import re
 from datetime import datetime
 
 from ..extensions import db, fold, fold_contains
-from ..models import (Account, Activity, AppSetting, BankAccount, Household, HouseholdMember, Membership, Person,
-                      Phone, Role, Season, Teacher)
+from ..models import (Account, Activity, AppSetting, BankAccount, Consent, Dossier, Enrollment, Household,
+                      HouseholdMember, Membership, Person, Phone, Role, Season, Teacher)
 from . import bank
 from .catalog import move_teaching
 
@@ -321,12 +321,21 @@ def merge_persons(keep, drop, take=()):
     for ref in list(drop.external_refs):
         ref.person = keep
 
-    seasons_kept = {m.season_id for m in keep.memberships}
+    seasons_kept = {m.season_id: m for m in keep.memberships}
     for membership in list(drop.memberships):
         if membership.season_id in seasons_kept:
             summary.append(f"adhésion {membership.season.label} en double : celle de la fiche gardée reste")
+            kept = seasons_kept[membership.season_id]
+            courses = {e.course_id for e in kept.enrollments}
+            for enrollment in list(membership.enrollments):  # ses cours passent sur l'adhésion gardée
+                if enrollment.course_id not in courses:
+                    membership.enrollments.remove(enrollment)
+                    kept.enrollments.append(Enrollment(course_id=enrollment.course_id, status=enrollment.status,
+                                                       withdrawn_on=enrollment.withdrawn_on,
+                                                       dossier_id=enrollment.dossier_id))
         else:
             membership.person = keep
+    db.session.execute(db.update(Consent).where(Consent.person_id == drop.id).values(person_id=keep.id))
 
     if drop.teacher is not None:
         if keep.teacher is None:
@@ -350,6 +359,7 @@ def merge_persons(keep, drop, take=()):
                        .values(holder_person_id=keep.id))
     db.session.execute(db.update(Activity).where(Activity.person_id == drop.id).values(person_id=keep.id))
     db.session.flush()
+    db.session.expire(drop, ["consents"])  # repris par la requête ci-dessus : la suppression ne doit pas les emporter
     db.session.delete(drop)
     db.session.flush()
     return summary
@@ -370,6 +380,11 @@ def household_merge_problems(keep, drop):
                 problems.append(f"{member.person.full_name} n'a pas le même rôle dans les deux foyers.")
     if drop.bank_accounts and not bank.enabled():
         problems.append("Le foyer à fusionner a des coordonnées bancaires et BANK_DATA_KEYS n'est pas définie.")
+    campaigns = set(db.session.scalars(db.select(Dossier.campaign_id).filter_by(household_id=keep.id)))
+    if any(d.campaign_id in campaigns for d in
+           db.session.scalars(db.select(Dossier).filter_by(household_id=drop.id))):
+        problems.append("Les deux foyers ont chacun un dossier pour la même campagne d'inscription : traitez-en "
+                        "un d'abord.")
     return problems
 
 
@@ -402,7 +417,10 @@ def merge_households(keep, drop, take=()):
         bank.move(account, keep.id, iban)
         summary.append(f"coordonnées bancaires {account.masked_iban} reprises")
     db.session.execute(db.update(Activity).where(Activity.household_id == drop.id).values(household_id=keep.id))
+    db.session.execute(db.update(Consent).where(Consent.household_id == drop.id).values(household_id=keep.id))
+    db.session.execute(db.update(Dossier).where(Dossier.household_id == drop.id).values(household_id=keep.id))
     db.session.flush()
+    db.session.expire(drop)
     db.session.delete(drop)
     db.session.flush()
     return summary

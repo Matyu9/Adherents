@@ -256,10 +256,64 @@ def test_saved_manager_role_gets_the_catalogue_rights(migrated):
     upgrade(MIGRATIONS, revision="a0000001initial")
     run_sql(migrated, "INSERT INTO role (key, name, permissions) VALUES "
                       "('gestionnaire', 'Gestionnaire', '[\"directory.view\"]'), ('regie', 'Régie', '[\"activity.view\"]')")
-    upgrade(MIGRATIONS)
+    upgrade(MIGRATIONS, revision="a0000002catalogue")
     (rows,) = run_sql(migrated, "SELECT key, permissions::text FROM role ORDER BY key")
     assert rows == [("gestionnaire", '["directory.view", "catalog.view", "catalog.edit"]'),
                     ("regie", '["activity.view"]')]
     downgrade(MIGRATIONS, revision="a0000001initial")
     (rows,) = run_sql(migrated, "SELECT key, permissions::text FROM role ORDER BY key")
     assert rows == [("gestionnaire", '["directory.view"]'), ("regie", '["activity.view"]')]
+
+
+def test_registration_on_the_real_schema(migrated):
+    """Contraintes et cascades des inscriptions, telles que la migration les crée."""
+    upgrade(MIGRATIONS)
+    run_sql(migrated, *SEED, *CATALOG,
+            "INSERT INTO household (id, uuid, name, country, created_at, updated_at) "
+            "VALUES (1, 'h1', 'Famille Martin', 'FR', now(), now())",
+            "INSERT INTO membership (id, person_id, season_id, status, created_at, updated_at) "
+            "VALUES (1, 1, 1, 'active', now(), now())",
+            "INSERT INTO campaign (id, season_id, title, opens_at, closes_at, allow_new, created_at, updated_at) "
+            "VALUES (1, 1, 'Réinscriptions', '2027-06-01', '2027-07-01', false, now(), now())",
+            "INSERT INTO campaign_consent (id, campaign_id, label, text, scope, required, position) "
+            "VALUES (1, 1, 'Image', 'Photos', 'student', false, 0)",
+            "INSERT INTO dossier (id, uuid, campaign_id, household_id, account_id, status, data, created_at, updated_at) "
+            "VALUES (1, 'd1', 1, 1, 2, 'validated', '{}', now(), now())",
+            "INSERT INTO enrollment (id, membership_id, course_id, status, dossier_id, created_at, updated_at) "
+            "VALUES (1, 1, 1, 'active', 1, now(), now())",
+            "INSERT INTO consent (person_id, season_id, label, text, granted, given_at, dossier_id) "
+            "VALUES (1, 1, 'Image', 'Photos', true, now(), 1)")
+    assert run_sql(migrated, "SELECT permissions::text FROM role WHERE key = 'regie'") == [[('["activity.view"]',)]]
+    for statement in (
+        "INSERT INTO campaign (season_id, title, opens_at, closes_at, allow_new, created_at, updated_at) "
+        "VALUES (1, 'x', '2027-07-01', '2027-06-01', false, now(), now())",
+        "INSERT INTO campaign_consent (campaign_id, label, text, scope, required, position) "
+        "VALUES (1, 'x', 'x', 'autre', false, 0)",
+        "INSERT INTO dossier (uuid, campaign_id, household_id, status, data, created_at, updated_at) "
+        "VALUES ('d2', 1, 1, 'draft', '{}', now(), now())",  # un dossier par foyer et par campagne
+        "INSERT INTO dossier (uuid, campaign_id, status, data, created_at, updated_at) "
+        "VALUES ('d3', 1, 'perdu', '{}', now(), now())",
+        "INSERT INTO enrollment (membership_id, course_id, status, created_at, updated_at) "
+        "VALUES (1, 1, 'active', now(), now())",
+        "INSERT INTO consent (person_id, household_id, season_id, label, text, granted, given_at) "
+        "VALUES (1, 1, 1, 'x', 'x', true, now())",
+        "INSERT INTO consent (season_id, label, text, granted, given_at) VALUES (1, 'x', 'x', true, now())",
+        "DELETE FROM course WHERE id = 1",  # il a des élèves
+        "DELETE FROM campaign WHERE id = 1",  # elle a des dossiers
+    ):
+        assert_fails(migrated, statement)
+    run_sql(migrated, "INSERT INTO dossier (uuid, campaign_id, status, data, created_at, updated_at) "
+                      "VALUES ('d4', 1, 'draft', '{}', now(), now()), ('d5', 1, 'draft', '{}', now(), now())")
+    run_sql(migrated, "DELETE FROM account WHERE id = 2", "DELETE FROM household WHERE id = 1")
+    assert run_sql(migrated, "SELECT household_id, account_id FROM dossier WHERE id = 1") == [[(None, None)]]
+    run_sql(migrated, "DELETE FROM person WHERE id = 1")
+    assert run_sql(migrated, "SELECT count(*) FROM enrollment", "SELECT count(*) FROM consent") == [[(0,)], [(0,)]]
+
+
+def test_saved_manager_role_gets_the_registration_rights(migrated):
+    upgrade(MIGRATIONS, revision="a0000002catalogue")
+    run_sql(migrated, "INSERT INTO role (key, name, permissions) VALUES ('gestionnaire', 'Gestionnaire', '[]')")
+    upgrade(MIGRATIONS)
+    assert run_sql(migrated, "SELECT permissions::text FROM role") == [[('["registration.view", "registration.manage"]',)]]
+    downgrade(MIGRATIONS, revision="a0000002catalogue")
+    assert run_sql(migrated, "SELECT permissions::text FROM role") == [[("[]",)]]

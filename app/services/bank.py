@@ -27,7 +27,7 @@ from flask import current_app
 from sqlalchemy import inspect
 
 from ..extensions import db
-from ..models import BankAccount, SepaMandate
+from ..models import BankAccount, Dossier, SepaMandate
 
 NONCE_BYTES = 12
 # Mandat supprimé 13 mois après son dernier prélèvement (durée de contestation d'un prélèvement non autorisé).
@@ -100,6 +100,9 @@ def check_startup(app):
             if not inspect(db.engine).has_table("bank_account"):
                 return  # base pas encore migrée
             used = set(db.session.scalars(db.select(BankAccount.key_version).distinct()))
+            if inspect(db.engine).has_table("dossier"):
+                used |= set(db.session.scalars(db.select(Dossier.iban_key_version).distinct()
+                                               .where(Dossier.iban_key_version.is_not(None))))
         finally:
             db.session.remove()
     missing = sorted(used - set(available))
@@ -195,6 +198,40 @@ def move(account, household_id, iban=None):
     set_iban(account, iban)
 
 
+def _dossier_aad(dossier):
+    return f"adherents/iban/dossier:{dossier.uuid}".encode()
+
+
+def set_dossier_iban(dossier, iban):
+    """IBAN saisi par une famille dans son dossier : chiffré, lié au dossier (le foyer peut ne pas encore exister)."""
+    iban = normalize_iban(iban)
+    version = current_version()
+    nonce = os.urandom(NONCE_BYTES)
+    dossier.iban_ciphertext = nonce + AESGCM(_derive(keys()[version], b"adherents/iban")).encrypt(
+        nonce, iban.encode(), _dossier_aad(dossier))
+    dossier.iban_last4 = iban[-4:]
+    dossier.iban_key_version = version
+
+
+def reveal_dossier_iban(dossier):
+    """IBAN en clair d'un dossier : à la validation (recopié dans l'annuaire) et dans le fichier de report."""
+    if dossier.iban_ciphertext is None:
+        return None
+    key = keys().get(dossier.iban_key_version)
+    if key is None:
+        raise BankKeyError(f"La clé n° {dossier.iban_key_version} n'est plus dans BANK_DATA_KEYS.")
+    blob = dossier.iban_ciphertext
+    try:
+        return AESGCM(_derive(key, b"adherents/iban")).decrypt(
+            blob[:NONCE_BYTES], blob[NONCE_BYTES:], _dossier_aad(dossier)).decode()
+    except InvalidTag:
+        raise BankKeyError("IBAN du dossier indéchiffrable : il a été modifié ou recopié d'un autre dossier.") from None
+
+
+def clear_dossier_iban(dossier):
+    dossier.iban_ciphertext = dossier.iban_last4 = dossier.iban_key_version = None
+
+
 def same_iban(iban, exclude=None):
     """Comptes bancaires portant déjà cet IBAN, retrouvés par leur empreinte."""
     query = db.select(BankAccount).where(BankAccount.iban_fingerprint.in_(fingerprints(iban)))
@@ -210,6 +247,10 @@ def rotate():
     for account in db.session.scalars(db.select(BankAccount)):
         if account.key_version != version or account.iban_fingerprint != fingerprint(reveal(account), version):
             set_iban(account, reveal(account))
+            count += 1
+    for dossier in db.session.scalars(db.select(Dossier).where(Dossier.iban_ciphertext.is_not(None))):
+        if dossier.iban_key_version != version:
+            set_dossier_iban(dossier, reveal_dossier_iban(dossier))
             count += 1
     return count
 

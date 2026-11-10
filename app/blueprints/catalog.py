@@ -10,7 +10,7 @@ from ..extensions import db, fold
 from ..filters import date_fr
 from ..models import Course, Discipline, Level, Room, Season, Site, Teacher
 from ..permissions import require
-from ..services import catalog, directory
+from ..services import catalog, directory, registration
 from ..services.activity import diff, log
 from ..services.catalog import CatalogError
 from .directory import _blank, _strip, _text
@@ -180,7 +180,8 @@ def _item_label(item):
 def index():
     season, seasons = _selected_season()
     if season is None:
-        return render_template("catalog/index.html", season=None, seasons=[], items=[], conflicts={}, filters={})
+        return render_template("catalog/index.html", season=None, seasons=[], items=[], conflicts={}, filters={},
+                               enrolled={})
     filters = {"discipline": request.args.get("discipline", type=int),
                "prof": request.args.get("prof") if request.args.get("prof") == "aucun" else request.args.get("prof", type=int),
                "jour": request.args.get("jour", type=int), "site": request.args.get("site", type=int)}
@@ -191,6 +192,7 @@ def index():
     every = db.session.scalars(catalog.course_query(season)).all()
     return render_template("catalog/index.html", season=season, seasons=seasons, items=items, filters=filters,
                            conflicts=catalog.season_conflicts(every), total=len(every),
+                           enrolled=registration.enrolled_counts(season),
                            disciplines=catalog.disciplines(include_archived=True),
                            teachers=catalog.teachers_for(season), sites=catalog.sites(include_archived=True),
                            weekdays=Course.WEEKDAYS)
@@ -257,6 +259,10 @@ def edit_course(course_id):
 def delete_course(course_id):
     course = _course(course_id)
     season_id = course.season_id
+    if course.enrollments:
+        flash(f"{len(course.enrollments)} élève(s) sont inscrits à ce cours : il ne peut pas être supprimé. "
+              "Fermez-le aux inscriptions s'il ne doit plus être proposé.", "error")
+        return redirect(url_for(".index", saison=season_id))
     log("course.delete", f"Cours supprimé : {catalog.describe(course)}")
     db.session.delete(course)
     db.session.commit()

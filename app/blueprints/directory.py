@@ -12,8 +12,8 @@ from wtforms import DateField, EmailField, SelectField, StringField, TextAreaFie
 from wtforms.validators import DataRequired, Length, Optional, Regexp, ValidationError
 
 from ..extensions import db
-from ..models import (Account, Activity, BankAccount, Course, Household, HouseholdMember, Membership, Person, Phone,
-                      Season, SepaMandate)
+from ..models import (Account, Activity, BankAccount, Campaign, Course, Household, HouseholdMember, Membership,
+                      Person, Phone, Season, SepaMandate)
 from ..permissions import can, require
 from ..services import accounts as accounts_service
 from ..services import bank, catalog, directory, guard, throttle
@@ -960,6 +960,8 @@ def delete_season(season_id):
     season = db.session.get(Season, season_id) or abort(404)
     if db.session.scalar(db.select(Membership.id).filter_by(season_id=season.id).limit(1)) is not None:
         flash("Cette saison a des adhésions : elle ne peut pas être supprimée.", "error")
+    elif db.session.scalar(db.select(Campaign.id).filter_by(season_id=season.id).limit(1)) is not None:
+        flash("Cette saison a des campagnes d'inscription : elle ne peut pas être supprimée.", "error")
     elif catalog.target_has_catalog(season):
         flash("Cette saison a des cours ou des disciplines de professeurs : elle ne peut pas être supprimée.", "error")
     elif directory.current_season() is season:

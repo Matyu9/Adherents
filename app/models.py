@@ -756,6 +756,165 @@ class TeacherDiscipline(db.Model):
     discipline = db.relationship("Discipline")
 
 
+# ---------------------------------------------------------------------------
+# Inscriptions : campagnes, dossiers, inscriptions aux cours, consentements (voir docs/inscriptions.md)
+# ---------------------------------------------------------------------------
+
+class Campaign(TimestampMixin, db.Model):
+    """Campagne d'inscription d'une saison : les familles déposent leur dossier entre ces deux dates."""
+    __table_args__ = (db.CheckConstraint("closes_at > opens_at", name="ck_campaign_dates"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    # Une saison qui a des campagnes ne se supprime pas.
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="RESTRICT"), nullable=False, index=True)
+    title = db.Column(db.String(120), nullable=False)
+    opens_at = db.Column(db.DateTime, nullable=False)
+    closes_at = db.Column(db.DateTime, nullable=False)
+    allow_new = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())  # formulaire public
+    instructions = db.Column(db.Text)  # affichées en tête du dossier
+
+    season = db.relationship("Season")
+    consents = db.relationship("CampaignConsent", back_populates="campaign", cascade="all, delete-orphan",
+                               order_by="(CampaignConsent.position, CampaignConsent.id)")
+
+    def is_open(self, now=None):
+        now = now or datetime.now()
+        return self.opens_at <= now < self.closes_at
+
+    def __repr__(self):
+        return f"<Campaign {self.title}>"
+
+
+class CampaignConsent(db.Model):
+    """Consentement demandé dans une campagne : droit à l'image, règlement intérieur… Son texte est recopié dans
+    chaque réponse, pour garder la preuve de ce qui a été accepté même s'il change ensuite."""
+    STUDENT = "student"
+    HOUSEHOLD = "household"
+    SCOPES = {STUDENT: "Pour chaque élève", HOUSEHOLD: "Pour le foyer"}
+    __table_args__ = (db.CheckConstraint("scope IN ('student', 'household')", name="ck_campaign_consent_scope"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    campaign_id = db.Column(db.ForeignKey("campaign.id", ondelete="CASCADE"), nullable=False, index=True)
+    label = db.Column(db.String(120), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    scope = db.Column(db.String(10), nullable=False, default=STUDENT)
+    required = db.Column(db.Boolean, nullable=False, default=False)  # sans lui, le dossier ne part pas
+    position = db.Column(db.Integer, nullable=False, default=0)
+
+    campaign = db.relationship("Campaign", back_populates="consents")
+
+
+class Dossier(TimestampMixin, db.Model):
+    """Dossier d'inscription d'un foyer pour une campagne.
+
+    Ce que la famille saisit reste dans `data` (JSON) : l'annuaire ne change qu'à la validation, par un gestionnaire.
+    Une nouvelle famille (formulaire public) n'a pas encore de foyer : `household_id` est vide jusque-là.
+    """
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    TO_FIX = "to_fix"
+    VALIDATED = "validated"
+    TRANSFERRED = "transferred"
+    STATUSES = {DRAFT: "Brouillon", SUBMITTED: "Soumis", TO_FIX: "À corriger", VALIDATED: "Validé",
+                TRANSFERRED: "Reporté dans le logiciel de gestion"}
+    EDITABLE = (DRAFT, TO_FIX)  # la famille peut encore le modifier
+    __table_args__ = (
+        db.UniqueConstraint("campaign_id", "household_id"),  # plusieurs NULL permis : les nouvelles familles
+        db.CheckConstraint("status IN ('draft', 'submitted', 'to_fix', 'validated', 'transferred')",
+                           name="ck_dossier_status"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    uuid = db.Column(db.String(36), nullable=False, unique=True, default=_uuid)
+    # Un dossier fait partie de l'historique de la campagne : elle ne se supprime pas tant qu'elle en a.
+    campaign_id = db.Column(db.ForeignKey("campaign.id", ondelete="RESTRICT"), nullable=False, index=True)
+    household_id = db.Column(db.ForeignKey("household.id", ondelete="SET NULL"), index=True)
+    account_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"), index=True)  # qui l'a rempli
+    email = db.Column(db.String(255))  # contact d'une nouvelle famille, sans compte
+    email_verified_at = db.Column(db.DateTime)
+    # Accès d'une nouvelle famille par lien envoyé par email : seule l'empreinte du jeton est gardée.
+    access_digest = db.Column(db.String(64), unique=True)
+    access_expires_at = db.Column(db.DateTime)
+    status = db.Column(db.String(12), nullable=False, default=DRAFT)
+    data = db.Column(db.JSON, nullable=False, default=dict)
+    review_note = db.Column(db.Text)  # ce que la famille doit corriger
+    submitted_at = db.Column(db.DateTime)
+    validated_at = db.Column(db.DateTime)
+    validated_by_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"))
+    transferred_at = db.Column(db.DateTime)
+    reminded_at = db.Column(db.DateTime)
+    # IBAN saisi par la famille, chiffré comme ceux de l'annuaire, mais lié au dossier (le foyer peut ne pas exister).
+    iban_ciphertext = db.Column(db.LargeBinary)
+    iban_last4 = db.Column(db.String(4))
+    iban_key_version = db.Column(db.Integer)
+
+    campaign = db.relationship("Campaign")
+    household = db.relationship("Household")
+    account = db.relationship("Account", foreign_keys=[account_id])
+    validated_by = db.relationship("Account", foreign_keys=[validated_by_id])
+
+    @property
+    def editable(self):
+        return self.status in self.EDITABLE
+
+    @property
+    def status_label(self):
+        return self.STATUSES[self.status]
+
+    def __repr__(self):
+        return f"<Dossier {self.id} {self.status}>"
+
+
+class Enrollment(TimestampMixin, db.Model):
+    """Inscription d'un élève à un cours, rattachée à son adhésion de la saison."""
+    ACTIVE = "active"
+    WITHDRAWN = "withdrawn"
+    STATUSES = {ACTIVE: "Inscrit", WITHDRAWN: "Abandon"}
+    __table_args__ = (
+        db.UniqueConstraint("membership_id", "course_id"),
+        db.CheckConstraint("status IN ('active', 'withdrawn')", name="ck_enrollment_status"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    membership_id = db.Column(db.ForeignKey("membership.id", ondelete="CASCADE"), nullable=False, index=True)
+    # Un cours qui a des élèves ne se supprime pas.
+    course_id = db.Column(db.ForeignKey("course.id", ondelete="RESTRICT"), nullable=False, index=True)
+    status = db.Column(db.String(10), nullable=False, default=ACTIVE)
+    withdrawn_on = db.Column(db.Date)
+    dossier_id = db.Column(db.ForeignKey("dossier.id", ondelete="SET NULL"), index=True)
+
+    membership = db.relationship("Membership", backref=db.backref("enrollments", cascade="all, delete-orphan",
+                                                                  passive_deletes=True))
+    course = db.relationship("Course", backref=db.backref("enrollments", passive_deletes=True))
+    dossier = db.relationship("Dossier")
+
+
+class Consent(db.Model):
+    """Consentement donné (ou refusé) pour une saison, daté, avec le texte tel qu'il était affiché."""
+    __table_args__ = (
+        db.CheckConstraint("(person_id IS NULL) <> (household_id IS NULL)", name="ck_consent_owner"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    person_id = db.Column(db.ForeignKey("person.id", ondelete="CASCADE"), index=True)
+    household_id = db.Column(db.ForeignKey("household.id", ondelete="CASCADE"), index=True)
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="RESTRICT"), nullable=False, index=True)
+    label = db.Column(db.String(120), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    granted = db.Column(db.Boolean, nullable=False)
+    given_at = db.Column(db.DateTime, nullable=False)
+    given_by_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"))
+    given_by_name = db.Column(db.String(160))  # nom de la personne qui a répondu, gardé si son compte disparaît
+    dossier_id = db.Column(db.ForeignKey("dossier.id", ondelete="SET NULL"), index=True)
+
+    person = db.relationship("Person", backref=db.backref("consents", cascade="all, delete-orphan",
+                                                          passive_deletes=True, order_by="Consent.given_at.desc()"))
+    household = db.relationship("Household", backref=db.backref("consents", cascade="all, delete-orphan",
+                                                                passive_deletes=True))
+    season = db.relationship("Season")
+    dossier = db.relationship("Dossier")
+
+
 class BankAccount(TimestampMixin, db.Model):
     """Coordonnées bancaires d'un foyer. L'IBAN est chiffré (services/bank.py) : seuls ses 4 derniers caractères
     sont en clair, et son empreinte sert à repérer un même IBAN sans rien déchiffrer."""

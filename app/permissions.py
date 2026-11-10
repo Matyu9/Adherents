@@ -27,6 +27,10 @@ PERMISSION_GROUPS = [
         ("catalog.view", "Consulter le catalogue : disciplines, niveaux, lieux et cours des saisons"),
         ("catalog.edit", "Modifier le catalogue, les disciplines des professeurs et copier une saison"),
     ]),
+    ("Inscriptions", [
+        ("registration.view", "Consulter les campagnes et les dossiers d'inscription"),
+        ("registration.manage", "Ouvrir les campagnes, valider ou renvoyer les dossiers, préparer le report"),
+    ]),
     ("Comptes", [
         ("account.manage", "Gérer les comptes : créer, inviter, couper, fermer les sessions"),
         ("group.manage", "Gérer les groupes, qui donnent accès aux applis de l'association"),
@@ -42,7 +46,8 @@ PERMISSIONS = {key: label for _, perms in PERMISSION_GROUPS for key, label in pe
 # Droits des rôles de base tant qu'ils n'ont pas été modifiés (et à la création de la base).
 DEFAULT_PERMISSIONS = {
     A: set(PERMISSIONS),
-    G: {"activity.view", "directory.view", "directory.edit", "directory.merge", "catalog.view", "catalog.edit"},
+    G: {"activity.view", "directory.view", "directory.edit", "directory.merge", "catalog.view", "catalog.edit",
+        "registration.view", "registration.manage"},
     H: set(),
 }
 

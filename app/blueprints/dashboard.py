@@ -15,4 +15,5 @@ def index():
     if can(current_user, "settings.manage"):
         open_sessions, connected = sessions.stats()
         stats = {"sessions": open_sessions, "connected": connected}
-    return render_template("dashboard/index.html", stats=stats)
+    from .enrollment import my_dossiers
+    return render_template("dashboard/index.html", stats=stats, dossiers=my_dossiers(current_user))

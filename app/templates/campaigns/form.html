@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ campaign.title if campaign else "Nouvelle campagne" }}{% endblock %}
+{% block content %}
+<article class="narrow wide-form">
+  <h1>{{ "Modifier la campagne" if campaign else "Nouvelle campagne" }}</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.season_id) }}
+    {{ field(form.title) }}<small class="muted">{{ form.title.description }}</small>
+    <div class="grid"><div>{{ field(form.opens_at) }}</div><div>{{ field(form.closes_at) }}</div></div>
+    <label class="form-check">{{ form.allow_new() }} {{ form.allow_new.label.text }}</label>
+    {{ field(form.instructions, rows=4) }}<small class="muted">{{ form.instructions.description }}</small>
+    <button type="submit">Enregistrer</button>
+  </form>
+  <p class="small"><a href="{{ url_for('campaigns.detail', campaign_id=campaign.id) if campaign else url_for('campaigns.index') }}">Annuler</a></p>
+</article>
+{% endblock %}

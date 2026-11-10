@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Dossiers · {{ campaign.title }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('campaigns.detail', campaign_id=campaign.id) }}">← {{ campaign.title }}</a></p>
+<div class="page-head">
+  <div><h1>Dossiers</h1><p class="muted">{{ items | length }} dossier{{ "s" if items | length > 1 }}{% if status %} · {{ statuses[status] | lower }}{% endif %}.</p></div>
+  <form method="get" class="inline-form">
+    <select name="statut" aria-label="Statut" data-autosubmit>
+      <option value="">Tous les statuts</option>
+      {% for key, label in statuses.items() %}<option value="{{ key }}" {{ "selected" if status == key }}>{{ label }}</option>{% endfor %}
+    </select>
+    <noscript><button type="submit" class="secondary small">Filtrer</button></noscript>
+  </form>
+</div>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Foyer</th><th>Élèves</th><th>Statut</th><th>Envoyé le</th></tr></thead>
+  <tbody>
+  {% for d in items %}
+  <tr>
+    <td data-label="Foyer"><span><a href="{{ url_for('campaigns.dossier', dossier_id=d.id) }}">{{ d.household.name if d.household else (d.data.household.name or d.email) }}</a>{% if not d.household %} <span class="badge">nouvelle famille</span>{% endif %}</span></td>
+    <td data-label="Élèves"><small>{% for s in registration.enrolled_students(d) %}{{ registration.student_name(s, d.data) }}{{ ", " if not loop.last }}{% else %}—{% endfor %}</small></td>
+    <td data-label="Statut"><span class="badge{{ ' badge-ok' if d.status in ('validated', 'transferred') }}{{ ' health-warn' if d.status == 'submitted' }}">{{ d.status_label }}</span></td>
+    <td data-label="Envoyé le"><small>{{ d.submitted_at | datetime_fr if d.submitted_at else "—" }}</small></td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">Aucun dossier.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

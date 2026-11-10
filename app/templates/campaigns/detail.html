@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import post_button, csrf %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ campaign.title }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('campaigns.index') }}">← Campagnes</a></p>
+<div class="page-head">
+  <div>
+    <h1>{{ campaign.title }}</h1>
+    <p class="muted">Saison {{ campaign.season.label }} · du {{ campaign.opens_at | datetime_fr }} au {{ campaign.closes_at | datetime_fr }}
+      {% if campaign.is_open(now) %}<span class="badge badge-ok">ouverte</span>{% elif campaign.opens_at > now %}<span class="badge">à venir</span>{% else %}<span class="badge">close</span>{% endif %}
+      {% if campaign.allow_new %}<span class="badge">nouvelles familles en ligne</span>{% endif %}</p>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('campaigns.dossiers', campaign_id=campaign.id) }}" role="button">Dossiers</a>
+    {% if can(current_user, "registration.manage") %}
+    <a href="{{ url_for('campaigns.report', campaign_id=campaign.id) }}" role="button" class="secondary">Report</a>
+    <a href="{{ url_for('campaigns.edit', campaign_id=campaign.id) }}" role="button" class="secondary">Modifier</a>
+    {% endif %}
+  </div>
+</div>
+<div class="stats">
+  {% for key, label in statuses.items() %}
+  <a class="stat card" href="{{ url_for('campaigns.dossiers', campaign_id=campaign.id, statut=key) }}"><span class="stat-value">{{ counts.get(key, 0) }}</span><span class="stat-label">{{ label }}</span></a>
+  {% endfor %}
+</div>
+{% if campaign.instructions %}<section class="card"><h2>Message aux familles</h2><p class="notes">{{ campaign.instructions }}</p></section>{% endif %}
+{% if campaign.allow_new %}<p class="small muted">Formulaire public des nouvelles familles : <code>{{ url_for('enrollment.new_family', campaign_id=campaign.id, _external=True) }}</code></p>{% endif %}
+
+<section id="consentements" class="settings-block">
+  <h2>Consentements demandés</h2>
+  <p class="muted small">Leur texte est recopié dans chaque réponse : on garde la preuve de ce qui a été accepté, même s'il change plus tard.</p>
+  {% for c in campaign.consents %}
+  <div class="card settings-block">
+    <div class="page-head">
+      <div><h3>{{ c.label }}</h3><p class="small muted">{{ c.SCOPES[c.scope] }}{{ " · obligatoire" if c.required }}</p></div>
+      {% if can(current_user, "registration.manage") %}{{ post_button(url_for('campaigns.delete_consent', consent_id=c.id), "Retirer", "link-button", "Retirer « " ~ c.label ~ " » ?") }}{% endif %}
+    </div>
+    <p class="notes">{{ c.text }}</p>
+  </div>
+  {% else %}<p class="muted">Aucun consentement demandé.</p>{% endfor %}
+  {% if can(current_user, "registration.manage") %}
+  <details class="card settings-block">
+    <summary>+ Ajouter un consentement</summary>
+    <form method="post" action="{{ url_for('campaigns.add_consent', campaign_id=campaign.id) }}" novalidate>
+      {{ consent_form.hidden_tag() }}
+      {{ field(consent_form.label, placeholder="Droit à l'image") }}
+      {{ field(consent_form.text, rows=3) }}
+      {{ field(consent_form.scope) }}
+      <label class="form-check">{{ consent_form.required() }} {{ consent_form.required.label.text }}</label>
+      <button type="submit" class="secondary">Ajouter</button>
+    </form>
+  </details>
+  {% endif %}
+</section>
+{% if can(current_user, "registration.manage") and not counts %}
+<p class="danger-zone">{{ post_button(url_for('campaigns.delete', campaign_id=campaign.id), "Supprimer la campagne", "contrast outline small", "Supprimer « " ~ campaign.title ~ " » ?") }}</p>
+{% endif %}
+{% endblock %}

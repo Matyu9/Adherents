@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ campaign.title }}{% endblock %}
+{% block content %}
+<article class="login-card">
+  <h1>{{ campaign.title }}</h1>
+  {% if not campaign.is_open() %}
+  <p>Les inscriptions en ligne {{ "ne sont pas encore ouvertes" if campaign.opens_at > now else "sont fermées" }}.</p>
+  {% elif not smtp %}
+  <p>L'inscription en ligne est momentanément indisponible : contactez le secrétariat.</p>
+  {% else %}
+  <p class="muted">Vous n'êtes pas encore adhérent(e) ? Indiquez votre adresse email : vous recevrez le lien de votre dossier d'inscription. Il vous permettra d'y revenir pendant toute la campagne.</p>
+  <p class="small muted">Déjà adhérent(e) ? <a href="{{ url_for('auth.login') }}">Connectez-vous</a> : votre dossier est pré-rempli.</p>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.email, autocomplete="email", autofocus=true) }}
+    <button type="submit" class="wide">Recevoir le lien</button>
+  </form>
+  {% endif %}
+</article>
+{% endblock %}

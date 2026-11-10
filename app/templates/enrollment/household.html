@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% from "enrollment/_step.html" import back %}
+{% block title %}Le foyer{% endblock %}
+{% block guest_class %} guest-wide{% endblock %}
+{% block content %}
+{{ back(dossier) }}
+<article class="wide-form">
+  <h1>Le foyer</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.name) }}<small class="muted">{{ form.name.description }}</small>
+    {{ field(form.address_recipient) }}
+    {{ field(form.address_street, rows=2) }}
+    <div class="grid"><div>{{ field(form.postal_code) }}</div><div>{{ field(form.city) }}</div><div>{{ field(form.country) }}</div></div>
+    {{ field(form.phone) }}
+    {% for n in (1, 2) %}
+    <h2>Responsable {{ n }}{% if n == 2 %} <small class="muted">(facultatif)</small>{% endif %}</h2>
+    <div class="grid"><div>{{ field(form["g%d_civility" % n]) }}</div><div>{{ field(form["g%d_relationship" % n]) }}</div></div>
+    <div class="grid"><div>{{ field(form["g%d_first_name" % n]) }}</div><div>{{ field(form["g%d_last_name" % n]) }}</div></div>
+    <div class="grid"><div>{{ field(form["g%d_email" % n]) }}</div><div>{{ field(form["g%d_phone" % n]) }}</div></div>
+    {% endfor %}
+    <button type="submit">Enregistrer</button>
+  </form>
+</article>
+{% endblock %}

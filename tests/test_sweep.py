@@ -23,6 +23,7 @@ DIR_VIEW, DIR_EDIT, DIR_MERGE, BANK = "directory.view", "directory.edit", "direc
 LINKING = "account.manage+directory.edit"
 TEACHERS = "teacher.manage"
 CAT_VIEW, CAT_EDIT = "catalog.view", "catalog.edit"
+REG_VIEW, REG_MANAGE, REG_IBAN = "registration.view", "registration.manage", "registration.manage+bank.view"
 ACCESS = {
     "static": PUBLIC, "auth.login": PUBLIC, "csp.report": PUBLIC, "settings.logo_file": PUBLIC,
     "auth.two_factor": PUBLIC, "auth.forgot": PUBLIC, "auth.token_link": PUBLIC,
@@ -54,6 +55,16 @@ ACCESS = {
         "swap_guardians", "seasons", "create_season", "edit_season", "set_current_season", "delete_season")},
     **{f"teachers.{name}": TEACHERS for name in ("index", "create", "detail", "edit", "remove")},
     **{f"catalog.{name}": CAT_VIEW for name in ("index", "teachers", "references")},
+    **{f"campaigns.{name}": REG_VIEW for name in ("index", "detail", "dossiers", "dossier")},
+    **{f"campaigns.{name}": REG_MANAGE for name in ("create", "edit", "delete", "add_consent", "delete_consent",
+                                                    "validate", "send_back", "mark_transferred", "report",
+                                                    "report_csv", "report_done")},
+    "campaigns.report_csv_iban": REG_IBAN,
+    "enrollment.index": LOGGED_IN, "enrollment.start": LOGGED_IN, "enrollment.my_students": LOGGED_IN,
+    # Un dossier s'ouvre par son compte ou par le lien reçu par email : un identifiant inconnu donne 404.
+    **{f"enrollment.{name}": PUBLIC for name in ("new_family", "access", "dossier", "household", "student",
+                                                 "add_student", "remove_student", "consents", "bank_details",
+                                                 "remove_bank_details", "send")},
     **{f"catalog.{name}": CAT_EDIT for name in ("create_course", "edit_course", "delete_course", "copy",
                                                 "teacher_disciplines", "create_item", "edit_item", "archive_item",
                                                 "restore_item", "delete_item")},
@@ -66,13 +77,14 @@ ACCESS = {
 }
 HOLDERS = {SETTINGS: {A}, JOURNAL: {A, G}, ADMIN_ONLY: {A}, HIDDEN: {A}, ACCOUNTS: {A}, GROUPS: {A}, CLIENTS: {A},
            DIR_VIEW: {A, G}, DIR_EDIT: {A, G}, DIR_MERGE: {A, G}, BANK: {A}, LINKING: {A}, TEACHERS: {A},
-           CAT_VIEW: {A, G}, CAT_EDIT: {A, G}}
+           CAT_VIEW: {A, G}, CAT_EDIT: {A, G}, REG_VIEW: {A, G}, REG_MANAGE: {A, G}, REG_IBAN: {A}}
 ARGUMENTS = {"filename": "css/app.css", "key": "adherent", "sid": "inconnue", "name": "absent",
              "account_id": 1, "group_id": 999, "token": "inconnu", "client_pk": 999, "person_id": 999,
              "household_id": 999, "phone_id": 999, "membership_id": 999, "season_id": 999, "mandate_id": 999,
-             "course_id": 999, "kind": "disciplines", "item_id": 999}
+             "course_id": 999, "kind": "disciplines", "item_id": 999, "campaign_id": 999, "dossier_id": 999,
+             "consent_id": 999, "uuid": "inconnu", "key": "inconnue"}
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
-SENDS_TO_LOGIN = {"auth.logout", "auth.two_factor", "auth.token_link", "oidc.end_session"}
+SENDS_TO_LOGIN = {"auth.logout", "auth.two_factor", "auth.token_link", "oidc.end_session", "enrollment.access"}
 
 
 def url_of(app, rule):
@@ -91,7 +103,7 @@ def test_every_route_is_declared(app):
 def test_every_declared_permission_exists():
     from app.permissions import PERMISSIONS
     assert {SETTINGS, JOURNAL, ACCOUNTS, GROUPS, CLIENTS, DIR_VIEW, DIR_EDIT, DIR_MERGE, BANK, TEACHERS, CAT_VIEW,
-            CAT_EDIT} <= set(PERMISSIONS)
+            CAT_EDIT, REG_VIEW, REG_MANAGE} <= set(PERMISSIONS)
 
 
 @pytest.mark.parametrize("who", [ANONYMOUS, H, G, A])
@@ -207,6 +219,26 @@ def _catalog(season, old, teacher):
                           ends_at=time(18, 30)))
     db.session.flush()
     catalog.set_disciplines(teacher, season, [discipline])
+    _registrations(season)
+
+
+def _registrations(season):
+    """Une campagne ouverte avec un consentement, le dossier de la famille Dupont et celui d'une nouvelle famille."""
+    from datetime import timedelta
+
+    from app.models import Campaign, CampaignConsent, Household
+    from app.services import registration
+
+    campaign = Campaign(season=season, title="Réinscriptions <b>", opens_at=datetime.now() - timedelta(days=1),
+                        closes_at=datetime.now() + timedelta(days=30), allow_new=True, instructions="<script>")
+    campaign.consents = [CampaignConsent(label="Image <b>", text="<i>photos</i>", scope="student"),
+                         CampaignConsent(label="Règlement <b>", text="<i>lu</i>", scope="household", required=True)]
+    db.session.add(campaign)
+    household = db.session.scalar(db.select(Household))
+    registration.dossier_for(campaign, household, None)
+    new, _ = registration.new_family_dossier(campaign, "nouvelle@famille.test")
+    new.data = {**new.data, "household": {"name": "Famille <b>Nouvelle</b>"}}
+    db.session.flush()
 
 
 INLINE = re.compile(r"""<[a-z][^>]*\son[a-z]+\s*=|<[a-z][^>]*\sstyle\s*=|<style\b|<script\b(?![^>]*\ssrc=)|href\s*=\s*["']javascript:""", re.I)
@@ -238,7 +270,8 @@ def test_crawl_every_link(app, rich, who):
         html = response.get_data(as_text=True)
         if match := INLINE.search(html):
             problems.append(f"{path} : contenu en ligne interdit par la CSP : {match.group(0)!r}")
-        if "<script>" in html or "<b>à compléter" in html or "<em>modifiée" in html or "Flûte <b>" in html:
+        if "<script>" in html or "<b>à compléter" in html or "<em>modifiée" in html or "Flûte <b>" in html \
+                or "Famille <b>Nouvelle" in html or "Image <b>" in html:
             problems.append(f"{path} : une donnée n'a pas été échappée")
         for link in LINK.findall(html):
             target = urlsplit(urljoin(path, link.replace("&amp;", "&")))
@@ -262,6 +295,9 @@ def test_crawl_every_link(app, rich, who):
     assert ("/catalogue" in seen) == (who in (A, G)) and ("/catalogue/referentiels" in seen) == (who in (A, G))
     assert any(p.startswith("/catalogue/cours/") for p in seen) == (who in (A, G))
     assert any(p.startswith("/catalogue/copier") for p in seen) == (who in (A, G))
+    assert ("/campagnes" in seen) == (who in (A, G))
+    assert any(p.startswith("/campagnes/dossiers/") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/inscription/dossier/") for p in seen) == (who == H)  # le compte d'Anne, responsable
 
 
 def test_custom_role_gets_exactly_its_rights(app, rich):

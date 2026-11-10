@@ -1,0 +1,4 @@
+{#- En-tête commun aux pages d'un dossier. -#}
+{% macro back(dossier) -%}
+<p><a href="{{ url_for('enrollment.dossier', uuid=dossier.uuid) }}">← Dossier · {{ dossier.campaign.title }}</a></p>
+{%- endmacro %}

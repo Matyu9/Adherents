@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% from "enrollment/_step.html" import back %}
+{% block title %}Engagements du foyer{% endblock %}
+{% block guest_class %} guest-wide{% endblock %}
+{% block content %}
+{{ back(dossier) }}
+<article class="wide-form">
+  <h1>Engagements du foyer</h1>
+  <form method="post">
+    {{ csrf() }}
+    {% for c in items %}
+    <fieldset class="settings-block">
+      <legend>{{ c.label }}{{ " (obligatoire)" if c.required }}</legend>
+      <p class="notes">{{ c.text }}</p>
+      <label><input type="checkbox" name="consent-{{ c.id }}" value="y"{% if dossier.data.consents.get(c.id | string) %} checked{% endif %}> J'accepte</label>
+    </fieldset>
+    {% endfor %}
+    <button type="submit">Enregistrer</button>
+  </form>
+</article>
+{% endblock %}

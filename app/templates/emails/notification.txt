@@ -1,4 +1,4 @@
-Bonjour {{ user.first_name }},
+Bonjour{{ " " ~ user.first_name if user }},
 
 {{ intro }}
 {% if url %}

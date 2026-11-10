@@ -14,6 +14,13 @@
 {% endif %}
 <section class="card">
   <h2>{{ icon("clipboard", 18) }} Inscriptions</h2>
+  {% for campaign, household, dossier in dossiers %}
+  <p>{{ campaign.title }}{% if household %} · {{ household.name }}{% endif %} :
+    {% if dossier %}<a href="{{ url_for('enrollment.dossier', uuid=dossier.uuid) }}">{{ dossier.status_label | lower }}</a>
+    {% else %}<a href="{{ url_for('enrollment.index') }}">dossier à commencer</a>{% endif %}
+    <small class="muted">jusqu'au {{ campaign.closes_at | datetime_fr }}</small></p>
+  {% else %}
   <p class="empty">Aucune campagne d'inscription ouverte pour le moment.</p>
+  {% endfor %}
 </section>
 {% endblock %}

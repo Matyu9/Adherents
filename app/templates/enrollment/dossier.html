@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import post_button, csrf %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ dossier.campaign.title }}{% endblock %}
+{% block guest_class %} guest-wide{% endblock %}
+{% block content %}
+{% set data = dossier.data %}
+{% if current_user.is_authenticated %}<p><a href="{{ url_for('enrollment.index') }}">← Inscriptions</a></p>{% endif %}
+<div class="page-head">
+  <div>
+    <h1>{{ dossier.campaign.title }}</h1>
+    <p class="muted">{{ data.household.name or "Votre foyer" }} · <span class="badge{{ ' badge-ok' if dossier.status in ('validated', 'transferred') }}">{{ dossier.status_label }}</span>
+      · jusqu'au {{ dossier.campaign.closes_at | datetime_fr }}</p>
+  </div>
+</div>
+{% if dossier.status == "to_fix" and dossier.review_note %}<p class="flash flash-warning">À corriger : {{ dossier.review_note }}</p>{% endif %}
+{% if dossier.status == "submitted" %}<p class="flash flash-info">Dossier envoyé le {{ dossier.submitted_at | datetime_fr }} : le secrétariat le vérifie. Vous serez prévenu(e) de sa validation.</p>{% endif %}
+{% if dossier.status in ("validated", "transferred") %}<p class="flash flash-success">Dossier validé : l'inscription est enregistrée.</p>{% endif %}
+{% if dossier.editable and not editable %}<p class="flash flash-error">La campagne est fermée : le dossier ne peut plus être modifié.</p>{% endif %}
+{% if dossier.campaign.instructions %}<section class="card settings-block"><p class="notes">{{ dossier.campaign.instructions }}</p></section>{% endif %}
+
+<section class="card settings-block">
+  <div class="page-head"><h2>1. Le foyer</h2>{% if editable %}<a href="{{ url_for('enrollment.household', uuid=dossier.uuid) }}" role="button" class="secondary small">Modifier</a>{% endif %}</div>
+  <dl class="props">
+    <dt>Adresse</dt><dd>{% if data.household.address_street %}{% for line in data.household.address_street.splitlines() %}{{ line }}<br>{% endfor %}{{ data.household.postal_code }} {{ data.household.city }}{% else %}<span class="muted">à compléter</span>{% endif %}</dd>
+    {% if data.household.phone %}<dt>Domicile</dt><dd>{{ data.household.phone | phone }}</dd>{% endif %}
+    {% for g in data.guardians %}
+    <dt>Responsable {{ loop.index }}</dt><dd>{{ g.first_name }} {{ g.last_name }}{% if g.relationship %} <small class="muted">({{ g.relationship }})</small>{% endif %}<br><small>{{ g.email or "" }}{% if g.phone %} · {{ g.phone | phone }}{% endif %}</small></dd>
+    {% else %}<dt>Responsables</dt><dd class="muted">à compléter</dd>{% endfor %}
+  </dl>
+</section>
+
+<section class="card settings-block">
+  <div class="page-head"><h2>2. Les élèves et leurs cours</h2></div>
+  {% for s in data.students %}
+  <div class="settings-block">
+    <div class="page-head">
+      <div><h3>{{ registration.student_name(s, data) or "Nouvel élève" }}{% if s.guardian is not none %} <small class="muted">(responsable)</small>{% endif %}</h3>
+        {% if s.enrolled %}<p class="small">{% for cid in s.courses %}{% set c = courses.get(cid) %}{% if c %}{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}{% endif %}</small>{% endif %}{% endif %}{{ " · " if not loop.last }}{% else %}<span class="error">aucun cours choisi</span>{% endfor %}</p>
+        {% else %}<p class="small muted">Ne se réinscrit pas cette saison.</p>{% endif %}</div>
+      {% if editable %}<div class="actions"><a href="{{ url_for('enrollment.student', uuid=dossier.uuid, key=s.key) }}">Modifier</a>
+        {% if not s.person_id or s.guardian is not none %}{{ post_button(url_for('enrollment.remove_student', uuid=dossier.uuid, key=s.key), "Retirer", "link-button", "Retirer cet élève du dossier ?") }}{% endif %}</div>{% endif %}
+    </div>
+  </div>
+  {% else %}<p class="muted">Aucun élève pour l'instant.</p>{% endfor %}
+  {% if editable %}
+  <form method="post" action="{{ url_for('enrollment.add_student', uuid=dossier.uuid) }}" class="inline-form">
+    {{ csrf() }}
+    <select name="qui" aria-label="Qui inscrire">
+      <option value="">Un enfant ou une autre personne du foyer</option>
+      {% for g in data.guardians %}<option value="{{ loop.index0 }}">{{ g.first_name }} {{ g.last_name }} (responsable) prend des cours</option>{% endfor %}
+    </select>
+    <button type="submit" class="secondary small">+ Ajouter un élève</button>
+  </form>
+  {% endif %}
+</section>
+
+{% set household_consents = dossier.campaign.consents | selectattr("scope", "equalto", "household") | list %}
+{% if household_consents %}
+<section class="card settings-block">
+  <div class="page-head"><h2>3. Engagements du foyer</h2>{% if editable %}<a href="{{ url_for('enrollment.consents', uuid=dossier.uuid) }}" role="button" class="secondary small">Répondre</a>{% endif %}</div>
+  <ul class="plain-list">{% for c in household_consents %}<li>{{ c.label }} : <strong>{{ "oui" if data.consents.get(c.id | string) else "non" }}</strong>{{ " (obligatoire)" if c.required }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<section class="card settings-block">
+  <div class="page-head"><h2>{{ "4" if household_consents else "3" }}. Prélèvement (facultatif)</h2>
+    {% if editable %}<div class="actions"><a href="{{ url_for('enrollment.bank_details', uuid=dossier.uuid) }}" role="button" class="secondary small">{{ "Changer" if dossier.iban_last4 else "Indiquer un IBAN" }}</a>
+      {% if dossier.iban_last4 %}{{ post_button(url_for('enrollment.remove_bank_details', uuid=dossier.uuid), "Retirer", "link-button", "Retirer ces coordonnées bancaires du dossier ?") }}{% endif %}</div>{% endif %}</div>
+  {% if dossier.iban_last4 %}<p>IBAN •••• {{ dossier.iban_last4 }} · {{ data.bank.holder_name }}</p>{% else %}<p class="muted small">Pour payer la cotisation par prélèvement. Sans IBAN, le secrétariat vous indiquera les autres moyens de paiement.</p>{% endif %}
+</section>
+
+{% if editable %}
+<section class="card settings-block">
+  <h2>Envoi</h2>
+  {% if problems %}
+  <p>Avant d'envoyer le dossier :</p>
+  <ul>{% for p in problems %}<li class="error">{{ p }}</li>{% endfor %}</ul>
+  {% else %}
+  <form method="post" action="{{ url_for('enrollment.send', uuid=dossier.uuid) }}" novalidate>
+    {{ send_form.hidden_tag() }}
+    {{ field(send_form.comment, rows=2) }}
+    <label class="form-check">{{ send_form.certify() }} {{ send_form.certify.label.text }}</label>
+    <button type="submit">Envoyer le dossier</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

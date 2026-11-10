@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Report · {{ campaign.title }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('campaigns.detail', campaign_id=campaign.id) }}">← {{ campaign.title }}</a></p>
+<h1>Report dans le logiciel de gestion</h1>
+<p class="muted">Tant que le logiciel de gestion reste la référence, chaque dossier validé y est ressaisi. Le fichier liste, dossier par dossier, ce qui a changé. Son format définitif viendra avec les exports du logiciel de gestion.</p>
+{% if items %}
+<div class="actions">
+  <a href="{{ url_for('campaigns.report_csv', campaign_id=campaign.id) }}" role="button" class="secondary">Fichier sans IBAN</a>
+  {% if with_iban %}<a href="{{ url_for('campaigns.report_csv_iban', campaign_id=campaign.id) }}" role="button" class="secondary">Fichier avec les IBAN en clair</a>{% endif %}
+</div>
+{% if with_iban %}<p class="flash flash-warning">Le fichier avec les IBAN les contient en clair sur votre ordinateur : l'appli ne peut plus le protéger. Supprimez-le (corbeille comprise) dès qu'il a été saisi.</p>{% endif %}
+<form method="post" action="{{ url_for('campaigns.report_done', campaign_id=campaign.id) }}" data-confirm="Ces dossiers ont bien été saisis dans le logiciel de gestion ?">
+  {{ csrf() }}
+  <fieldset>
+    <legend>Dossiers validés, pas encore reportés</legend>
+    {% for d in items %}<label><input type="checkbox" name="dossier" value="{{ d.id }}" checked> {{ d.household.name }} <small class="muted">validé le {{ d.validated_at | datetime_fr }}</small></label>{% endfor %}
+  </fieldset>
+  <button type="submit">Noter comme reportés</button>
+</form>
+{% else %}<p class="muted">Aucun dossier validé en attente de report.</p>{% endif %}
+{% endblock %}

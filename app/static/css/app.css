@@ -438,3 +438,4 @@ a.badge:hover { text-decoration: none; border-color: var(--brand); }
 .tabs { display: flex; flex-wrap: wrap; gap: .25rem; margin: 0 0 1rem; border-bottom: 1px solid var(--border); }
 .tabs a { padding: .45rem .8rem; color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: .92rem; }
 .tabs a[aria-current="page"] { color: var(--brand); border-bottom-color: var(--brand); font-weight: 600; }
+.guest-main.guest-wide { max-width: 46rem; }

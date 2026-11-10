@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Campagnes d'inscription{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Campagnes d'inscription</h1>
+    <p class="muted">Les familles déposent leur dossier entre l'ouverture et la clôture. L'annuaire ne change qu'à la validation de chaque dossier.</p>
+  </div>
+  {% if can(current_user, "registration.manage") %}<a href="{{ url_for('campaigns.create') }}" role="button">+ Nouvelle campagne</a>{% endif %}
+</div>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Campagne</th><th>Saison</th><th>Dates</th><th>Dossiers</th></tr></thead>
+  <tbody>
+  {% for c in campaigns %}
+  {% set n = counts.get(c.id, {}) %}
+  <tr>
+    <td data-label="Campagne"><span><a href="{{ url_for('campaigns.detail', campaign_id=c.id) }}">{{ c.title }}</a>
+      {% if c.is_open(now) %} <span class="badge badge-ok">ouverte</span>{% elif c.opens_at > now %} <span class="badge">à venir</span>{% else %} <span class="badge">close</span>{% endif %}</span></td>
+    <td data-label="Saison">{{ c.season.label }}</td>
+    <td data-label="Dates"><small>du {{ c.opens_at | datetime_fr }} au {{ c.closes_at | datetime_fr }}</small></td>
+    <td data-label="Dossiers"><small>{% for key, label in statuses.items() if n.get(key) %}<a href="{{ url_for('campaigns.dossiers', campaign_id=c.id, statut=key) }}">{{ n[key] }} {{ label | lower }}</a>{{ " · " if not loop.last }}{% else %}—{% endfor %}</small></td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">Aucune campagne pour l'instant.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

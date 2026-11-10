@@ -134,6 +134,11 @@ def renew_access(dossier):
     return raw
 
 
+def access_url(raw):
+    from flask import current_app, url_for
+    return current_app.config["BASE_URL"] + url_for("enrollment.access", token=raw)
+
+
 def find_by_access(raw):
     if not raw or len(raw) > 100:
         return None
@@ -144,10 +149,10 @@ def find_by_access(raw):
 
 
 def pending_new_dossier(campaign, email):
-    """Dossier d'une nouvelle famille déjà commencé avec cette adresse : on renvoie un lien plutôt que d'en créer un."""
+    """Dossier déjà ouvert avec cette adresse pour la campagne (même envoyé, même validé) : on renvoie un lien vers
+    lui plutôt que d'en créer un second."""
     return db.session.scalar(db.select(Dossier).where(
-        Dossier.campaign_id == campaign.id, Dossier.household_id.is_(None), Dossier.email == email.strip().lower(),
-        Dossier.status.in_(Dossier.EDITABLE)))
+        Dossier.campaign_id == campaign.id, Dossier.email == email.strip().lower()).order_by(Dossier.id.desc()).limit(1))
 
 
 # ---------------------------------------------------------------------------
@@ -511,3 +516,75 @@ def export_rows(dossiers, with_iban=False):
 def changes_at_validation(dossier):
     """Les changements tels qu'ils étaient au moment de la validation (gardés dans le dossier)."""
     return [tuple(row) for row in dossier.data.get("changes", [])] or changes(dossier)
+
+
+# ---------------------------------------------------------------------------
+# Relances
+# ---------------------------------------------------------------------------
+
+def _week(now):
+    year, week, _ = now.isocalendar()
+    return f"{year}-{week:02d}"
+
+
+def remind(now=None):
+    """Une relance par semaine aux responsables qui ont un compte, pour chaque campagne ouverte :
+    - dossier commencé mais pas envoyé, ou renvoyé « à corriger » ;
+    - foyer d'un élève de la saison précédente qui n'a pas encore ouvert son dossier.
+    Renvoie le nombre de foyers relancés."""
+    from . import notify
+    now = now or datetime.now()
+    reminded = 0
+    for campaign in open_campaigns(now):
+        previous = previous_season(campaign.season)
+        dossiers = {d.household_id: d for d in db.session.scalars(
+            db.select(Dossier).where(Dossier.campaign_id == campaign.id, Dossier.household_id.is_not(None)))}
+        households = set()
+        if previous is not None:
+            households = set(db.session.scalars(
+                db.select(Household).join(HouseholdMember).join(Person).join(Membership).where(
+                    Membership.season_id == previous.id, Membership.status == Membership.ACTIVE,
+                    Household.archived_at.is_(None))))
+        households |= {d.household for d in dossiers.values() if d.status in Dossier.EDITABLE}
+        for household in households:
+            dossier = dossiers.get(household.id)
+            if dossier is not None and not dossier.editable:
+                continue
+            accounts = [link.person.account for link in household.guardians
+                        if link.person.account is not None and link.person.account.active]
+            if not accounts:
+                continue
+            if dossier is None:
+                message = f"Les inscriptions « {campaign.title} » sont ouvertes jusqu'au {campaign.closes_at:%d/%m/%Y}."
+            elif dossier.status == Dossier.TO_FIX:
+                message = f"Votre dossier « {campaign.title} » attend vos corrections."
+            else:
+                message = f"Votre dossier « {campaign.title} » n'est pas encore envoyé."
+            # Chemins écrits à la main : les tâches périodiques tournent sans requête, donc sans url_for.
+            link = f"/inscription/dossier/{dossier.uuid}" if dossier else "/inscription"
+            if notify.notify(accounts, message, link=link,
+                             dedup_key=f"relance:{campaign.id}:{household.id}:{_week(now)}"):
+                reminded += 1
+                if dossier is not None:
+                    dossier.reminded_at = now
+    return reminded
+
+
+# ---------------------------------------------------------------------------
+# Professeurs : leurs élèves
+# ---------------------------------------------------------------------------
+
+def students_of(teacher, season):
+    """[(cours, [(élève, [responsables])])] : les élèves inscrits aux cours du professeur pendant la saison."""
+    from .catalog import sorted_courses
+    result = []
+    for course in sorted_courses(c for c in teacher.courses if c.season_id == season.id):
+        students = sorted((e.membership.person for e in course.enrollments if e.status == Enrollment.ACTIVE),
+                          key=lambda p: (fold(p.last_name), fold(p.first_name)))
+        rows = []
+        for student in students:
+            guardians = [link.person for h in student.household_links for link in h.household.guardians
+                         if h.role == HouseholdMember.DEPENDENT and link.person is not student]
+            rows.append((student, list({p.id: p for p in guardians}.values())))
+        result.append((course, rows))
+    return result

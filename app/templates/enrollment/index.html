@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import post_button %}
+{% block title %}Inscriptions{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Inscriptions</h1><p class="muted">Le dossier de votre foyer est pré-rempli : vérifiez-le, choisissez les cours, puis envoyez-le.</p></div></div>
+{% if not rows %}
+<p class="empty">{% if has_household %}Aucune campagne d'inscription ouverte pour le moment.{% else %}Votre compte n'est pas encore relié à un foyer : contactez le secrétariat pour qu'il le rattache.{% endif %}</p>
+{% endif %}
+{% for campaign, household, dossier in rows %}
+<section class="card settings-block">
+  <div class="page-head">
+    <div>
+      <h2>{{ campaign.title }}</h2>
+      <p class="muted small">{{ household.name if household else "Nouveau foyer" }} · jusqu'au {{ campaign.closes_at | datetime_fr }}</p>
+    </div>
+    {% if dossier %}
+    <div class="actions"><span class="badge{{ ' badge-ok' if dossier.status in ('validated', 'transferred') }}{{ ' health-warn' if dossier.status == 'to_fix' }}">{{ dossier.status_label }}</span>
+      <a href="{{ url_for('enrollment.dossier', uuid=dossier.uuid) }}" role="button" class="secondary">{{ "Continuer" if dossier.editable else "Voir" }}</a></div>
+    {% elif campaign.is_open() %}
+    {{ post_button(url_for('enrollment.start', campaign_id=campaign.id, household_id=household.id), "Commencer le dossier", "") }}
+    {% endif %}
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

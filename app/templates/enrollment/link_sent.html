@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Vérifiez vos emails{% endblock %}
+{% block content %}
+<article class="login-card">
+  <h1>Vérifiez vos emails</h1>
+  <p>Si l'adresse <strong>{{ email }}</strong> est valable, un lien vers votre dossier « {{ campaign.title }} » vient d'y être envoyé.</p>
+  <p class="muted small">Pas de message après quelques minutes ? Regardez dans les courriers indésirables, puis recommencez.</p>
+</article>
+{% endblock %}

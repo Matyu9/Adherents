@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import post_button %}
+{% from "partials/_form.html" import field %}
+{% block title %}Dossier{% endblock %}
+{% block content %}
+{% set data = dossier.data %}
+<p><a href="{{ url_for('campaigns.dossiers', campaign_id=dossier.campaign_id) }}">← Dossiers · {{ dossier.campaign.title }}</a></p>
+<div class="page-head">
+  <div>
+    <h1>{{ dossier.household.name if dossier.household else (data.household.name or "Nouvelle famille") }}</h1>
+    <p class="muted"><span class="badge{{ ' badge-ok' if dossier.status in ('validated', 'transferred') }}">{{ dossier.status_label }}</span>
+      {% if dossier.submitted_at %}envoyé le {{ dossier.submitted_at | datetime_fr }}{% endif %}
+      {% if dossier.validated_at %} · validé le {{ dossier.validated_at | datetime_fr }}{% if dossier.validated_by %} par {{ dossier.validated_by.full_name }}{% endif %}{% endif %}
+      {% if dossier.transferred_at %} · reporté le {{ dossier.transferred_at | datetime_fr }}{% endif %}</p>
+  </div>
+  {% if dossier.household and can(current_user, "directory.view") %}<a href="{{ url_for('directory.household', household_id=dossier.household_id) }}" role="button" class="secondary">Fiche du foyer</a>{% endif %}
+</div>
+{% if not dossier.household %}<p class="flash flash-info">Nouvelle famille ({{ dossier.email }}{{ ", adresse vérifiée" if dossier.email_verified_at }}) : la validation crée son foyer et ses fiches. Vérifiez d'abord dans l'annuaire qu'elle n'y est pas déjà.</p>{% endif %}
+{% if dossier.review_note and dossier.status in ("to_fix", "submitted") %}<p class="flash flash-warning">Dernier message à la famille : {{ dossier.review_note }}</p>{% endif %}
+{% for p in problems %}<p class="flash flash-error">{{ p }}</p>{% endfor %}
+
+<section class="card settings-block">
+  <h2>{{ "Ce que la validation a changé" if dossier.status in ("validated", "transferred") else "Ce que la validation changera dans l'annuaire" }}</h2>
+  <div class="overflow-auto"><table class="striped responsive">
+    <thead><tr><th>Fiche</th><th>Champ</th><th>Avant</th><th>Après</th></tr></thead>
+    <tbody>
+    {% for record, label, old, new in changes %}
+    <tr><td data-label="Fiche"><small>{{ record }}</small></td><td data-label="Champ">{{ label }}</td>
+      <td data-label="Avant"><small class="muted">{{ old or "—" }}</small></td><td data-label="Après"><strong>{{ new or "—" }}</strong></td></tr>
+    {% else %}<tr><td colspan="4" class="muted">Aucun changement.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="card settings-block">
+  <h2>Élèves et cours</h2>
+  {% for s in data.students %}
+  <h3>{{ registration.student_name(s, data) or "Élève" }} {% if not s.enrolled %}<span class="badge">ne se réinscrit pas</span>{% endif %}</h3>
+  {% if s.enrolled %}
+  <ul class="plain-list">
+    {% for cid in s.courses %}{% set c = courses.get(cid) %}
+    <li>{% if c %}{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}{% endif %}</small>{% endif %}
+      <small class="muted">{{ counts.get(cid, 0) }}{{ " / " ~ c.capacity if c.capacity }} inscrit(s)</small>{% if c.is_full(counts.get(cid, 0)) %} <span class="badge health-warn">complet</span>{% endif %}{% else %}<span class="error">cours retiré</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% if s.wishes %}<p class="notes">Souhaits : {{ s.wishes }}</p>{% endif %}
+  {% for consent in dossier.campaign.consents if consent.scope == "student" %}
+  <p class="small">{{ consent.label }} : <strong>{{ "oui" if s.consents.get(consent.id | string) else "non" }}</strong></p>
+  {% endfor %}
+  {% endif %}
+  {% endfor %}
+  {% for consent in dossier.campaign.consents if consent.scope == "household" %}
+  <p class="small">{{ consent.label }} : <strong>{{ "oui" if data.consents.get(consent.id | string) else "non" }}</strong></p>
+  {% endfor %}
+  {% if data.answered_by %}<p class="small muted">Réponses données par {{ data.answered_by }}{% if data.answered_at %}, le {{ data.answered_at[:10] }}{% endif %}.</p>{% endif %}
+  {% if data.comment %}<p class="notes">Message de la famille : {{ data.comment }}</p>{% endif %}
+</section>
+
+{% if can(current_user, "registration.manage") %}
+{% if dossier.status == "submitted" %}
+<section class="card settings-block">
+  <h2>Décision</h2>
+  {{ post_button(url_for('campaigns.validate', dossier_id=dossier.id), "Valider et mettre à jour l'annuaire", "", "Valider ce dossier ? L'annuaire sera modifié comme indiqué ci-dessus.") }}
+  <form method="post" action="{{ url_for('campaigns.send_back', dossier_id=dossier.id) }}" novalidate>
+    {{ return_form.hidden_tag() }}
+    {{ field(return_form.note, rows=3) }}
+    <button type="submit" class="secondary">Renvoyer à la famille</button>
+  </form>
+</section>
+{% elif dossier.status == "validated" %}
+{{ post_button(url_for('campaigns.mark_transferred', dossier_id=dossier.id), "Noter comme reporté dans le logiciel de gestion", "secondary", "Ce dossier a bien été saisi dans le logiciel de gestion ?") }}
+{% endif %}
+{% endif %}
+{% endblock %}

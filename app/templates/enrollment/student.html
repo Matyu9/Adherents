@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% from "enrollment/_step.html" import back %}
+{% block title %}{{ name }}{% endblock %}
+{% block guest_class %} guest-wide{% endblock %}
+{% block content %}
+{{ back(dossier) }}
+<article class="wide-form">
+  <h1>{{ name }}</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <label class="form-check">{{ form.enrolled() }} {{ form.enrolled.label.text }}</label>
+    {% if not is_guardian %}
+    <div class="grid"><div>{{ field(form.first_name) }}</div><div>{{ field(form.last_name) }}</div></div>
+    <div class="grid"><div>{{ field(form.birth_date) }}</div><div>{{ field(form.sex) }}</div></div>
+    {% endif %}
+    <div class="grid"><div>{{ field(form.category) }}</div><div>{{ field(form.school_level) }}</div><div>{{ field(form.school_class) }}</div></div>
+    <fieldset>
+      <legend>Cours</legend>
+      {% if form.courses.errors %}<small class="error">{{ form.courses.errors | join(" ") }}</small>{% endif %}
+      {% for c in courses %}
+      {% set disabled = c.id in full and c.id not in (student.courses or []) %}
+      <label><input type="checkbox" name="courses" value="{{ c.id }}"{% if c.id in (form.courses.data or []) %} checked{% endif %}{% if disabled %} disabled{% endif %}>
+        {{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}</small>{% endif %}
+        {% if c.teacher %} <small class="muted">avec {{ c.teacher.person.full_name }}</small>{% endif %}
+        {% if disabled %} <span class="badge">complet</span>{% endif %}</label>
+      {% else %}<p class="muted">Aucun cours n'est encore proposé pour cette saison.</p>{% endfor %}
+    </fieldset>
+    {{ field(form.wishes, rows=2) }}
+    {% for c in consents %}
+    <fieldset class="settings-block">
+      <legend>{{ c.label }}{{ " (obligatoire)" if c.required }}</legend>
+      <p class="notes">{{ c.text }}</p>
+      <label><input type="checkbox" name="consent-{{ c.id }}" value="y"{% if student.consents.get(c.id | string) %} checked{% endif %}> J'accepte</label>
+    </fieldset>
+    {% endfor %}
+    <button type="submit">Enregistrer</button>
+  </form>
+</article>
+{% endblock %}

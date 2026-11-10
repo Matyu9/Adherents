@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "catalog/_season_picker.html" import season_picker %}
+{% block title %}Mes élèves{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Mes élèves{% if season %} {{ season.label }}{% endif %}</h1>
+    <p class="muted">Les élèves inscrits à vos cours, et les responsables à contacter.</p>
+  </div>
+  {{ season_picker(seasons, season, "enrollment.my_students") }}
+</div>
+{% for course, students in rows %}
+<section class="card settings-block">
+  <h2>{{ course.title }}{% if course.weekday is not none %} <small class="muted">{{ course.weekday_name }}{% if course.starts_at %} {{ course.starts_at.strftime("%H:%M") }}-{{ course.ends_at.strftime("%H:%M") }}{% endif %}{% if course.room %} · {{ course.room.label }}{% endif %}</small>{% endif %}</h2>
+  {% if students %}
+  <div class="overflow-auto"><table class="striped responsive">
+    <thead><tr><th>Élève</th><th>Âge</th><th>Responsables</th></tr></thead>
+    <tbody>
+    {% for student, guardians in students %}
+    <tr>
+      <td data-label="Élève">{{ student.sort_name }}</td>
+      <td data-label="Âge"><small>{{ student.age() ~ " ans" if student.birth_date else "—" }}</small></td>
+      <td data-label="Responsables"><small>{% for g in guardians %}{{ g.full_name }}{% for p in g.phones[:1] %} · <a href="tel:{{ p.number }}">{{ p.number | phone }}</a>{% endfor %}{% if g.email %} · <a href="mailto:{{ g.email }}">{{ g.email }}</a>{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}{% if student.email %}<a href="mailto:{{ student.email }}">{{ student.email }}</a>{% else %}—{% endif %}{% endfor %}</small></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="muted">Aucun élève inscrit.</p>{% endif %}
+</section>
+{% else %}
+<p class="empty">Aucun cours ne vous est confié {{ "cette saison" if season else "pour l'instant" }}.</p>
+{% endfor %}
+{% endblock %}

@@ -34,6 +34,8 @@
       <p class="nav-title">Au quotidien</p>
       {{ navlink("dashboard.index", "Tableau de bord", "home") }}
       {{ navlink("notifications.index", "Notifications", "bell", ["notifications"]) }}
+      {{ navlink("enrollment.index", "Inscriptions", "clipboard") }}
+      {% if current_user.person and current_user.person.teacher %}{{ navlink("enrollment.my_students", "Mes élèves", "music") }}{% endif %}
       {% if can(current_user, "directory.view") or can(current_user, "teacher.manage") %}
       <p class="nav-title">Annuaire</p>
       {% if can(current_user, "directory.view") %}
@@ -44,10 +46,13 @@
       {% if can(current_user, "directory.edit") %}{{ navlink("directory.seasons", "Saisons", "calendar") }}{% endif %}
       {% if can(current_user, "directory.edit") and can(current_user, "account.manage") %}{{ navlink("directory.link_accounts", "Rattachement", "user-check") }}{% endif %}
       {% endif %}
-      {% if can(current_user, "catalog.view") %}
+      {% if can(current_user, "catalog.view") or can(current_user, "registration.view") %}
       <p class="nav-title">Enseignement</p>
-      {{ navlink("catalog.index", "Catalogue", "clipboard", ["catalog"]) }}
       {% endif %}
+      {% if can(current_user, "catalog.view") %}
+      {{ navlink("catalog.index", "Catalogue", "layers", ["catalog"]) }}
+      {% endif %}
+      {% if can(current_user, "registration.view") %}{{ navlink("campaigns.index", "Campagnes", "calendar", ["campaigns"]) }}{% endif %}
       {% if current_user.is_admin or can(current_user, "account.manage") or can(current_user, "group.manage") or can(current_user, "client.manage") or can(current_user, "settings.manage") or can(current_user, "activity.view") %}
       <p class="nav-title">Administration</p>
       {% if can(current_user, "account.manage") %}{{ navlink("accounts.index", "Comptes", "users", ["accounts"]) }}{% endif %}
@@ -109,7 +114,7 @@
     <button type="button" data-open-nav aria-controls="sidebar">{{ icon("menu") }}<span>Menu</span></button>
   </nav>
 {% else %}
-  <main class="guest-main">
+  <main class="guest-main{% block guest_class %}{% endblock %}">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
         <div class="flash flash-{{ category }}" role="alert">{{ message }}</div>

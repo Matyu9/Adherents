@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% from "enrollment/_step.html" import back %}
+{% block title %}Prélèvement{% endblock %}
+{% block content %}
+{{ back(dossier) }}
+<article class="narrow">
+  <h1>Prélèvement</h1>
+  <p class="muted small">Recopiez l'IBAN de votre RIB. Il est vérifié, puis chiffré : seuls ses quatre derniers chiffres s'affichent ensuite. Le mandat de prélèvement vous sera proposé par le secrétariat.</p>
+  {% if dossier.iban_last4 %}<p class="small">IBAN actuel : •••• {{ dossier.iban_last4 }}. Le nouveau le remplacera.</p>{% endif %}
+  <form method="post" novalidate autocomplete="off">
+    {{ form.hidden_tag() }}
+    {{ field(form.holder_name) }}
+    {{ field(form.iban, placeholder="FR76 …", spellcheck="false") }}
+    {{ field(form.bic) }}
+    <button type="submit">Enregistrer</button>
+  </form>
+</article>
+{% endblock %}

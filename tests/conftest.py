@@ -68,7 +68,25 @@ def stamp_head():
 # Base PostgreSQL de test (TEST_DATABASE_URL, par défaut « adherents_test » sur le socket local)
 # ---------------------------------------------------------------------------
 
-TEST_DATABASE_URL = TestConfig.SQLALCHEMY_DATABASE_URI
+
+def _worker_database(url):
+    """Avec pytest-xdist (`-n auto`), chaque processus a sa propre base, créée au besoin : `adherents_test_gw0`…
+    Sans quoi les processus videraient les tables les uns des autres."""
+    worker = os.environ.get("PYTEST_XDIST_WORKER")
+    if not worker:
+        return url
+    target = make_url(url)
+    name = f"{target.database}_{worker}"
+    admin = create_engine(target.set(database="postgres"), isolation_level="AUTOCOMMIT", poolclass=NullPool)
+    with admin.connect() as connection:
+        if not connection.execute(text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": name}).scalar():
+            connection.exec_driver_sql(f'CREATE DATABASE "{name}"')
+    admin.dispose()
+    return target.set(database=name).render_as_string(hide_password=False)
+
+
+TEST_DATABASE_URL = TestConfig.SQLALCHEMY_DATABASE_URI = _worker_database(TestConfig.SQLALCHEMY_DATABASE_URI)
+os.environ["TEST_DATABASE_URL"] = TEST_DATABASE_URL  # pour les commandes lancées dans un autre processus
 _SCHEMA_READY = []
 
 

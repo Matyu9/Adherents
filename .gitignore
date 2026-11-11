@@ -18,6 +18,9 @@ uploads/
 # Outils
 .pytest_cache/
 .hypothesis/
+.coverage
+htmlcov/
+.ruff_cache/
 .claude/
 .DS_Store
 /postgres/

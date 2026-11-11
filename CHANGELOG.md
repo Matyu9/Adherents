@@ -4,6 +4,13 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ## Non publié
 
+### Outillage
+
+- **Ruff** vérifie et met en forme tout le code (`pyproject.toml`, qui remplace aussi `pytest.ini`), avec `pre-commit` pour le lancer avant chaque commit.
+- **Intégration continue** sur GitHub Actions : Ruff, tests sous Python 3.12 et 3.14 avec PostgreSQL 18, tests dans un navigateur, failles connues des dépendances (`pip-audit`). Dependabot pour les mises à jour.
+- **Tests en parallèle** avec `pytest -m "not e2e" -n auto` (une base par processus) et couverture avec `--cov=app`.
+- **Guide d'utilisation** ([docs/guide-utilisateur.md](docs/guide-utilisateur.md)) pour les familles, les professeurs, le secrétariat et les administrateurs.
+
 ### Changé : PostgreSQL remplace SQLite
 
 - **Base PostgreSQL** (16 ou plus récent, 18 conseillé) : `DATABASE_URL`, et un service `db` dans docker-compose (mot de passe dans `POSTGRES_PASSWORD`), jamais exposé hors du réseau Docker.

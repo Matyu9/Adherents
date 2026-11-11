@@ -25,6 +25,8 @@ export FLASK_APP=wsgi.py FLASK_DEBUG=1
 ```sh
 .venv/bin/python -m pytest                 # tout
 .venv/bin/python -m pytest -m "not e2e"    # sans navigateur, plus rapide
+.venv/bin/python -m pytest -m "not e2e" -n auto             # en parallèle, un processus par cœur
+.venv/bin/python -m pytest -m "not e2e" -n auto --cov=app   # avec la couverture du code
 HYPOTHESIS_PROFILE=deep .venv/bin/python -m pytest tests/test_properties.py   # 1000 cas par propriété
 ```
 
@@ -48,9 +50,22 @@ HYPOTHESIS_PROFILE=deep .venv/bin/python -m pytest tests/test_properties.py   # 
 
 Dans les tests comme en production, un administrateur a la double authentification : `make_account` la configure et `login` saisit le code. Elle n'a pas de réglage pour la désactiver.
 
-**Base de test :** PostgreSQL, base `adherents_test` (ou `TEST_DATABASE_URL`). Le schéma est recréé au début de chaque session, puis les tables sont vidées avant et après chaque test. Les serveurs des tests de bout en bout, les migrations et les redémarrages de l'appli ont chacun une base jetable (`fresh_database()`). Les tests ne doivent donc pas tourner en parallèle sur la même base.
+**Base de test :** PostgreSQL, base `adherents_test` (ou `TEST_DATABASE_URL`). Le schéma est recréé au début de chaque session, puis les tables sont vidées avant et après chaque test. Les serveurs des tests de bout en bout, les migrations et les redémarrages de l'appli ont chacun une base jetable (`fresh_database()`). Deux lancements de `pytest` ne doivent donc pas tourner en même temps sur la même base. Avec `-n auto`, chaque processus crée et garde sa propre base (`adherents_test_gw0`, `adherents_test_gw1`…). Gardez les tests dans un navigateur en série : sous la charge d'un lancement en parallèle, leurs attentes peuvent expirer.
 
 Le client de test (`conftest.py`) oublie l'utilisateur en cache et annule toute écriture non validée après chaque requête. Sans ça, une session révoquée resterait connectée dans les tests et un `commit` oublié passerait inaperçu.
+
+## Qualité du code
+
+```sh
+.venv/bin/ruff check .        # erreurs probables, imports, tournures à simplifier
+.venv/bin/ruff format .       # mise en forme, lignes de 120 caractères
+.venv/bin/pre-commit install  # une fois : Ruff passe ensuite avant chaque commit
+.venv/bin/pip install pip-audit && .venv/bin/pip-audit -r requirements.txt   # failles connues des dépendances
+```
+
+Les règles sont dans `pyproject.toml`. Le formatage d'origine de tout le code est un commit à part, listé dans `.git-blame-ignore-revs` : `git config blame.ignoreRevsFile .git-blame-ignore-revs` le fait ignorer par `git blame`.
+
+**Intégration continue** (`.github/workflows/ci.yml`), à chaque push sur `main` et à chaque pull request : Ruff, les tests sans navigateur sous Python 3.12 (celui de l'image Docker) et 3.14, les tests dans un navigateur, et `pip-audit`. Dependabot propose les mises à jour chaque semaine.
 
 ## Essayer avec l'Inventaire en local
 

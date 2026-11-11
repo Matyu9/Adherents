@@ -3,6 +3,7 @@
 Chaque façon de fermer une session, de perdre l'accès ou de changer de groupes doit prévenir les bonnes applis, et
 seulement elles. L'envoi réseau est remplacé par un enregistreur, sauf dans les tests qui parlent à un vrai serveur.
 """
+
 import re
 import threading
 import time
@@ -55,6 +56,7 @@ AFTER = "https://appli.test/au-revoir"
 # Outils
 # ---------------------------------------------------------------------------
 
+
 class Sent:
     """Avis « envoyés » : (adresse, jeton). `failing` : motif d'échec à renvoyer, None pour réussir."""
 
@@ -106,8 +108,9 @@ def app_a(members, person):
 
 @pytest.fixture
 def app_b(members, person):
-    return with_backchannel(make_client(allowed=[members], shared=[members], name="Appli B"),
-                            uri="https://b.test/backchannel", after=())
+    return with_backchannel(
+        make_client(allowed=[members], shared=[members], name="Appli B"), uri="https://b.test/backchannel", after=()
+    )
 
 
 @pytest.fixture
@@ -125,8 +128,9 @@ def connect(http, client, scope="openid profile email groups"):
 
 
 def sid_of(http_account):
-    return db.session.scalar(db.select(LoginSession.sid).filter_by(account_id=http_account.id)
-                             .order_by(LoginSession.created_at.desc()))
+    return db.session.scalar(
+        db.select(LoginSession.sid).filter_by(account_id=http_account.id).order_by(LoginSession.created_at.desc())
+    )
 
 
 def notices():
@@ -140,6 +144,7 @@ def app_sessions():
 # ---------------------------------------------------------------------------
 # sid dans le jeton d'identité, et sessions d'appli notées
 # ---------------------------------------------------------------------------
+
 
 def test_id_token_carries_the_public_sid_of_the_browser_session(browser, app_a, person):
     claims = decode(connect(browser, app_a)["id_token"])
@@ -203,6 +208,7 @@ def test_code_issued_before_the_upgrade_still_works(browser, app_a):
 # Le jeton de déconnexion
 # ---------------------------------------------------------------------------
 
+
 def test_logout_token_follows_the_specification(browser, app_a, person, sent):
     sid = decode(connect(browser, app_a)["id_token"])["sid"]
     browser.post("/deconnexion")
@@ -228,30 +234,35 @@ def test_logout_token_without_sid_has_only_sub(app_a, person):
     assert "sid" not in token.claims and token.claims["sub"] == person.sub
 
 
-@pytest.mark.parametrize("header, extra", [({"typ": "logout+jwt"}, {}),
-                                           ({}, {"events": {logout.EVENT: {}}})])
+@pytest.mark.parametrize("header, extra", [({"typ": "logout+jwt"}, {}), ({}, {"events": {logout.EVENT: {}}})])
 def test_either_mark_of_a_logout_token_is_enough_to_refuse_it(app_a, person, header, extra):
     kid, private = oidc.active_key()
-    token = jwt.encode({"alg": "RS256", "kid": kid, **header},
-                       {"iss": "http://localhost:8001", "aud": app_a.client_id, "sub": person.sub, **extra},
-                       RSAKey.import_key(private))
+    token = jwt.encode(
+        {"alg": "RS256", "kid": kid, **header},
+        {"iss": "http://localhost:8001", "aud": app_a.client_id, "sub": person.sub, **extra},
+        RSAKey.import_key(private),
+    )
     assert oidc.hint_claims(token) is None
 
 
 def test_genuine_hint_shape_is_accepted(app_a, person):
     kid, private = oidc.active_key()
-    token = jwt.encode({"alg": "RS256", "kid": kid, "typ": "JWT"},
-                       {"iss": "http://localhost:8001", "aud": app_a.client_id, "sub": person.sub},
-                       RSAKey.import_key(private))
+    token = jwt.encode(
+        {"alg": "RS256", "kid": kid, "typ": "JWT"},
+        {"iss": "http://localhost:8001", "aud": app_a.client_id, "sub": person.sub},
+        RSAKey.import_key(private),
+    )
     assert oidc.hint_claims(token)["sub"] == person.sub
 
 
 @pytest.mark.parametrize("claims", [{"iss": "https://autre.test"}, {"sub": 42}, {"sub": None}])
 def test_hint_from_another_issuer_or_without_a_string_sub_is_refused(app_a, person, claims):
     kid, private = oidc.active_key()
-    token = jwt.encode({"alg": "RS256", "kid": kid},
-                       {"iss": "http://localhost:8001", "aud": app_a.client_id, "sub": person.sub, **claims},
-                       RSAKey.import_key(private))
+    token = jwt.encode(
+        {"alg": "RS256", "kid": kid},
+        {"iss": "http://localhost:8001", "aud": app_a.client_id, "sub": person.sub, **claims},
+        RSAKey.import_key(private),
+    )
     assert oidc.hint_claims(token) is None
 
 
@@ -266,6 +277,7 @@ def test_logout_token_is_never_accepted_as_an_id_token_hint(browser, app_a, pers
 # ---------------------------------------------------------------------------
 # Toutes les façons de fermer une session préviennent les applis
 # ---------------------------------------------------------------------------
+
 
 def test_local_logout_notifies_every_app_used_in_this_session(browser, app_a, app_b, person, sent):
     connect(browser, app_a)
@@ -314,8 +326,10 @@ def test_password_change_notifies_the_other_devices(app, browser, app_a, person,
     login(phone, person)
     theirs = decode(connect(phone, app_a)["id_token"])["sid"]
     connect(browser, app_a)
-    response = browser.post("/mot-de-passe", data={"current": PASSWORD, "new": "nouveau-mot-de-passe-1",
-                                                   "confirm": "nouveau-mot-de-passe-1"})
+    response = browser.post(
+        "/mot-de-passe",
+        data={"current": PASSWORD, "new": "nouveau-mot-de-passe-1", "confirm": "nouveau-mot-de-passe-1"},
+    )
     assert response.status_code == 302
     assert [claims["sid"] for claims in sent.claims()] == [theirs]
 
@@ -338,6 +352,7 @@ def test_cut_account_notifies_all_its_sessions_and_kills_its_tokens(app, app_a, 
 def test_totp_reset_by_an_admin_notifies_the_apps(app, app_a, members, sent):
     target = make_account(Role.GESTIONNAIRE, email="g@asso.test")
     from .conftest import enroll_totp
+
     enroll_totp(target)
     target.groups = [members]
     db.session.commit()
@@ -402,6 +417,7 @@ def test_scheduler_catches_sessions_closed_behind_its_back(browser, app_a, perso
 # ---------------------------------------------------------------------------
 # Accès perdu, groupes transmis changés
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def admin_http(app):
@@ -472,11 +488,15 @@ def test_only_the_changed_account_is_notified(app, admin_http, browser, app_a, p
 
 
 def edit_app(admin_http, client, **fields):
-    data = {"name": client.name, "redirect_uris": "\n".join(client.redirect_uris),
-            "post_logout_redirect_uris": "\n".join(client.post_logout_redirect_uris),
-            "backchannel_logout_uri": client.backchannel_logout_uri or "",
-            "allowed_groups": [g.id for g in client.allowed_groups],
-            "shared_groups": [g.id for g in client.shared_groups], **fields}
+    data = {
+        "name": client.name,
+        "redirect_uris": "\n".join(client.redirect_uris),
+        "post_logout_redirect_uris": "\n".join(client.post_logout_redirect_uris),
+        "backchannel_logout_uri": client.backchannel_logout_uri or "",
+        "allowed_groups": [g.id for g in client.allowed_groups],
+        "shared_groups": [g.id for g in client.shared_groups],
+        **fields,
+    }
     if client.first_party:
         data.setdefault("first_party", "y")
     return admin_http.post(f"/applications/{client.id}/modifier", data=data)
@@ -516,8 +536,10 @@ def test_revoking_consent_notifies_the_app(browser, members, person, sent):
     page = follow(browser, browser.get(flow.url))
     query = re.search(r'name="query" value="([^"]+)"', page.get_data(as_text=True)).group(1)
     import html as html_lib
-    location = follow(browser, browser.post("/oidc/consentement", data={"query": html_lib.unescape(query),
-                                                                          "decision": "allow"}))
+
+    location = follow(
+        browser, browser.post("/oidc/consentement", data={"query": html_lib.unescape(query), "decision": "allow"})
+    )
     assert exchange(browser, flow, code_of(location)).status_code == 200
     sent.clear()
     browser.post(f"/mon-compte/applications/{third.id}/retirer")
@@ -528,6 +550,7 @@ def test_revoking_consent_notifies_the_app(browser, members, person, sent):
 # ---------------------------------------------------------------------------
 # File d'envoi : échecs, nouveaux essais, abandon
 # ---------------------------------------------------------------------------
+
 
 def test_failed_notice_waits_in_the_queue(browser, app_a, sent):
     connect(browser, app_a)
@@ -567,8 +590,11 @@ def test_retry_delays_grow_then_stay(app_a, person, sent):
 
 def test_notice_is_abandoned_after_three_days_and_journaled(app_a, person, sent):
     created = datetime.now() - logout.GIVE_UP - timedelta(minutes=1)
-    db.session.add(OidcLogout(client_id=app_a.id, sub=person.sub, sid="s", created_at=created,
-                              next_attempt_at=created, attempts=12))
+    db.session.add(
+        OidcLogout(
+            client_id=app_a.id, sub=person.sub, sid="s", created_at=created, next_attempt_at=created, attempts=12
+        )
+    )
     db.session.commit()
     sent.failing = "réponse 500"
     assert logout.deliver_pending() == (0, 0, 1)
@@ -674,7 +700,9 @@ def test_notice_survives_the_deletion_of_the_account(app_a, person, sent):
 
 
 def test_detail_page_shows_pending_notices(admin_http, app_a, person):
-    db.session.add(OidcLogout(client_id=app_a.id, sub=person.sub, sid="s", next_attempt_at=datetime.now() + timedelta(hours=1)))
+    db.session.add(
+        OidcLogout(client_id=app_a.id, sub=person.sub, sid="s", next_attempt_at=datetime.now() + timedelta(hours=1))
+    )
     db.session.commit()
     html = admin_http.get(f"/applications/{app_a.id}").get_data(as_text=True)
     assert "1 avis de déconnexion en attente" in html and BACKCHANNEL in html and AFTER in html
@@ -682,9 +710,11 @@ def test_detail_page_shows_pending_notices(admin_http, app_a, person):
 
 def test_view_rollback_is_not_committed_by_the_delivery(app, person, sent):
     """Ce qu'une route n'a pas validé ne doit pas l'être par l'envoi qui suit la requête."""
+
     @app.route("/_essai")
     def essai():
         from flask import g
+
         person.first_name = "Modifié"
         g.oidc_logout_queued = True
         return "ok"
@@ -698,6 +728,7 @@ def test_view_rollback_is_not_committed_by_the_delivery(app, person, sent):
 # Envoi réel, vers un petit serveur local
 # ---------------------------------------------------------------------------
 
+
 class Receiver:
     """Serveur HTTP sur 127.0.0.1 qui note les avis reçus et répond le code demandé."""
 
@@ -708,7 +739,9 @@ class Receiver:
         class Handler(BaseHTTPRequestHandler):
             def do_POST(self):
                 length = int(self.headers.get("Content-Length", 0))
-                receiver.received.append((self.path, self.headers.get("Content-Type"), self.rfile.read(length).decode()))
+                receiver.received.append(
+                    (self.path, self.headers.get("Content-Type"), self.rfile.read(length).decode())
+                )
                 self.send_response(receiver.status)
                 if receiver.location:
                     self.send_header("Location", receiver.location)
@@ -742,8 +775,10 @@ def test_real_post_is_form_encoded(receiver, app_a, person):
     assert parse_qs(body) == {"logout_token": [token]}
 
 
-@pytest.mark.parametrize("status, expected", [(204, None), (202, None), (400, "réponse 400"), (404, "réponse 404"),
-                                              (500, "réponse 500"), (501, "réponse 501")])
+@pytest.mark.parametrize(
+    "status, expected",
+    [(204, None), (202, None), (400, "réponse 400"), (404, "réponse 404"), (500, "réponse 500"), (501, "réponse 501")],
+)
 def test_real_post_status_codes(receiver, status, expected):
     receiver.status = status
     assert logout.post(receiver.url, "jeton") == expected
@@ -771,6 +806,7 @@ def test_background_delivery_reaches_the_app(tmp_path, receiver):
     from app import create_app
 
     from .conftest import Client
+
     app = create_app(config_for(tmp_path, BACKCHANNEL_IN_BACKGROUND=True))
     app.test_client_class = Client
     with app.app_context():
@@ -801,6 +837,7 @@ def test_background_delivery_reaches_the_app(tmp_path, receiver):
 # ---------------------------------------------------------------------------
 # Déconnexion demandée par l'appli (end_session_endpoint)
 # ---------------------------------------------------------------------------
+
 
 def end_session(http, **params):
     return http.get("/oidc/deconnexion?" + urlencode(params))
@@ -850,8 +887,10 @@ def test_without_hint_the_person_confirms(browser, app_a, sent):
     assert browser.get("/").status_code == 200 and len(sent) == 0  # rien n'est fait avant la confirmation
     query = re.search(r'name="query" value="([^"]+)"', html).group(1)
     import html as html_lib
-    response = browser.post("/oidc/deconnexion/confirmer", data={"query": html_lib.unescape(query),
-                                                                  "decision": "logout"})
+
+    response = browser.post(
+        "/oidc/deconnexion/confirmer", data={"query": html_lib.unescape(query), "decision": "logout"}
+    )
     assert follow(browser, response) == AFTER + "?state=s1"
     assert browser.get("/").status_code == 302 and len(sent) == 1
 
@@ -896,8 +935,11 @@ def test_hint_of_an_older_session_asks_for_confirmation(app, browser, app_a, per
 
 def test_forged_hint_is_ignored(browser, app_a, person):
     key = RSAKey.generate_key(2048)
-    forged = jwt.encode({"alg": "RS256", "kid": oidc.active_key()[0]},
-                        {"iss": "http://localhost:8001", "sub": person.sub, "aud": app_a.client_id}, key)
+    forged = jwt.encode(
+        {"alg": "RS256", "kid": oidc.active_key()[0]},
+        {"iss": "http://localhost:8001", "sub": person.sub, "aud": app_a.client_id},
+        key,
+    )
     page = end_session(browser, id_token_hint=forged)
     assert page.status_code == 200 and browser.get("/").status_code == 200  # confirmation demandée
     assert end_session(browser, id_token_hint=forged, post_logout_redirect_uri=AFTER).status_code == 400
@@ -932,7 +974,9 @@ def test_return_address_of_another_app_is_refused(browser, app_a, app_b):
     app_b.post_logout_redirect_uris = ["https://b.test/bye"]
     db.session.commit()
     id_token = connect(browser, app_a)["id_token"]
-    assert end_session(browser, id_token_hint=id_token, post_logout_redirect_uri="https://b.test/bye").status_code == 400
+    assert (
+        end_session(browser, id_token_hint=id_token, post_logout_redirect_uri="https://b.test/bye").status_code == 400
+    )
 
 
 def test_closed_app_cannot_redirect(admin_http, browser, app_a):
@@ -973,6 +1017,7 @@ def test_logout_pages_are_never_cached(browser, app_a):
 
 def test_confirmation_needs_csrf(tmp_path):
     from app import create_app
+
     app = create_app(config_for(tmp_path, WTF_CSRF_ENABLED=True))
     with app.app_context():
         reset_database()
@@ -996,14 +1041,19 @@ def test_html_in_the_app_name_is_escaped(browser, members):
 # Écran Applications
 # ---------------------------------------------------------------------------
 
+
 def create_form(**fields):
     return {"name": "Inventaire", "redirect_uris": CB, **fields}
 
 
 def test_logout_addresses_are_saved(admin_http):
-    response = admin_http.post("/applications/nouvelle", data=create_form(
-        post_logout_redirect_uris=f"{AFTER}\n{AFTER}\nhttp://localhost:5000/bye",
-        backchannel_logout_uri=f"  {BACKCHANNEL}  "))
+    response = admin_http.post(
+        "/applications/nouvelle",
+        data=create_form(
+            post_logout_redirect_uris=f"{AFTER}\n{AFTER}\nhttp://localhost:5000/bye",
+            backchannel_logout_uri=f"  {BACKCHANNEL}  ",
+        ),
+    )
     assert response.status_code == 200
     client = db.session.scalar(db.select(OidcClient))
     assert client.post_logout_redirect_uris == [AFTER, "http://localhost:5000/bye"]
@@ -1016,18 +1066,21 @@ def test_logout_addresses_are_optional(admin_http):
     assert client.post_logout_redirect_uris == [] and client.backchannel_logout_uri is None
 
 
-@pytest.mark.parametrize("field, value", [
-    ("post_logout_redirect_uris", "http://appli.test/bye"),
-    ("post_logout_redirect_uris", "https://appli.test/bye#x"),
-    ("post_logout_redirect_uris", "javascript:alert(1)"),
-    ("post_logout_redirect_uris", "https://*.appli.test/"),
-    ("backchannel_logout_uri", "http://appli.test/bc"),
-    ("backchannel_logout_uri", "https://appli.test/bc#x"),
-    ("backchannel_logout_uri", "https://user:pw@appli.test/bc"),
-    ("backchannel_logout_uri", "https://a.test/bc https://b.test/bc"),
-    ("backchannel_logout_uri", "ftp://appli.test/bc"),
-    ("backchannel_logout_uri", "https://appli.test/" + "a" * 2100),
-])
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("post_logout_redirect_uris", "http://appli.test/bye"),
+        ("post_logout_redirect_uris", "https://appli.test/bye#x"),
+        ("post_logout_redirect_uris", "javascript:alert(1)"),
+        ("post_logout_redirect_uris", "https://*.appli.test/"),
+        ("backchannel_logout_uri", "http://appli.test/bc"),
+        ("backchannel_logout_uri", "https://appli.test/bc#x"),
+        ("backchannel_logout_uri", "https://user:pw@appli.test/bc"),
+        ("backchannel_logout_uri", "https://a.test/bc https://b.test/bc"),
+        ("backchannel_logout_uri", "ftp://appli.test/bc"),
+        ("backchannel_logout_uri", "https://appli.test/" + "a" * 2100),
+    ],
+)
 def test_bad_logout_addresses_are_refused(admin_http, field, value):
     response = admin_http.post("/applications/nouvelle", data=create_form(**{field: value}))
     assert response.status_code == 200 and db.session.scalar(db.select(OidcClient)) is None
@@ -1045,6 +1098,7 @@ def test_edit_keeps_and_journals_logout_addresses(admin_http, app_a):
 # ---------------------------------------------------------------------------
 # sid des sessions
 # ---------------------------------------------------------------------------
+
 
 def test_every_session_gets_a_distinct_uuid_sid(app, person):
     for _ in range(3):

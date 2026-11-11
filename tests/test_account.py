@@ -1,4 +1,5 @@
 """Mon compte : profil, affichage, appareils connectés."""
+
 import uuid
 
 import pytest
@@ -17,8 +18,10 @@ def test_profile_update_is_logged(client, member):
 
 
 def test_profile_cannot_change_role_or_email(client, member):
-    client.post("/mon-compte", data={"first_name": "A", "last_name": "B", "role": "admin", "email": "x@y.z",
-                                     "active": "0", "sub": "autre"})
+    client.post(
+        "/mon-compte",
+        data={"first_name": "A", "last_name": "B", "role": "admin", "email": "x@y.z", "active": "0", "sub": "autre"},
+    )
     account = db.session.get(Account, member.id)
     assert account.role == member.role and account.email == "adherent@asso.test" and account.active
 
@@ -58,8 +61,11 @@ def test_invalid_display_choice_is_refused(client, member, data):
 
 def test_sessions_are_listed_with_device(app, accounts):
     client = app.test_client()
-    client.post("/connexion", data={"email": "adherent@asso.test", "password": "motdepasse"},
-                headers={"User-Agent": "Mozilla/5.0 (iPhone) Safari/604.1"})
+    client.post(
+        "/connexion",
+        data={"email": "adherent@asso.test", "password": "motdepasse"},
+        headers={"User-Agent": "Mozilla/5.0 (iPhone) Safari/604.1"},
+    )
     html = client.get("/mon-compte", headers={"User-Agent": "x"}).get_data(as_text=True)
     assert "Safari · iPhone" in html and "cet appareil" in html
 
@@ -103,19 +109,24 @@ def test_session_of_someone_else_cannot_be_closed(app, accounts):
     assert db.session.get(LoginSession, theirs.id) is not None and other.get("/").status_code == 200
 
 
-@pytest.mark.parametrize("agent, label", [
-    ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit Version/17 Safari/605", "Safari · macOS"),
-    ("Mozilla/5.0 (Windows NT 10.0) Chrome/120.0 Safari/537 Edg/120.0", "Edge · Windows"),
-    ("Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko Firefox/120.0", "Firefox · Linux"),
-    ("Mozilla/5.0 (Linux; Android 14) Chrome/120.0 Mobile Safari/537", "Chrome · Android"),
-    ("", "Appareil inconnu"), (None, "Appareil inconnu"),
-])
+@pytest.mark.parametrize(
+    "agent, label",
+    [
+        ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit Version/17 Safari/605", "Safari · macOS"),
+        ("Mozilla/5.0 (Windows NT 10.0) Chrome/120.0 Safari/537 Edg/120.0", "Edge · Windows"),
+        ("Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko Firefox/120.0", "Firefox · Linux"),
+        ("Mozilla/5.0 (Linux; Android 14) Chrome/120.0 Mobile Safari/537", "Chrome · Android"),
+        ("", "Appareil inconnu"),
+        (None, "Appareil inconnu"),
+    ],
+)
 def test_device_label(agent, label):
     assert sessions.device_label(agent) == label
 
 
 def test_last_seen_is_only_written_every_few_minutes(client, member):
     from datetime import datetime, timedelta
+
     login_row = db.session.scalar(db.select(LoginSession))
     old = datetime.now() - sessions.SEEN_EVERY + timedelta(minutes=1)
     login_row.last_seen_at = old

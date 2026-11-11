@@ -2,6 +2,7 @@
 
 Les dossiers contiennent des données personnelles : le navigateur ne garde pas ces pages (Cache-Control: no-store).
 """
+
 import csv
 import io
 from datetime import datetime
@@ -41,11 +42,13 @@ def no_store(response):
 
 def _secure(view):
     """Fichier avec les IBAN en clair : mode sécurisé obligatoire (code TOTP récent), comme dans l'annuaire."""
+
     @wraps(view)
     def wrapped(*args, **kwargs):
         if guard.elevated():
             return view(*args, **kwargs)
         return redirect(url_for("directory.elevate", suite=request.full_path.rstrip("?")))
+
     return wrapped
 
 
@@ -53,16 +56,25 @@ def _secure(view):
 # Formulaires
 # ---------------------------------------------------------------------------
 
+
 class CampaignForm(FlaskForm):
     season_id = SelectField("Saison", coerce=int, validators=[DataRequired()])
-    title = StringField("Titre", validators=[DataRequired(), Length(max=120)], filters=[_strip],
-                        description="Vu par les familles : « Réinscriptions 2027-2028 ».")
+    title = StringField(
+        "Titre",
+        validators=[DataRequired(), Length(max=120)],
+        filters=[_strip],
+        description="Vu par les familles : « Réinscriptions 2027-2028 ».",
+    )
     opens_at = DateTimeLocalField("Ouverture", format="%Y-%m-%dT%H:%M", validators=[DataRequired("Date et heure.")])
     closes_at = DateTimeLocalField("Clôture", format="%Y-%m-%dT%H:%M", validators=[DataRequired("Date et heure.")])
-    allow_new = BooleanField("Accueillir aussi les nouvelles familles, par un formulaire public avec vérification "
-                             "de leur adresse email")
-    instructions = TextAreaField("Message aux familles", validators=[Optional(), Length(max=5000)],
-                                 description="Affiché en tête de chaque dossier : pièces à prévoir, dates à retenir…")
+    allow_new = BooleanField(
+        "Accueillir aussi les nouvelles familles, par un formulaire public avec vérification de leur adresse email"
+    )
+    instructions = TextAreaField(
+        "Message aux familles",
+        validators=[Optional(), Length(max=5000)],
+        description="Affiché en tête de chaque dossier : pièces à prévoir, dates à retenir…",
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -73,9 +85,14 @@ class CampaignForm(FlaskForm):
             raise ValidationError("La clôture doit suivre l'ouverture.")
 
     def values(self):
-        return {"season_id": self.season_id.data, "title": self.title.data, "opens_at": self.opens_at.data,
-                "closes_at": self.closes_at.data, "allow_new": self.allow_new.data,
-                "instructions": _blank(self.instructions.data)}
+        return {
+            "season_id": self.season_id.data,
+            "title": self.title.data,
+            "opens_at": self.opens_at.data,
+            "closes_at": self.closes_at.data,
+            "allow_new": self.allow_new.data,
+            "instructions": _blank(self.instructions.data),
+        }
 
 
 class ConsentForm(FlaskForm):
@@ -86,21 +103,26 @@ class ConsentForm(FlaskForm):
 
 
 class ReturnForm(FlaskForm):
-    note = TextAreaField("Ce que la famille doit corriger", validators=[DataRequired("Expliquez quoi corriger."),
-                                                                        Length(max=5000)])
+    note = TextAreaField(
+        "Ce que la famille doit corriger", validators=[DataRequired("Expliquez quoi corriger."), Length(max=5000)]
+    )
 
 
 # ---------------------------------------------------------------------------
 # Campagnes
 # ---------------------------------------------------------------------------
 
+
 def _campaign(campaign_id):
     return db.session.get(Campaign, campaign_id) or abort(404)
 
 
 def _counts():
-    rows = db.session.execute(db.select(Dossier.campaign_id, Dossier.status, db.func.count(Dossier.id))
-                              .group_by(Dossier.campaign_id, Dossier.status)).all()
+    rows = db.session.execute(
+        db.select(Dossier.campaign_id, Dossier.status, db.func.count(Dossier.id)).group_by(
+            Dossier.campaign_id, Dossier.status
+        )
+    ).all()
     counts = {}
     for campaign_id, status, count in rows:
         counts.setdefault(campaign_id, {})[status] = count
@@ -111,8 +133,9 @@ def _counts():
 @require("registration.view")
 def index():
     campaigns = db.session.scalars(db.select(Campaign).order_by(Campaign.opens_at.desc())).all()
-    return render_template("campaigns/index.html", campaigns=campaigns, counts=_counts(), statuses=Dossier.STATUSES,
-                           now=datetime.now())
+    return render_template(
+        "campaigns/index.html", campaigns=campaigns, counts=_counts(), statuses=Dossier.STATUSES, now=datetime.now()
+    )
 
 
 @bp.route("/nouvelle", methods=["GET", "POST"])
@@ -137,8 +160,14 @@ def create():
 @require("registration.view")
 def detail(campaign_id):
     campaign = _campaign(campaign_id)
-    return render_template("campaigns/detail.html", campaign=campaign, counts=_counts().get(campaign.id, {}),
-                           statuses=Dossier.STATUSES, consent_form=ConsentForm(), now=datetime.now())
+    return render_template(
+        "campaigns/detail.html",
+        campaign=campaign,
+        counts=_counts().get(campaign.id, {}),
+        statuses=Dossier.STATUSES,
+        consent_form=ConsentForm(),
+        now=datetime.now(),
+    )
 
 
 @bp.route("/<int:campaign_id>/modifier", methods=["GET", "POST"])
@@ -179,9 +208,15 @@ def add_consent(campaign_id):
     campaign = _campaign(campaign_id)
     form = ConsentForm()
     if form.validate_on_submit():
-        campaign.consents.append(CampaignConsent(label=form.label.data, text=form.text.data.strip(),
-                                                 scope=form.scope.data, required=form.required.data,
-                                                 position=len(campaign.consents)))
+        campaign.consents.append(
+            CampaignConsent(
+                label=form.label.data,
+                text=form.text.data.strip(),
+                scope=form.scope.data,
+                required=form.required.data,
+                position=len(campaign.consents),
+            )
+        )
         log("campaign.consent", f"Consentement « {form.label.data} » ajouté à {campaign.title}")
         db.session.commit()
         flash("Consentement ajouté.", "success")
@@ -195,8 +230,9 @@ def add_consent(campaign_id):
 def delete_consent(consent_id):
     consent = db.session.get(CampaignConsent, consent_id) or abort(404)
     campaign = consent.campaign
-    sent = db.session.scalar(db.select(Dossier.id).where(Dossier.campaign_id == campaign.id,
-                                                         Dossier.status != Dossier.DRAFT).limit(1))
+    sent = db.session.scalar(
+        db.select(Dossier.id).where(Dossier.campaign_id == campaign.id, Dossier.status != Dossier.DRAFT).limit(1)
+    )
     if sent:
         flash("Des dossiers ont déjà été envoyés avec ce consentement : il reste.", "error")
     else:
@@ -211,6 +247,7 @@ def delete_consent(consent_id):
 # Dossiers
 # ---------------------------------------------------------------------------
 
+
 @bp.route("/<int:campaign_id>/dossiers")
 @require("registration.view")
 def dossiers(campaign_id):
@@ -220,8 +257,14 @@ def dossiers(campaign_id):
     if status in Dossier.STATUSES:
         query = query.filter_by(status=status)
     items = db.session.scalars(query.order_by(Dossier.submitted_at.desc().nulls_last(), Dossier.id.desc())).all()
-    return render_template("campaigns/dossiers.html", campaign=campaign, items=items, status=status,
-                           statuses=Dossier.STATUSES, registration=registration)
+    return render_template(
+        "campaigns/dossiers.html",
+        campaign=campaign,
+        items=items,
+        status=status,
+        statuses=Dossier.STATUSES,
+        registration=registration,
+    )
 
 
 def _dossier(dossier_id):
@@ -233,11 +276,20 @@ def _dossier(dossier_id):
 def dossier(dossier_id):
     item = _dossier(dossier_id)
     courses, counts = registration.offered_courses(item.campaign)
-    return render_template("campaigns/dossier.html", dossier=item, changes=(
-        registration.changes_at_validation(item) if item.status in (Dossier.VALIDATED, Dossier.TRANSFERRED)
-        else registration.changes(item)),
+    return render_template(
+        "campaigns/dossier.html",
+        dossier=item,
+        changes=(
+            registration.changes_at_validation(item)
+            if item.status in (Dossier.VALIDATED, Dossier.TRANSFERRED)
+            else registration.changes(item)
+        ),
         problems=registration.problems(item) if item.status != Dossier.VALIDATED else [],
-        courses={c.id: c for c in courses}, counts=counts, return_form=ReturnForm(), registration=registration)
+        courses={c.id: c for c in courses},
+        counts=counts,
+        return_form=ReturnForm(),
+        registration=registration,
+    )
 
 
 def _tell_family(item, message):
@@ -247,9 +299,18 @@ def _tell_family(item, message):
         notify.notify(accounts, message, link=url_for("enrollment.dossier", uuid=item.uuid))
     elif item.email:
         from ..services import mailer
+
         if mailer.smtp_enabled():  # nouvelle famille sans compte : un nouveau lien d'accès, par email
-            mailer.send_in_background(item.email, *mailer.render(
-                None, message, message, "Ouvrir le dossier", registration.access_url(registration.renew_access(item))))
+            mailer.send_in_background(
+                item.email,
+                *mailer.render(
+                    None,
+                    message,
+                    message,
+                    "Ouvrir le dossier",
+                    registration.access_url(registration.renew_access(item)),
+                ),
+            )
 
 
 @bp.route("/dossiers/<int:dossier_id>/valider", methods=["POST"])
@@ -266,6 +327,7 @@ def validate(dossier_id):
     _tell_family(item, f"Votre dossier « {item.campaign.title} » est validé.")
     db.session.commit()
     from ..services import mailer
+
     mailer.deliver_quietly()
     for warning in warnings:
         flash(warning, "warning")
@@ -289,6 +351,7 @@ def send_back(dossier_id):
     _tell_family(item, f"Votre dossier « {item.campaign.title} » est à corriger : {item.review_note}")
     db.session.commit()
     from ..services import mailer
+
     mailer.deliver_quietly()
     flash("Dossier renvoyé à la famille, avec votre message.", "success")
     return redirect(url_for(".dossier", dossier_id=item.id))
@@ -313,9 +376,11 @@ def mark_transferred(dossier_id):
 # Report vers le logiciel de gestion
 # ---------------------------------------------------------------------------
 
+
 def _to_report(campaign):
-    return db.session.scalars(db.select(Dossier).filter_by(campaign_id=campaign.id, status=Dossier.VALIDATED)
-                              .order_by(Dossier.validated_at)).all()
+    return db.session.scalars(
+        db.select(Dossier).filter_by(campaign_id=campaign.id, status=Dossier.VALIDATED).order_by(Dossier.validated_at)
+    ).all()
 
 
 def _csv(rows, filename):
@@ -332,8 +397,9 @@ def _csv(rows, filename):
 @require("registration.manage")
 def report(campaign_id):
     campaign = _campaign(campaign_id)
-    return render_template("campaigns/report.html", campaign=campaign, items=_to_report(campaign),
-                           with_iban=can(current_user, "bank.view"))
+    return render_template(
+        "campaigns/report.html", campaign=campaign, items=_to_report(campaign), with_iban=can(current_user, "bank.view")
+    )
 
 
 @bp.route("/<int:campaign_id>/report.csv")
@@ -370,6 +436,8 @@ def report_done(campaign_id):
             done += 1
     log("dossier.transfer", f"{done} dossier(s) notés comme reportés ({campaign.title})")
     db.session.commit()
-    flash(f"{done} dossier(s) notés comme reportés. Pensez à supprimer le fichier téléchargé de votre ordinateur.",
-          "success")
+    flash(
+        f"{done} dossier(s) notés comme reportés. Pensez à supprimer le fichier téléchargé de votre ordinateur.",
+        "success",
+    )
     return redirect(url_for(".report", campaign_id=campaign.id))

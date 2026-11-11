@@ -3,6 +3,7 @@
 Un responsable du foyer ouvre le dossier depuis son compte. Une nouvelle famille, sans compte, l'ouvre par un lien
 reçu par email : le dossier est alors noté dans sa session, pour la durée du lien.
 """
+
 import uuid
 from datetime import datetime
 from functools import wraps
@@ -41,6 +42,7 @@ def _access():
 
 def _with_dossier(view):
     """Charge le dossier `uuid` si la personne peut l'ouvrir ; sinon 404, sans dire s'il existe."""
+
     @wraps(view)
     def wrapped(uuid, *args, **kwargs):
         dossier = db.session.scalar(db.select(Dossier).filter_by(uuid=uuid))
@@ -50,6 +52,7 @@ def _with_dossier(view):
             abort(404)
         g.dossier = dossier
         return view(dossier, *args, **kwargs)
+
     return wrapped
 
 
@@ -68,6 +71,7 @@ def _refuse_if_locked(dossier):
 def _data(dossier):
     """Copie de travail du JSON : on la modifie, puis `registration.save` la remet en place."""
     import copy
+
     return copy.deepcopy(dossier.data)
 
 
@@ -75,13 +79,16 @@ def _data(dossier):
 # Accueil : campagnes ouvertes et dossiers de mes foyers
 # ---------------------------------------------------------------------------
 
+
 def my_dossiers(account):
     """[(campagne, foyer, dossier ou None)] pour les campagnes ouvertes, plus les dossiers que j'ai créés."""
     rows = []
     households = registration.guarded_households(account)
     for campaign in registration.open_campaigns():
         for household in households:
-            dossier = db.session.scalar(db.select(Dossier).filter_by(campaign_id=campaign.id, household_id=household.id))
+            dossier = db.session.scalar(
+                db.select(Dossier).filter_by(campaign_id=campaign.id, household_id=household.id)
+            )
             rows.append((campaign, household, dossier))
     seen = {d.id for _, _, d in rows if d}
     mine = db.session.scalars(db.select(Dossier).where(Dossier.account_id == account.id)).all()
@@ -92,8 +99,11 @@ def my_dossiers(account):
 @bp.route("")
 @login_required
 def index():
-    return render_template("enrollment/index.html", rows=my_dossiers(current_user),
-                           has_household=bool(registration.guarded_households(current_user)))
+    return render_template(
+        "enrollment/index.html",
+        rows=my_dossiers(current_user),
+        has_household=bool(registration.guarded_households(current_user)),
+    )
 
 
 @bp.route("/<int:campaign_id>/foyer/<int:household_id>", methods=["POST"])
@@ -115,6 +125,7 @@ def start(campaign_id, household_id):
 # Nouvelles familles
 # ---------------------------------------------------------------------------
 
+
 class NewFamilyForm(FlaskForm):
     email = EmailField("Votre adresse email", validators=[DataRequired(), Length(max=255), EMAIL], filters=[_strip])
 
@@ -130,8 +141,13 @@ def new_family(campaign_id):
         keys = (f"email:{email}", f"ip:{request.remote_addr}")
         if _requests.blocked(keys):
             flash("Trop de demandes : réessayez dans une heure.", "error")
-            return render_template("enrollment/new_family.html", form=form, campaign=campaign,
-                                   smtp=mailer.smtp_enabled(), now=datetime.now()), 429
+            return render_template(
+                "enrollment/new_family.html",
+                form=form,
+                campaign=campaign,
+                smtp=mailer.smtp_enabled(),
+                now=datetime.now(),
+            ), 429
         _requests.hit(keys)
         dossier = registration.pending_new_dossier(campaign, email)
         if dossier is None:
@@ -141,15 +157,23 @@ def new_family(campaign_id):
             raw = registration.renew_access(dossier)
         db.session.commit()
         if raw:
-            mailer.send_in_background(email, *mailer.render(
-                None, f"Votre dossier d'inscription : {campaign.title}",
-                f"Voici le lien de votre dossier « {campaign.title} ». Il reste valable "
-                f"{registration.ACCESS_TTL.days} jours : gardez cet email pour revenir compléter le dossier.\n\n"
-                "Si vous n'avez rien demandé, ignorez ce message.", "Ouvrir mon dossier", registration.access_url(raw)))
+            mailer.send_in_background(
+                email,
+                *mailer.render(
+                    None,
+                    f"Votre dossier d'inscription : {campaign.title}",
+                    f"Voici le lien de votre dossier « {campaign.title} ». Il reste valable "
+                    f"{registration.ACCESS_TTL.days} jours : gardez cet email pour revenir compléter le dossier.\n\n"
+                    "Si vous n'avez rien demandé, ignorez ce message.",
+                    "Ouvrir mon dossier",
+                    registration.access_url(raw),
+                ),
+            )
         # Même réponse dans tous les cas : la page ne dit pas si un dossier existe déjà pour cette adresse.
         return render_template("enrollment/link_sent.html", email=email, campaign=campaign)
-    return render_template("enrollment/new_family.html", form=form, campaign=campaign, smtp=mailer.smtp_enabled(),
-                           now=datetime.now())
+    return render_template(
+        "enrollment/new_family.html", form=form, campaign=campaign, smtp=mailer.smtp_enabled(), now=datetime.now()
+    )
 
 
 @bp.route("/acces/<token>")
@@ -169,40 +193,63 @@ def access(token):
 # Le dossier
 # ---------------------------------------------------------------------------
 
+
 @bp.route("/dossier/<uuid>")
 @_with_dossier
 def dossier(dossier):
     courses, counts = registration.offered_courses(dossier.campaign)
-    return render_template("enrollment/dossier.html", dossier=dossier, editable=_editable(dossier),
-                           problems=registration.problems(dossier) if dossier.editable else [],
-                           courses={c.id: c for c in courses}, counts=counts, registration=registration,
-                           send_form=SendForm())
+    return render_template(
+        "enrollment/dossier.html",
+        dossier=dossier,
+        editable=_editable(dossier),
+        problems=registration.problems(dossier) if dossier.editable else [],
+        courses={c.id: c for c in courses},
+        counts=counts,
+        registration=registration,
+        send_form=SendForm(),
+    )
 
 
 def _guardian_fields(prefix, required):
     """Champs d'un responsable, préfixés g1_ ou g2_ dans HouseholdForm."""
     req = [DataRequired()] if required else [Optional()]
     return {
-        f"{prefix}civility": SelectField("Civilité", default="", coerce=_text, validate_choice=False,
-                                         choices=[("", "—"), *((c, c) for c in Person.CIVILITIES)]),
+        f"{prefix}civility": SelectField(
+            "Civilité",
+            default="",
+            coerce=_text,
+            validate_choice=False,
+            choices=[("", "—"), *((c, c) for c in Person.CIVILITIES)],
+        ),
         f"{prefix}first_name": StringField("Prénom", validators=[*req, Length(max=80)], filters=[_strip]),
         f"{prefix}last_name": StringField("Nom", validators=[*req, Length(max=80)], filters=[_strip]),
         f"{prefix}email": EmailField("Email", validators=[Optional(), Length(max=255), EMAIL], filters=[_strip]),
         f"{prefix}phone": StringField("Téléphone", validators=[Optional(), Length(max=30)]),
-        f"{prefix}relationship": StringField("Lien avec les élèves", validators=[Optional(), Length(max=40)],
-                                             filters=[_strip], description="Mère, père, tuteur, lui-même…"),
+        f"{prefix}relationship": StringField(
+            "Lien avec les élèves",
+            validators=[Optional(), Length(max=40)],
+            filters=[_strip],
+            description="Mère, père, tuteur, lui-même…",
+        ),
     }
 
 
 class HouseholdForm(FlaskForm):
-    name = StringField("Nom du foyer", validators=[DataRequired(), Length(max=120)], filters=[_strip],
-                       description="Par exemple « Famille Martin ».")
+    name = StringField(
+        "Nom du foyer",
+        validators=[DataRequired(), Length(max=120)],
+        filters=[_strip],
+        description="Par exemple « Famille Martin ».",
+    )
     address_recipient = StringField("Destinataire (s'il diffère)", validators=[Optional(), Length(max=120)])
     address_street = TextAreaField("Adresse", validators=[DataRequired(), Length(max=500)])
     postal_code = StringField("Code postal", validators=[DataRequired(), Length(max=10)])
     city = StringField("Ville", validators=[DataRequired(), Length(max=80)])
-    country = StringField("Pays (code ISO)", default="FR",
-                          validators=[DataRequired(), Regexp(r"^[A-Za-z]{2}$", message="Deux lettres : FR, BE…")])
+    country = StringField(
+        "Pays (code ISO)",
+        default="FR",
+        validators=[DataRequired(), Regexp(r"^[A-Za-z]{2}$", message="Deux lettres : FR, BE…")],
+    )
     phone = StringField("Téléphone du domicile", validators=[Optional(), Length(max=30)])
 
     def validate(self, extra_validators=None):
@@ -239,8 +286,9 @@ def household(dossier):
     form = HouseholdForm()
     if request.method == "GET":
         for f in ("name", "address_recipient", "address_street", "postal_code", "city", "country", "phone"):
-            getattr(form, f).data = data["household"].get(f) if f != "phone" else \
-                directory.display_phone(data["household"].get(f))
+            getattr(form, f).data = (
+                data["household"].get(f) if f != "phone" else directory.display_phone(data["household"].get(f))
+            )
         form.country.data = form.country.data or "FR"
         for index, g_ in enumerate(data["guardians"][:2], start=1):
             for f in ("civility", "first_name", "last_name", "email", "relationship"):
@@ -249,13 +297,17 @@ def household(dossier):
         if not data["guardians"] and dossier.email:
             form.g1_email.data = dossier.email
     if form.validate_on_submit():
-        data["household"] = {f: _blank(getattr(form, f).data) for f in
-                             ("name", "address_recipient", "address_street", "postal_code", "city", "phone")}
+        data["household"] = {
+            f: _blank(getattr(form, f).data)
+            for f in ("name", "address_recipient", "address_street", "postal_code", "city", "phone")
+        }
         data["household"]["country"] = form.country.data.upper()
         guardians = []
         for index in (1, 2):
-            values = {f: _blank(getattr(form, f"g{index}_{f}").data) for f in
-                      ("civility", "first_name", "last_name", "email", "phone", "relationship")}
+            values = {
+                f: _blank(getattr(form, f"g{index}_{f}").data)
+                for f in ("civility", "first_name", "last_name", "email", "phone", "relationship")
+            }
             if not values["first_name"]:
                 continue
             values["email"] = values["email"].lower() if values["email"] else None
@@ -278,16 +330,26 @@ class StudentForm(FlaskForm):
     first_name = StringField("Prénom", validators=[Optional(), Length(max=80)], filters=[_strip])
     last_name = StringField("Nom", validators=[Optional(), Length(max=80)], filters=[_strip])
     birth_date = DateField("Date de naissance", validators=[Optional()])
-    sex = SelectField("Sexe", default="", coerce=_text, validate_choice=False,
-                      choices=[("", "—"), *Person.SEXES.items()])
-    category = SelectField("Catégorie", default="", coerce=_text, validate_choice=False,
-                           choices=[("", "—"), ("Scolaire", "Scolaire"), ("Non scolaire", "Non scolaire"),
-                                    ("Adulte", "Adulte")])
-    school_level = StringField("Niveau scolaire", validators=[Optional(), Length(max=40)], filters=[_strip],
-                               description="Primaire, collège, lycée, études…")
+    sex = SelectField(
+        "Sexe", default="", coerce=_text, validate_choice=False, choices=[("", "—"), *Person.SEXES.items()]
+    )
+    category = SelectField(
+        "Catégorie",
+        default="",
+        coerce=_text,
+        validate_choice=False,
+        choices=[("", "—"), ("Scolaire", "Scolaire"), ("Non scolaire", "Non scolaire"), ("Adulte", "Adulte")],
+    )
+    school_level = StringField(
+        "Niveau scolaire",
+        validators=[Optional(), Length(max=40)],
+        filters=[_strip],
+        description="Primaire, collège, lycée, études…",
+    )
     school_class = StringField("Classe", validators=[Optional(), Length(max=40)], filters=[_strip])
-    courses = SelectMultipleField("Cours", coerce=int, widget=ListWidget(prefix_label=False),
-                                  option_widget=CheckboxInput(), validate_choice=False)
+    courses = SelectMultipleField(
+        "Cours", coerce=int, widget=ListWidget(prefix_label=False), option_widget=CheckboxInput(), validate_choice=False
+    )
     wishes = TextAreaField("Souhaits, contraintes d'horaire", validators=[Optional(), Length(max=2000)])
 
     def __init__(self, *args, is_guardian=False, full=(), offered=(), already=(), **kwargs):
@@ -308,8 +370,11 @@ class StudentForm(FlaskForm):
             self.courses.errors.append("Un cours choisi n'est pas proposé.")
             ok = False
         if full := chosen & self._full - self._already:
-            self.courses.errors.append("Un cours choisi est complet : choisissez-en un autre, ou indiquez votre "
-                                       "souhait plus bas." if len(full) == 1 else "Des cours choisis sont complets.")
+            self.courses.errors.append(
+                "Un cours choisi est complet : choisissez-en un autre, ou indiquez votre souhait plus bas."
+                if len(full) == 1
+                else "Des cours choisis sont complets."
+            )
             ok = False
         return ok
 
@@ -335,8 +400,9 @@ def student(dossier, student_key):
     courses, counts = registration.offered_courses(dossier.campaign)
     full = [c.id for c in courses if c.is_full(counts.get(c.id, 0))]
     is_guardian = s.get("guardian") is not None
-    form = StudentForm(is_guardian=is_guardian, full=full, offered=[c.id for c in courses],
-                       already=s.get("courses", []))
+    form = StudentForm(
+        is_guardian=is_guardian, full=full, offered=[c.id for c in courses], already=s.get("courses", [])
+    )
     form.courses.choices = [(c.id, c.title) for c in courses]
     if request.method == "GET":
         form.enrolled.data = bool(s.get("enrolled"))
@@ -357,9 +423,18 @@ def student(dossier, student_key):
         flash("Élève enregistré.", "success")
         return redirect(url_for(".dossier", uuid=dossier.uuid))
     name = registration.student_name(s, data) or "Nouvel élève"
-    return render_template("enrollment/student.html", form=form, dossier=dossier, student=s, name=name,
-                           is_guardian=is_guardian, courses=courses, counts=counts, full=set(full),
-                           consents=_student_consents(dossier))
+    return render_template(
+        "enrollment/student.html",
+        form=form,
+        dossier=dossier,
+        student=s,
+        name=name,
+        is_guardian=is_guardian,
+        courses=courses,
+        counts=counts,
+        full=set(full),
+        consents=_student_consents(dossier),
+    )
 
 
 @bp.route("/dossier/<uuid>/eleves/nouveau", methods=["POST"])
@@ -376,8 +451,11 @@ def add_student(dossier):
         guardian = data["guardians"][int(who)]
         entry = {"guardian": int(who), "person_id": guardian.get("person_id"), "category": "Adulte"}
     else:
-        entry = {"guardian": None, "person_id": None,
-                 "last_name": (data["guardians"][0].get("last_name") if data["guardians"] else None)}
+        entry = {
+            "guardian": None,
+            "person_id": None,
+            "last_name": (data["guardians"][0].get("last_name") if data["guardians"] else None),
+        }
     key = uuid.uuid4().hex[:8]
     data["students"].append({"key": key, "enrolled": True, "courses": [], "consents": {}, **entry})
     registration.save(dossier, data)
@@ -448,15 +526,21 @@ def bank_details(dossier):
         form.holder_name.data = dossier.data.get("bank", {}).get("holder_name")
     if form.validate_on_submit():
         if not bank.enabled():
-            flash("Les coordonnées bancaires ne peuvent pas être enregistrées pour le moment : contactez le "
-                  "secrétariat.", "error")
+            flash(
+                "Les coordonnées bancaires ne peuvent pas être enregistrées pour le moment : contactez le secrétariat.",
+                "error",
+            )
             return redirect(url_for(".dossier", uuid=dossier.uuid))
         data = _data(dossier)
         data["bank"] = {"holder_name": form.holder_name.data, "bic": form.bic.data}
         registration.save(dossier, data)
         bank.set_dossier_iban(dossier, form.iban.data)
-        log("dossier.iban", "IBAN saisi dans un dossier d'inscription", user=current_user if current_user.is_authenticated
-            else None, household=dossier.household)
+        log(
+            "dossier.iban",
+            "IBAN saisi dans un dossier d'inscription",
+            user=current_user if current_user.is_authenticated else None,
+            household=dossier.household,
+        )
         db.session.commit()
         flash(f"Coordonnées bancaires enregistrées (•••• {dossier.iban_last4}).", "success")
         return redirect(url_for(".dossier", uuid=dossier.uuid))
@@ -479,8 +563,10 @@ def remove_bank_details(dossier):
 
 class SendForm(FlaskForm):
     comment = TextAreaField("Un message pour le secrétariat (facultatif)", validators=[Optional(), Length(max=2000)])
-    certify = BooleanField("Je certifie l'exactitude de ces informations",
-                           validators=[DataRequired("Cochez cette case pour envoyer le dossier.")])
+    certify = BooleanField(
+        "Je certifie l'exactitude de ces informations",
+        validators=[DataRequired("Cochez cette case pour envoyer le dossier.")],
+    )
 
 
 @bp.route("/dossier/<uuid>/envoyer", methods=["POST"])
@@ -496,8 +582,11 @@ def send(dossier):
     data["comment"] = _blank(form.comment.data)
     data["answered_at"] = datetime.now().isoformat(timespec="seconds")
     guardian = data["guardians"][0] if data["guardians"] else {}
-    data["answered_by"] = current_user.full_name if current_user.is_authenticated else \
-        f"{guardian.get('first_name') or ''} {guardian.get('last_name') or ''}".strip() or dossier.email
+    data["answered_by"] = (
+        current_user.full_name
+        if current_user.is_authenticated
+        else f"{guardian.get('first_name') or ''} {guardian.get('last_name') or ''}".strip() or dossier.email
+    )
     registration.save(dossier, data)
     try:
         registration.submit(dossier, current_user)
@@ -505,8 +594,12 @@ def send(dossier):
         db.session.rollback()
         flash(str(exc), "error")
         return redirect(url_for(".dossier", uuid=dossier.uuid))
-    log("dossier.submit", f"Dossier envoyé ({dossier.campaign.title})",
-        user=current_user if current_user.is_authenticated else None, household=dossier.household)
+    log(
+        "dossier.submit",
+        f"Dossier envoyé ({dossier.campaign.title})",
+        user=current_user if current_user.is_authenticated else None,
+        household=dossier.household,
+    )
     db.session.commit()
     flash("Dossier envoyé. Le secrétariat va le vérifier ; vous serez prévenu(e) de sa validation.", "success")
     return redirect(url_for(".dossier", uuid=dossier.uuid))
@@ -515,6 +608,7 @@ def send(dossier):
 # ---------------------------------------------------------------------------
 # Professeurs : mes élèves
 # ---------------------------------------------------------------------------
+
 
 def teacher_of(account):
     person = getattr(account, "person", None)
@@ -528,6 +622,7 @@ def my_students():
     from flask import g as flask_g
 
     from ..services import guard
+
     teacher = teacher_of(current_user)
     if teacher is None:
         abort(404)
@@ -535,7 +630,10 @@ def my_students():
     guard.count_read()
     seasons = directory.seasons()
     wanted = request.args.get("saison", type=int)
-    season = next((s for s in seasons if s.id == wanted), None) or directory.current_season() or \
-        (seasons[0] if seasons else None)
+    season = (
+        next((s for s in seasons if s.id == wanted), None)
+        or directory.current_season()
+        or (seasons[0] if seasons else None)
+    )
     rows = registration.students_of(teacher, season) if season else []
     return render_template("enrollment/my_students.html", season=season, seasons=seasons, rows=rows)

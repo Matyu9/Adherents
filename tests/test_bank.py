@@ -1,4 +1,5 @@
 """Coordonnées bancaires : chiffrement des IBAN, clés, lecture en clair, mandats."""
+
 import base64
 import re
 from datetime import date
@@ -37,13 +38,16 @@ def bank_account(home, iban=IBAN, holder="Anne Martin"):
 # IBAN, BIC et clés
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("text", [IBAN, "fr76 3000 6000 0112 3456 7890 189", " FR76-3000-6000-0112-3456-7890-189 "])
 def test_iban_is_normalized(text):
     assert bank.normalize_iban(text) == IBAN
 
 
-@pytest.mark.parametrize("text", ["", "FR7630006000011234567890188", "FR763000600001123456789018", "1234",
-                                  "FR76300060000112345678901899", "XX00"])
+@pytest.mark.parametrize(
+    "text",
+    ["", "FR7630006000011234567890188", "FR763000600001123456789018", "1234", "FR76300060000112345678901899", "XX00"],
+)
 def test_invalid_iban_is_refused(text):
     with pytest.raises(bank.InvalidIban):
         bank.normalize_iban(text)
@@ -66,8 +70,17 @@ def test_iban_is_grouped_by_four():
     assert bank.group(IBAN) == "FR76 3000 6000 0112 3456 7890 189"
 
 
-@pytest.mark.parametrize("text", ["clé", "1-abc", "0:" + "A" * 43, "1:" + base64.urlsafe_b64encode(b"x" * 16).decode(),
-                                  KEY_1 + "," + KEY_1, "1:!!!"])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "clé",
+        "1-abc",
+        "0:" + "A" * 43,
+        "1:" + base64.urlsafe_b64encode(b"x" * 16).decode(),
+        KEY_1 + "," + KEY_1,
+        "1:!!!",
+    ],
+)
 def test_malformed_keys_are_refused(text):
     with pytest.raises(bank.BankKeyError):
         bank.parse_keys(text)
@@ -82,6 +95,7 @@ def test_several_keys_and_the_highest_encrypts():
 # ---------------------------------------------------------------------------
 # Chiffrement
 # ---------------------------------------------------------------------------
+
 
 def test_round_trip_shows_only_the_last_four(app):
     account = bank_account(household())
@@ -206,6 +220,7 @@ def test_app_refuses_a_malformed_key(tmp_path):
 # Écrans
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def home(app):
     record = household()
@@ -227,9 +242,10 @@ def secure(client, admin):
 
 
 def test_adding_an_iban_keeps_it_out_of_the_journal(client, secure, home):
-    response = client.post(f"/annuaire/foyers/{home.id}/banque/nouveau",
-                           data={"holder_person_id": 0, "holder_name": "Anne Martin", "iban": bank.group(IBAN),
-                                 "bic": "agrifrpp882"})
+    response = client.post(
+        f"/annuaire/foyers/{home.id}/banque/nouveau",
+        data={"holder_person_id": 0, "holder_name": "Anne Martin", "iban": bank.group(IBAN), "bic": "agrifrpp882"},
+    )
     assert response.status_code == 302
     account = db.session.scalar(db.select(BankAccount))
     assert bank.reveal(account) == IBAN and account.bic == "AGRIFRPP882"
@@ -241,16 +257,21 @@ def test_adding_an_iban_keeps_it_out_of_the_journal(client, secure, home):
 
 
 def test_invalid_iban_is_explained(client, secure, home):
-    response = client.post(f"/annuaire/foyers/{home.id}/banque/nouveau",
-                           data={"holder_person_id": 0, "holder_name": "A", "iban": "FR7630006000011234567890188"})
+    response = client.post(
+        f"/annuaire/foyers/{home.id}/banque/nouveau",
+        data={"holder_person_id": 0, "holder_name": "A", "iban": "FR7630006000011234567890188"},
+    )
     assert response.status_code == 200 and "clé de contrôle" in response.get_data(as_text=True)
     assert db.session.scalar(db.select(db.func.count(BankAccount.id))) == 0
 
 
 def test_same_iban_on_two_households_is_flagged(client, secure, home):
     bank_account(household("Famille Durand"))
-    response = client.post(f"/annuaire/foyers/{home.id}/banque/nouveau",
-                           data={"holder_person_id": 0, "holder_name": "A", "iban": IBAN}, follow_redirects=True)
+    response = client.post(
+        f"/annuaire/foyers/{home.id}/banque/nouveau",
+        data={"holder_person_id": 0, "holder_name": "A", "iban": IBAN},
+        follow_redirects=True,
+    )
     assert "déjà enregistré pour le foyer Famille Durand" in response.get_data(as_text=True)
 
 
@@ -264,19 +285,26 @@ def test_without_key_the_form_is_not_offered(client, secure, home, app):
 # Mode sécurisé
 # ---------------------------------------------------------------------------
 
+
 def test_every_bank_operation_needs_the_secure_mode(client, admin, home):
     account = bank_account(home)
     mandate = SepaMandate(bank_account=account, rum="R1", signed_on=date(2026, 9, 1))
     db.session.add(mandate)
     db.session.commit()
-    for url in (f"/annuaire/banque/{account.id}/afficher", f"/annuaire/foyers/{home.id}/banque/nouveau",
-                f"/annuaire/banque/{account.id}/mandats/nouveau", f"/annuaire/mandats/{mandate.id}/modifier"):
+    for url in (
+        f"/annuaire/banque/{account.id}/afficher",
+        f"/annuaire/foyers/{home.id}/banque/nouveau",
+        f"/annuaire/banque/{account.id}/mandats/nouveau",
+        f"/annuaire/mandats/{mandate.id}/modifier",
+    ):
         response = client.get(url)
         assert response.status_code == 302 and "/annuaire/mode-securise?suite=" in response.location, url
         assert IBAN not in response.get_data(as_text=True)
-    for url, data in ((f"/annuaire/banque/{account.id}/supprimer", {}),
-                      (f"/annuaire/foyers/{home.id}/banque/nouveau", {"holder_name": "X", "iban": OTHER_IBAN}),
-                      (f"/annuaire/mandats/{mandate.id}/modifier", {"rum": "R1", "signed_on": "2027-01-01"})):
+    for url, data in (
+        (f"/annuaire/banque/{account.id}/supprimer", {}),
+        (f"/annuaire/foyers/{home.id}/banque/nouveau", {"holder_name": "X", "iban": OTHER_IBAN}),
+        (f"/annuaire/mandats/{mandate.id}/modifier", {"rum": "R1", "signed_on": "2027-01-01"}),
+    ):
         assert "/annuaire/mode-securise" in client.post(url, data=data).location
     assert db.session.scalar(db.select(db.func.count(BankAccount.id))) == 1
     assert db.session.get(SepaMandate, mandate.id).signed_on == date(2026, 9, 1)
@@ -320,6 +348,7 @@ def test_a_used_code_cannot_open_the_secure_mode_twice(client, admin, home):
 def test_secure_mode_stays_with_its_session(app, admin, home):
     """Une autre session du même compte n'en hérite pas, même avec une copie du cookie de session Flask."""
     from .conftest import Client
+
     account = bank_account(home)
     first = app.test_client()
     login(first, admin)
@@ -377,10 +406,14 @@ def test_mandate_and_deletion(client, secure, home):
     client.post(f"/annuaire/banque/{account.id}/mandats/nouveau", data={"rum": rum, "signed_on": "2026-09-01"})
     mandate = db.session.scalar(db.select(SepaMandate))
     assert mandate.rum == rum and mandate.signed_on == date(2026, 9, 1)
-    duplicate = client.post(f"/annuaire/banque/{account.id}/mandats/nouveau", data={"rum": rum, "signed_on": "2026-09-01"})
+    duplicate = client.post(
+        f"/annuaire/banque/{account.id}/mandats/nouveau", data={"rum": rum, "signed_on": "2026-09-01"}
+    )
     assert "Cette référence est déjà" in duplicate.get_data(as_text=True)
-    client.post(f"/annuaire/mandats/{mandate.id}/modifier", data={"rum": rum, "signed_on": "2026-09-01",
-                                                                  "revoked_on": "2026-10-01"})
+    client.post(
+        f"/annuaire/mandats/{mandate.id}/modifier",
+        data={"rum": rum, "signed_on": "2026-09-01", "revoked_on": "2026-10-01"},
+    )
     assert db.session.get(SepaMandate, mandate.id).revoked_on == date(2026, 10, 1)
     client.post(f"/annuaire/banque/{account.id}/supprimer")
     assert db.session.scalar(db.select(db.func.count(SepaMandate.id))) == 0
@@ -390,12 +423,14 @@ def test_mandate_and_deletion(client, secure, home):
 def test_expired_mandates_are_purged_with_their_last_bank_account(app):
     home = household()
     expired, recent, waiting, mixed = (bank_account(home, holder=name) for name in ("A", "B", "C", "D"))
-    db.session.add_all([
-        SepaMandate(bank_account=expired, rum="R1", signed_on=date(2023, 1, 1), last_debit_on=date(2025, 9, 30)),
-        SepaMandate(bank_account=recent, rum="R2", signed_on=date(2023, 1, 1), last_debit_on=date(2025, 10, 10)),
-        SepaMandate(bank_account=mixed, rum="R3", signed_on=date(2023, 1, 1), last_debit_on=date(2024, 1, 1)),
-        SepaMandate(bank_account=mixed, rum="R4", signed_on=date(2024, 2, 1)),
-    ])
+    db.session.add_all(
+        [
+            SepaMandate(bank_account=expired, rum="R1", signed_on=date(2023, 1, 1), last_debit_on=date(2025, 9, 30)),
+            SepaMandate(bank_account=recent, rum="R2", signed_on=date(2023, 1, 1), last_debit_on=date(2025, 10, 10)),
+            SepaMandate(bank_account=mixed, rum="R3", signed_on=date(2023, 1, 1), last_debit_on=date(2024, 1, 1)),
+            SepaMandate(bank_account=mixed, rum="R4", signed_on=date(2024, 2, 1)),
+        ]
+    )
     db.session.commit()
     assert bank.purge_expired_mandates(date(2026, 11, 9)) == (2, 1)
     db.session.commit()

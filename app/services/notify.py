@@ -1,4 +1,5 @@
 """Notifications dans l'appli (et par email quand le SMTP est configuré, cf. mailer.py)."""
+
 from flask_login import current_user
 
 from ..extensions import db
@@ -26,5 +27,8 @@ def unread_count():
     """Pastille de la cloche, pour le compte connecté."""
     if not current_user.is_authenticated:
         return 0
-    return db.session.scalar(db.select(db.func.count(Notification.id)).where(
-        Notification.account_id == current_user.id, Notification.read.is_(False)))
+    return db.session.scalar(
+        db.select(db.func.count(Notification.id)).where(
+            Notification.account_id == current_user.id, Notification.read.is_(False)
+        )
+    )

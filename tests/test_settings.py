@@ -1,4 +1,5 @@
 """Paramètres : personnalisation, logo, email de test, tâches, déconnexion générale."""
+
 import io
 import re
 from pathlib import Path
@@ -21,8 +22,9 @@ def png(size=(600, 300), mode="RGBA", fmt="PNG"):
 
 
 def upload(client, stream, name="logo.png"):
-    return client.post("/parametres/logo", data={"logo": (stream, name)}, content_type="multipart/form-data",
-                       follow_redirects=True)
+    return client.post(
+        "/parametres/logo", data={"logo": (stream, name)}, content_type="multipart/form-data", follow_redirects=True
+    )
 
 
 def logo_setting():
@@ -36,7 +38,9 @@ def test_defaults(client, admin, app):
 
 
 def test_save_branding_everywhere(client, admin):
-    response = client.post("/parametres/apparence", data={"name": " Harmonie ", "subtitle": "Les adhérents", "palette": "vert"})
+    response = client.post(
+        "/parametres/apparence", data={"name": " Harmonie ", "subtitle": "Les adhérents", "palette": "vert"}
+    )
     assert response.status_code == 302
     html = client.get("/").get_data(as_text=True)
     assert "Harmonie" in html and "Les adhérents" in html and 'data-palette="vert"' in html
@@ -56,8 +60,14 @@ def test_empty_values_go_back_to_defaults(client, admin):
     assert branding.DEFAULT_SUBTITLE in client.get("/").get_data(as_text=True)
 
 
-@pytest.mark.parametrize("data", [{"name": "x", "palette": "fluo"}, {"name": "x" * 81, "palette": "vert"},
-                                  {"name": "x", "subtitle": "y" * 61, "palette": "vert"}])
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"name": "x", "palette": "fluo"},
+        {"name": "x" * 81, "palette": "vert"},
+        {"name": "x", "subtitle": "y" * 61, "palette": "vert"},
+    ],
+)
 def test_invalid_branding_is_refused(client, admin, data):
     assert client.post("/parametres/apparence", data=data).status_code == 200
     assert db.session.get(AppSetting, "name") is None
@@ -125,15 +135,18 @@ def test_no_file_is_a_warning(client, admin):
     assert "Choisissez une image" in html
 
 
-@pytest.mark.parametrize("name", ["..%2F..%2Fadherents.db", "absent.png", "a" * 32 + ".png", "A" * 32 + ".PNG", "x.svg"])
+@pytest.mark.parametrize(
+    "name", ["..%2F..%2Fadherents.db", "absent.png", "a" * 32 + ".png", "A" * 32 + ".PNG", "x.svg"]
+)
 def test_logo_route_serves_nothing_else(client, name):
     assert client.get(f"/logo/{name}").status_code == 404
 
 
 def test_upload_too_large_is_a_clean_error(app, client, admin):
     app.config["MAX_CONTENT_LENGTH"] = 100
-    response = client.post("/parametres/logo", data={"logo": (io.BytesIO(b"x" * 1000), "l.png")},
-                           content_type="multipart/form-data")
+    response = client.post(
+        "/parametres/logo", data={"logo": (io.BytesIO(b"x" * 1000), "l.png")}, content_type="multipart/form-data"
+    )
     assert response.status_code == 413 and "volumineux" in response.get_data(as_text=True)
 
 

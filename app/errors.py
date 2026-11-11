@@ -1,5 +1,5 @@
-
 """Pages d'erreur : une seule mise en page, un message en français adapté à chaque code."""
+
 import contextlib
 import uuid
 from urllib.parse import urlsplit
@@ -19,13 +19,20 @@ MESSAGES = {
     400: ("alert", "Requête invalide", "La demande envoyée n'a pas pu être comprise. Revenez en arrière et réessayez."),
     403: ("key", "Accès refusé", "Vous n'avez pas les droits nécessaires pour cette action."),
     404: ("search", "Page introuvable", "Cette page n'existe pas ou a été supprimée."),
-    405: ("alert", "Action impossible", "Cette adresse ne s'utilise pas de cette façon : passez par les boutons de l'appli."),
+    405: (
+        "alert",
+        "Action impossible",
+        "Cette adresse ne s'utilise pas de cette façon : passez par les boutons de l'appli.",
+    ),
     413: ("image", "Fichier trop volumineux", "Le fichier envoyé dépasse {max_mb} Mo. Réduisez-le puis réessayez."),
     429: ("clock", "Trop de tentatives", "Patientez quelques minutes avant de réessayer."),
 }
 DEFAULT = ("alert", "Demande impossible", "La demande n'a pas pu aboutir. Revenez en arrière et réessayez.")
-CSRF_EXPIRED = ("clock", "Page expirée", "Par sécurité, le formulaire a expiré et rien n'a été enregistré. "
-                                         "Rechargez la page puis recommencez.")
+CSRF_EXPIRED = (
+    "clock",
+    "Page expirée",
+    "Par sécurité, le formulaire a expiré et rien n'a été enregistré. Rechargez la page puis recommencez.",
+)
 
 
 def _back_url():
@@ -39,8 +46,9 @@ def _back_url():
 
 def _page(code, icon, title, message):
     message = message.format(max_mb=(current_app.config.get("MAX_CONTENT_LENGTH") or 0) // (1024 * 1024))
-    return render_template("errors/error.html", code=code, icon_name=icon, title=title, message=message,
-                           back=_back_url()), code
+    return render_template(
+        "errors/error.html", code=code, icon_name=icon, title=title, message=message, back=_back_url()
+    ), code
 
 
 def _is_api():

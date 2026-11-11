@@ -1,4 +1,5 @@
 """Groupes de comptes. La clé est fixée à la création : les applis clientes s'y fieront."""
+
 from flask import Blueprint, abort, flash, redirect, render_template, url_for
 from flask_wtf import FlaskForm
 from wtforms import StringField
@@ -36,8 +37,12 @@ def _apply(form, group):
 @bp.route("")
 @require("group.manage")
 def index():
-    return render_template("groups/index.html", groups=groups.all_groups(), counts=groups.member_counts(),
-                           roles_of={g.id: groups.roles_using(g) for g in groups.all_groups()})
+    return render_template(
+        "groups/index.html",
+        groups=groups.all_groups(),
+        counts=groups.member_counts(),
+        roles_of={g.id: groups.roles_using(g) for g in groups.all_groups()},
+    )
 
 
 @bp.route("/nouveau", methods=["GET", "POST"])
@@ -80,8 +85,9 @@ def delete(group_id):
     elif used_by:
         flash(f"Ce groupe est utilisé par {', '.join(c.name for c in used_by)} : retirez-le d'abord.", "error")
     elif roles_using:
-        flash(f"Ce groupe est donné par le rôle {', '.join(r.name for r in roles_using)} : retirez-le d'abord.",
-              "error")
+        flash(
+            f"Ce groupe est donné par le rôle {', '.join(r.name for r in roles_using)} : retirez-le d'abord.", "error"
+        )
     else:
         db.session.delete(group)
         log("group.delete", f"Groupe supprimé : {group.name}")

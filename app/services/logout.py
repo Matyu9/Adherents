@@ -8,6 +8,7 @@ qu'une appli injoignable n'a pas reçus.
 Les fonctions qui modifient la file ne font pas de commit, comme les autres services. `deliver_pending` en fait :
 elle valide chaque avis à part, pour ne jamais garder la base verrouillée pendant un appel réseau.
 """
+
 import logging
 import secrets
 import threading
@@ -33,8 +34,14 @@ TIMEOUT = 5
 # Un avis en cours d'envoi est réservé : un autre worker ne l'envoie pas en même temps.
 LEASE = timedelta(minutes=2)
 # Délais entre deux essais, puis le dernier se répète. Le scheduler passe toutes les 15 minutes.
-RETRY_DELAYS = (timedelta(minutes=1), timedelta(minutes=5), timedelta(minutes=15), timedelta(hours=1),
-                timedelta(hours=3), timedelta(hours=6))
+RETRY_DELAYS = (
+    timedelta(minutes=1),
+    timedelta(minutes=5),
+    timedelta(minutes=15),
+    timedelta(hours=1),
+    timedelta(hours=3),
+    timedelta(hours=6),
+)
 # Au-delà, l'avis est abandonné et noté au journal : l'appli a été injoignable trop longtemps.
 GIVE_UP = timedelta(days=3)
 
@@ -43,6 +50,7 @@ GIVE_UP = timedelta(days=3)
 # Ce qui déclenche un avis
 # ---------------------------------------------------------------------------
 
+
 def remember(code, account, client):
     """Note que la session qui a obtenu `code` a servi à entrer dans `client`, avec les groupes transmis."""
     if not code.sid:
@@ -50,8 +58,11 @@ def remember(code, account, client):
     groups = oidc.shared_groups(client, account) if "groups" in code.scope.split() else None
     row = db.session.scalar(db.select(OidcSession).filter_by(sid=code.sid, client_id=client.id))
     if row is None:
-        db.session.add(OidcSession(sid=code.sid, client_id=client.id, account_id=account.id, groups=groups,
-                                   created_at=datetime.now()))
+        db.session.add(
+            OidcSession(
+                sid=code.sid, client_id=client.id, account_id=account.id, groups=groups, created_at=datetime.now()
+            )
+        )
     else:  # nouvelle connexion à la même appli depuis la même session : les groupes transmis sont ceux-ci
         row.groups = groups
         row.account_id = account.id
@@ -64,8 +75,9 @@ def _end(row):
         now = datetime.now()
         pending = db.session.scalar(db.select(OidcLogout).filter_by(client_id=client.id, sid=row.sid).limit(1))
         if pending is None:
-            db.session.add(OidcLogout(client_id=client.id, sub=row.account.sub, sid=row.sid, created_at=now,
-                                      next_attempt_at=now))
+            db.session.add(
+                OidcLogout(client_id=client.id, sub=row.account.sub, sid=row.sid, created_at=now, next_attempt_at=now)
+            )
         elif pending.next_attempt_at > now:  # un avis attend déjà pour cette session : il part maintenant
             pending.next_attempt_at = now
         g.oidc_logout_queued = True
@@ -117,8 +129,9 @@ def end_client_sessions(account, client_id):
 def orphans():
     """Sessions d'appli dont la session de connexion n'existe plus (filet de sécurité de la tâche périodique)."""
     alive = db.select(LoginSession.sid)
-    return sessions_ended(db.session.scalars(db.select(OidcSession.sid).where(OidcSession.sid.not_in(alive))
-                                             .distinct()).all())
+    return sessions_ended(
+        db.session.scalars(db.select(OidcSession.sid).where(OidcSession.sid.not_in(alive)).distinct()).all()
+    )
 
 
 def pending_for(client):
@@ -129,12 +142,20 @@ def pending_for(client):
 # Envoi
 # ---------------------------------------------------------------------------
 
+
 def logout_token(client, sub, sid):
     """Jeton de déconnexion signé (Back-Channel Logout, section 2.4) : jamais de `nonce`, `typ` dédié."""
     kid, private = oidc.active_key()
     now = int(time.time())
-    claims = {"iss": oidc.issuer(), "aud": client.client_id, "iat": now, "exp": now + TOKEN_LIFETIME,
-              "jti": secrets.token_urlsafe(16), "sub": sub, "events": {EVENT: {}}}
+    claims = {
+        "iss": oidc.issuer(),
+        "aud": client.client_id,
+        "iat": now,
+        "exp": now + TOKEN_LIFETIME,
+        "jti": secrets.token_urlsafe(16),
+        "sub": sub,
+        "events": {EVENT: {}},
+    }
     if sid:
         claims["sid"] = sid
     return jwt.encode({"alg": "RS256", "typ": "logout+jwt", "kid": kid}, claims, RSAKey.import_key(private))
@@ -152,8 +173,12 @@ _opener = urllib.request.build_opener(_NoRedirect)
 
 def post(uri, token):
     """Envoie l'avis. Renvoie None s'il est reçu (réponse 2xx, en pratique 200 ou 204), sinon le motif de l'échec."""
-    request = urllib.request.Request(uri, data=urlencode({"logout_token": token}).encode(), method="POST", headers={
-        "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Adherents-OIDC"})
+    request = urllib.request.Request(
+        uri,
+        data=urlencode({"logout_token": token}).encode(),
+        method="POST",
+        headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Adherents-OIDC"},
+    )
     try:
         with _opener.open(request, timeout=TIMEOUT) as response:
             status = response.status
@@ -171,9 +196,11 @@ def _next_delay(attempts):
 
 def _claim(row, now):
     """Réserve l'avis pour cet envoi. Faux si un autre worker l'a pris entre-temps."""
-    taken = db.session.execute(db.update(OidcLogout).where(OidcLogout.id == row.id,
-                                                           OidcLogout.next_attempt_at == row.next_attempt_at)
-                               .values(next_attempt_at=now + LEASE)).rowcount
+    taken = db.session.execute(
+        db.update(OidcLogout)
+        .where(OidcLogout.id == row.id, OidcLogout.next_attempt_at == row.next_attempt_at)
+        .values(next_attempt_at=now + LEASE)
+    ).rowcount
     db.session.commit()
     return taken == 1
 
@@ -190,15 +217,20 @@ def deliver_pending(now=None):
 
 def _deliver(now):
     sent = failed = dropped = 0
-    due = db.session.execute(db.select(OidcLogout.id, OidcLogout.next_attempt_at)
-                             .where(OidcLogout.next_attempt_at <= now).order_by(OidcLogout.id)).all()
+    due = db.session.execute(
+        db.select(OidcLogout.id, OidcLogout.next_attempt_at)
+        .where(OidcLogout.next_attempt_at <= now)
+        .order_by(OidcLogout.id)
+    ).all()
     db.session.commit()
     for row in due:
         if not _claim(row, now):
             continue
         notice = db.session.get(OidcLogout, row.id)
         client = notice.client if notice else None
-        if client is None or not client.backchannel_logout_uri:  # adresse retirée entre-temps : plus personne à prévenir
+        if (
+            client is None or not client.backchannel_logout_uri
+        ):  # adresse retirée entre-temps : plus personne à prévenir
             if notice is not None:
                 db.session.delete(notice)
             db.session.commit()
@@ -215,8 +247,14 @@ def _deliver(now):
             sent += 1
         elif now - notice.created_at >= GIVE_UP:
             # Sans auteur : la personne dont la requête a déclenché cet envoi n'y est pour rien.
-            db.session.add(Activity(action="oidc.logout_abandoned", message=(
-                f"Avis de déconnexion abandonné pour {client.name} après {notice.attempts + 1} essai(s) : {problem}")))
+            db.session.add(
+                Activity(
+                    action="oidc.logout_abandoned",
+                    message=(
+                        f"Avis de déconnexion abandonné pour {client.name} après {notice.attempts + 1} essai(s) : {problem}"
+                    ),
+                )
+            )
             db.session.delete(notice)
             dropped += 1
         else:
@@ -255,4 +293,3 @@ def deliver_after_request(response):
 
 def init_app(app):
     app.after_request(deliver_after_request)
-

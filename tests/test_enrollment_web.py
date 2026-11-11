@@ -1,4 +1,5 @@
 """Inscriptions dans l'appli : le dossier d'une famille, le formulaire public, et la revue par le secrétariat."""
+
 import re
 from datetime import datetime, timedelta
 
@@ -48,6 +49,7 @@ def fill_and_send(client, world, dossier):
 # Côté famille
 # ---------------------------------------------------------------------------
 
+
 def test_a_parent_fills_and_sends_the_dossier(client, parent, opened):
     page = client.get("/inscription").get_data(as_text=True)
     assert "Réinscriptions 2027-2028" in page and "Commencer le dossier" in page
@@ -70,10 +72,22 @@ def test_household_form(client, parent, opened):
     dossier = start(client, opened)
     form = client.get(f"/inscription/dossier/{dossier.uuid}/foyer").get_data(as_text=True)
     assert 'value="06 12 34 56 78"' in form and 'value="anne@asso.test"' in form
-    data = {"name": "Famille Martin", "address_street": "2 rue Neuve", "postal_code": "76000", "city": "Rouen",
-            "country": "fr", "phone": "02 35 00 00 00", "g1_first_name": "Anne", "g1_last_name": "Martin",
-            "g1_email": "Anne@Asso.test", "g1_phone": "06 12 34 56 78", "g1_relationship": "mère",
-            "g2_first_name": "Marc", "g2_last_name": "Martin", "g2_phone": "12"}
+    data = {
+        "name": "Famille Martin",
+        "address_street": "2 rue Neuve",
+        "postal_code": "76000",
+        "city": "Rouen",
+        "country": "fr",
+        "phone": "02 35 00 00 00",
+        "g1_first_name": "Anne",
+        "g1_last_name": "Martin",
+        "g1_email": "Anne@Asso.test",
+        "g1_phone": "06 12 34 56 78",
+        "g1_relationship": "mère",
+        "g2_first_name": "Marc",
+        "g2_last_name": "Martin",
+        "g2_phone": "12",
+    }
     page = client.post(f"/inscription/dossier/{dossier.uuid}/foyer", data=data).get_data(as_text=True)
     assert "Numéro invalide" in page
     data["g2_phone"] = "07 11 22 33 44"
@@ -92,6 +106,7 @@ def test_student_form_with_a_full_course(client, parent, opened):
     from app.models import Membership
 
     from .test_annuaire import person
+
     leo = person("Léo", "Autre")
     membership = Membership(person=leo, season=opened["new"])
     db.session.add(membership)
@@ -105,12 +120,19 @@ def test_student_form_with_a_full_course(client, parent, opened):
     page = client.get(f"/inscription/dossier/{dossier.uuid}/eleves/{key}").get_data(as_text=True)
     assert f'value="{opened["flute_c2"].id}" disabled' in page and "complet" in page
     base = {"enrolled": "y", "first_name": "Zoé", "last_name": "Martin", "birth_date": "2015-05-06"}
-    page = client.post(f"/inscription/dossier/{dossier.uuid}/eleves/{key}",
-                       data={**base, "courses": [opened["flute_c2"].id]}).get_data(as_text=True)
+    page = client.post(
+        f"/inscription/dossier/{dossier.uuid}/eleves/{key}", data={**base, "courses": [opened["flute_c2"].id]}
+    ).get_data(as_text=True)
     assert "complet" in page
-    client.post(f"/inscription/dossier/{dossier.uuid}/eleves/{key}",
-                data={**base, "courses": [opened["flute_new"].id, opened["fm_new"].id], f"consent-{image.id}": "y",
-                      "school_class": "6e"})
+    client.post(
+        f"/inscription/dossier/{dossier.uuid}/eleves/{key}",
+        data={
+            **base,
+            "courses": [opened["flute_new"].id, opened["fm_new"].id],
+            f"consent-{image.id}": "y",
+            "school_class": "6e",
+        },
+    )
     db.session.refresh(dossier)
     student = dossier.data["students"][0]
     assert student["courses"] == [opened["flute_new"].id, opened["fm_new"].id] and student["school_class"] == "6e"
@@ -125,12 +147,14 @@ def test_add_and_remove_students(client, parent, opened):
     db.session.refresh(dossier)
     assert [s.get("guardian") for s in dossier.data["students"]] == [None, None, 0]
     assert dossier.data["students"][1]["last_name"] == "Martin"
-    page = client.post(f"/inscription/dossier/{dossier.uuid}/eleves/nouveau", data={"qui": "0"},
-                       follow_redirects=True).get_data(as_text=True)
+    page = client.post(
+        f"/inscription/dossier/{dossier.uuid}/eleves/nouveau", data={"qui": "0"}, follow_redirects=True
+    ).get_data(as_text=True)
     assert "déjà dans la liste" in page
     zoe_key = dossier.data["students"][0]["key"]
-    page = client.post(f"/inscription/dossier/{dossier.uuid}/eleves/{zoe_key}/retirer",
-                       follow_redirects=True).get_data(as_text=True)
+    page = client.post(f"/inscription/dossier/{dossier.uuid}/eleves/{zoe_key}/retirer", follow_redirects=True).get_data(
+        as_text=True
+    )
     assert "décochez plutôt" in page
     client.post(f"/inscription/dossier/{dossier.uuid}/eleves/{new_key}/retirer")
     db.session.refresh(dossier)
@@ -139,11 +163,15 @@ def test_add_and_remove_students(client, parent, opened):
 
 def test_bank_details_are_encrypted_at_once(client, parent, opened):
     dossier = start(client, opened)
-    page = client.post(f"/inscription/dossier/{dossier.uuid}/banque",
-                       data={"holder_name": "Anne Martin", "iban": "FR76 3000 6000 0112 3456 7890 180"})
+    page = client.post(
+        f"/inscription/dossier/{dossier.uuid}/banque",
+        data={"holder_name": "Anne Martin", "iban": "FR76 3000 6000 0112 3456 7890 180"},
+    )
     assert "clé de contrôle" in page.get_data(as_text=True)
-    client.post(f"/inscription/dossier/{dossier.uuid}/banque",
-                data={"holder_name": "Anne Martin", "iban": "fr76 3000 6000 0112 3456 7890 189"})
+    client.post(
+        f"/inscription/dossier/{dossier.uuid}/banque",
+        data={"holder_name": "Anne Martin", "iban": "fr76 3000 6000 0112 3456 7890 189"},
+    )
     db.session.refresh(dossier)
     assert dossier.iban_last4 == "0189" and bank.reveal_dossier_iban(dossier) == IBAN
     page = client.get(f"/inscription/dossier/{dossier.uuid}").get_data(as_text=True)
@@ -177,8 +205,9 @@ def test_closed_campaign_is_read_only(client, parent, opened):
     db.session.commit()
     page = client.get(f"/inscription/dossier/{dossier.uuid}").get_data(as_text=True)
     assert "La campagne est fermée" in page and "Modifier" not in page
-    page = client.post(f"/inscription/dossier/{dossier.uuid}/envoyer", data={"certify": "y"},
-                       follow_redirects=True).get_data(as_text=True)
+    page = client.post(
+        f"/inscription/dossier/{dossier.uuid}/envoyer", data={"certify": "y"}, follow_redirects=True
+    ).get_data(as_text=True)
     assert "La campagne est fermée." in page and dossier.status == Dossier.DRAFT
 
 
@@ -186,8 +215,9 @@ def test_sending_needs_the_certification(client, parent, opened):
     dossier = start(client, opened)
     rules = opened["campaign"].consents[1]
     client.post(f"/inscription/dossier/{dossier.uuid}/consentements", data={f"consent-{rules.id}": "y"})
-    page = client.post(f"/inscription/dossier/{dossier.uuid}/envoyer", data={},
-                       follow_redirects=True).get_data(as_text=True)
+    page = client.post(f"/inscription/dossier/{dossier.uuid}/envoyer", data={}, follow_redirects=True).get_data(
+        as_text=True
+    )
     assert "Cochez cette case" in page and dossier.status == Dossier.DRAFT
 
 
@@ -195,12 +225,13 @@ def test_sending_needs_the_certification(client, parent, opened):
 # Nouvelles familles
 # ---------------------------------------------------------------------------
 
+
 def test_a_new_family_receives_a_link(client, opened, smtp):  # noqa: F811
     url = f"/inscription/nouvelle/{opened['campaign'].id}"
     assert "Recevoir le lien" in client.get(url).get_data(as_text=True)
     page = client.post(url, data={"email": "Claire@Famille.test"}).get_data(as_text=True)
     assert "Vérifiez vos emails" in page
-    (to, subject, text), = smtp
+    ((to, subject, text),) = smtp
     assert to == "claire@famille.test" and "Réinscriptions 2027-2028" in subject
     link = re.search(r"http://\S*(/inscription/acces/[\w-]+)", text).group(1)
     response = client.get(link)
@@ -248,6 +279,7 @@ def test_a_bad_access_link(client, opened):
 # Côté secrétariat
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def manager(app, opened, accounts):
     gestion = app.test_client()
@@ -256,17 +288,32 @@ def manager(app, opened, accounts):
 
 
 def test_campaign_screens(manager, opened):
-    response = manager.post("/campagnes/nouvelle", data={
-        "season_id": opened["new"].id, "title": "Inscriptions d'été", "opens_at": "2027-06-01T09:00",
-        "closes_at": "2027-05-01T09:00"})
+    response = manager.post(
+        "/campagnes/nouvelle",
+        data={
+            "season_id": opened["new"].id,
+            "title": "Inscriptions d'été",
+            "opens_at": "2027-06-01T09:00",
+            "closes_at": "2027-05-01T09:00",
+        },
+    )
     assert "La clôture doit suivre" in response.get_data(as_text=True)
-    response = manager.post("/campagnes/nouvelle", data={
-        "season_id": opened["new"].id, "title": "Inscriptions d'été", "opens_at": "2027-06-01T09:00",
-        "closes_at": "2027-07-01T18:00", "allow_new": "y"})
+    response = manager.post(
+        "/campagnes/nouvelle",
+        data={
+            "season_id": opened["new"].id,
+            "title": "Inscriptions d'été",
+            "opens_at": "2027-06-01T09:00",
+            "closes_at": "2027-07-01T18:00",
+            "allow_new": "y",
+        },
+    )
     campaign = db.session.scalar(sa.select(Campaign).filter_by(title="Inscriptions d'été"))
     assert response.location.endswith(f"/campagnes/{campaign.id}") and campaign.allow_new
-    manager.post(f"/campagnes/{campaign.id}/consentements", data={
-        "label": "Droit à l'image", "text": "J'autorise…", "scope": "student", "required": "y"})
+    manager.post(
+        f"/campagnes/{campaign.id}/consentements",
+        data={"label": "Droit à l'image", "text": "J'autorise…", "scope": "student", "required": "y"},
+    )
     assert [c.label for c in campaign.consents] == ["Droit à l'image"] and campaign.consents[0].required
     page = manager.get(f"/campagnes/{campaign.id}").get_data(as_text=True)
     assert "Droit à l&#39;image" in page and f"/inscription/nouvelle/{campaign.id}" in page
@@ -281,8 +328,15 @@ def test_a_campaign_with_dossiers_stays(manager, opened):
     db.session.commit()
     page = manager.post(f"/campagnes/{opened['campaign'].id}/supprimer", follow_redirects=True).get_data(as_text=True)
     assert "ne se supprime plus" in page
-    page = manager.post(f"/campagnes/{opened['campaign'].id}/modifier", data={
-        "season_id": opened["old"].id, "title": "x", "opens_at": "2027-06-01T09:00", "closes_at": "2027-07-01T09:00"})
+    page = manager.post(
+        f"/campagnes/{opened['campaign'].id}/modifier",
+        data={
+            "season_id": opened["old"].id,
+            "title": "x",
+            "opens_at": "2027-06-01T09:00",
+            "closes_at": "2027-07-01T09:00",
+        },
+    )
     assert "la saison ne change plus" in page.get_data(as_text=True)
 
 
@@ -308,7 +362,8 @@ def test_review_return_then_validate(client, parent, manager, opened):
     db.session.refresh(dossier)
     assert dossier.status == Dossier.VALIDATED
     assert {e.course for e in db.session.scalars(sa.select(Enrollment).filter_by(dossier_id=dossier.id))} == {
-        opened["flute_new"]}
+        opened["flute_new"]
+    }
     assert db.session.scalar(sa.select(Consent).filter_by(label="Règlement intérieur")).granted
     assert db.session.scalar(sa.select(sa.func.count(Notification.id)).filter_by(account_id=parent.id)) == 2
     page = manager.get(f"/campagnes/dossiers/{dossier.id}").get_data(as_text=True)
@@ -321,6 +376,7 @@ def test_review_return_then_validate(client, parent, manager, opened):
 def test_report_files(manager, opened, app, accounts):
     dossier = registration.dossier_for(opened["campaign"], opened["household"], None)
     from .test_registration import answer_consents
+
     answer_consents(dossier)
     data = dict(dossier.data, bank={"holder_name": "Anne Martin"})
     registration.save(dossier, data)
@@ -341,6 +397,7 @@ def test_report_files(manager, opened, app, accounts):
     response = treasurer.get(f"/campagnes/{opened['campaign'].id}/report-iban.csv")
     assert response.status_code == 302 and "/annuaire/mode-securise" in response.location
     from .conftest import totp_code
+
     accounts[Role.ADMIN].totp_last_counter = None
     db.session.commit()
     treasurer.post("/annuaire/mode-securise", data={"code": totp_code()})
@@ -356,12 +413,32 @@ def test_report_files(manager, opened, app, accounts):
 def test_a_new_family_dossier_is_validated_into_the_directory(manager, opened, accounts):
     dossier, _ = registration.new_family_dossier(opened["campaign"], "claire@famille.test")
     data = registration.blank_data()
-    data["household"] = {"name": "Famille Petit", "address_street": "4 rue Basse", "postal_code": "76100",
-                         "city": "Rouen", "country": "FR"}
-    data["guardians"] = [{"person_id": None, "first_name": "Claire", "last_name": "Petit",
-                          "email": "claire@famille.test", "phone": "+33611111111"}]
-    data["students"] = [{"key": "a", "person_id": None, "guardian": 0, "enrolled": True,
-                         "courses": [opened["fm_new"].id], "consents": {}}]
+    data["household"] = {
+        "name": "Famille Petit",
+        "address_street": "4 rue Basse",
+        "postal_code": "76100",
+        "city": "Rouen",
+        "country": "FR",
+    }
+    data["guardians"] = [
+        {
+            "person_id": None,
+            "first_name": "Claire",
+            "last_name": "Petit",
+            "email": "claire@famille.test",
+            "phone": "+33611111111",
+        }
+    ]
+    data["students"] = [
+        {
+            "key": "a",
+            "person_id": None,
+            "guardian": 0,
+            "enrolled": True,
+            "courses": [opened["fm_new"].id],
+            "consents": {},
+        }
+    ]
     data["consents"] = {str(opened["campaign"].consents[1].id): True}
     registration.save(dossier, data)
     registration.submit(dossier)
@@ -381,6 +458,7 @@ def test_members_do_not_see_the_campaigns(client, parent):
 # ---------------------------------------------------------------------------
 # Relances et professeurs
 # ---------------------------------------------------------------------------
+
 
 def test_weekly_reminders(opened, accounts):
     anne = accounts[Role.ADHERENT]
@@ -402,6 +480,7 @@ def test_weekly_reminders(opened, accounts):
     db.session.commit()
     assert registration.remind(now + timedelta(days=14)) == 0  # envoyé : plus de relance
     from app.services import tasks
+
     assert "foyer(s) relancé(s)" in tasks.run()
 
 
@@ -415,6 +494,7 @@ def test_a_teacher_sees_his_students_and_their_guardians(client, opened, account
     zoe_membership = next(m for m in opened["zoe"].memberships)
     zoe_membership.enrollments[0].status = "active"
     from app.models import Membership
+
     new = Membership(person=opened["zoe"], season=opened["new"])
     db.session.add(new)
     db.session.flush()

@@ -3,6 +3,7 @@
 Le formulaire d'une règle est construit à la main (groupes de conditions en nombre variable) : il marche sans
 JavaScript, les boutons « Ajouter une condition » renvoyant simplement le formulaire. La protection CSRF est globale.
 """
+
 import re
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
@@ -70,6 +71,7 @@ def euros_input(cents):
 # Grille : éléments de la saison
 # ---------------------------------------------------------------------------
 
+
 @bp.route("")
 @require("fee.view")
 def index():
@@ -77,21 +79,38 @@ def index():
     items = fees.items(season) if season else []
     usage = {}
     if season:
-        counts = dict(db.session.execute(db.select(Course.fee_item_id, db.func.count(Course.id))
-                                         .where(Course.season_id == season.id).group_by(Course.fee_item_id)).all())
+        counts = dict(
+            db.session.execute(
+                db.select(Course.fee_item_id, db.func.count(Course.id))
+                .where(Course.season_id == season.id)
+                .group_by(Course.fee_item_id)
+            ).all()
+        )
         usage = {item.id: counts.get(item.id, 0) for item in items}
         without = counts.get(None, 0)
     else:
         without = 0
-    return render_template("fees/index.html", season=season, seasons=seasons, items=items, usage=usage,
-                           without=without, rules=fees.season_rules(season) if season else [])
+    return render_template(
+        "fees/index.html",
+        season=season,
+        seasons=seasons,
+        items=items,
+        usage=usage,
+        without=without,
+        rules=fees.season_rules(season) if season else [],
+    )
 
 
 def _item_values(form, season):
     regie = db.session.get(Regie, form.get("regie", type=int) or 0)
-    return {"label": form.get("label", ""), "price": fees.parse_euros(form.get("price")),
-            "category": form.get("category", ""), "code": form.get("code", ""), "regie": regie,
-            "notes": form.get("notes", "")}
+    return {
+        "label": form.get("label", ""),
+        "price": fees.parse_euros(form.get("price")),
+        "category": form.get("category", ""),
+        "code": form.get("code", ""),
+        "regie": regie,
+        "notes": form.get("notes", ""),
+    }
 
 
 @bp.route("/elements/nouveau", methods=["GET", "POST"])
@@ -127,10 +146,23 @@ def _item_form(season, item):
             error = str(exc)
             values = dict(request.form)
     elif item is not None:
-        values = {"label": item.label, "price": euros_input(item.price), "category": item.category or "",
-                  "code": item.code or "", "regie": item.regie_id, "notes": item.notes or ""}
-    return render_template("fees/item_form.html", season=season, item=item, values=values, error=error,
-                           regies=fees.regies(), categories=fees.categories(season))
+        values = {
+            "label": item.label,
+            "price": euros_input(item.price),
+            "category": item.category or "",
+            "code": item.code or "",
+            "regie": item.regie_id,
+            "notes": item.notes or "",
+        }
+    return render_template(
+        "fees/item_form.html",
+        season=season,
+        item=item,
+        values=values,
+        error=error,
+        regies=fees.regies(),
+        categories=fees.categories(season),
+    )
 
 
 @bp.route("/elements/<int:item_id>/supprimer", methods=["POST"])
@@ -151,6 +183,7 @@ def delete_item(item_id):
 # ---------------------------------------------------------------------------
 # Élément facturé par chaque cours
 # ---------------------------------------------------------------------------
+
 
 @bp.route("/cours")
 @require("fee.view")
@@ -188,6 +221,7 @@ def save_courses():
 # Réglages de la saison et régies
 # ---------------------------------------------------------------------------
 
+
 @bp.route("/reglages", methods=["GET", "POST"])
 @require("fee.edit")
 def settings():
@@ -205,9 +239,12 @@ def settings():
             if not label and not ceiling:
                 continue
             bands.append({"label": label, "max": int(ceiling) if ceiling.isdigit() else (ceiling or None)})
-        engine = {"ranking": form.get("ranking", "price_desc"),
-                  "ranking_categories": form.getlist("ranking_categories"),
-                  "rounding": form.get("rounding", "none"), "rounding_scope": form.get("rounding_scope", "line")}
+        engine = {
+            "ranking": form.get("ranking", "price_desc"),
+            "ranking_categories": form.getlist("ranking_categories"),
+            "rounding": form.get("rounding", "none"),
+            "rounding_scope": form.get("rounding_scope", "line"),
+        }
         cities = (form.get("resident_cities") or "").splitlines()
         try:
             fees.save_settings(season, engine, bands, form.get("default_band"), cities)
@@ -219,11 +256,20 @@ def settings():
             error = str(exc)
             current = fees.season_settings(season)
     engine = pricing.validate_settings(current.engine or {})
-    return render_template("fees/settings.html", season=season, seasons=seasons, settings=current, engine=engine,
-                           error=error, rankings=pricing.RANKINGS, roundings=pricing.ROUNDINGS,
-                           scopes=pricing.ROUNDING_SCOPES, categories=fees.categories(season),
-                           band_rows=max(BAND_ROWS, len(current.qf_bands) + 2),
-                           regies=fees.regies(include_archived=True))
+    return render_template(
+        "fees/settings.html",
+        season=season,
+        seasons=seasons,
+        settings=current,
+        engine=engine,
+        error=error,
+        rankings=pricing.RANKINGS,
+        roundings=pricing.ROUNDINGS,
+        scopes=pricing.ROUNDING_SCOPES,
+        categories=fees.categories(season),
+        band_rows=max(BAND_ROWS, len(current.qf_bands) + 2),
+        regies=fees.regies(include_archived=True),
+    )
 
 
 @bp.route("/regies", methods=["POST"])
@@ -232,6 +278,7 @@ def create_regie():
     try:
         regie = fees.create_regie(request.form.get("name"))
         from ..services.activity import log
+
         log("fee.regie", f"Régie « {regie.name} » ajoutée")
         db.session.commit()
         flash(f"Régie « {regie.name} » ajoutée.", "success")
@@ -247,6 +294,7 @@ def toggle_regie(regie_id):
     from datetime import datetime
 
     from ..services.activity import log
+
     regie = db.session.get(Regie, regie_id) or abort(404)
     regie.archived_at = None if regie.archived else datetime.now()
     log("fee.regie", f"Régie « {regie.name} » {'archivée' if regie.archived else 'rouverte'}")
@@ -259,16 +307,25 @@ def toggle_regie(regie_id):
 # Règles
 # ---------------------------------------------------------------------------
 
+
 @bp.route("/regles")
 @require("fee.view")
 def rules():
     season, seasons = _selected_season()
     records = fees.season_rules(season) if season else []
     labels = _labels(season) if season else {}
-    described = [(r, fees.describe_conditions(r.conditions, labels), fees.describe_target(r.target, labels),
-                  fees.describe_effect(r.effect, labels)) for r in records]
-    return render_template("fees/rules.html", season=season, seasons=seasons, described=described,
-                           line_effects=pricing.LINE_EFFECTS)
+    described = [
+        (
+            r,
+            fees.describe_conditions(r.conditions, labels),
+            fees.describe_target(r.target, labels),
+            fees.describe_effect(r.effect, labels),
+        )
+        for r in records
+    ]
+    return render_template(
+        "fees/rules.html", season=season, seasons=seasons, described=described, line_effects=pricing.LINE_EFFECTS
+    )
 
 
 @bp.route("/regles/nouvelle", methods=["GET", "POST"])
@@ -296,8 +353,9 @@ def _posted_groups(form):
     for key in form:
         if match := CONDITION_KEY.match(key):
             g, i = int(match[1]), int(match[2])
-            groups.setdefault(g, {})[i] = {name: form.get(f"c-{g}-{i}-{name}", "")
-                                           for name in ("field", "op", "value", "param")}
+            groups.setdefault(g, {})[i] = {
+                name: form.get(f"c-{g}-{i}-{name}", "") for name in ("field", "op", "value", "param")
+            }
     return [[rows[i] for i in sorted(rows)] for _, rows in sorted(groups.items())]
 
 
@@ -323,9 +381,18 @@ def _rule_rows(rule, labels):
             else:
                 text = str(value)
             param = c.get("param") or {}
-            rows.append({"field": c["field"], "op": c["op"], "value": text,
-                         "param": f"item:{param['item']}" if "item" in param else
-                         f"cat:{param['category']}" if "category" in param else ""})
+            rows.append(
+                {
+                    "field": c["field"],
+                    "op": c["op"],
+                    "value": text,
+                    "param": f"item:{param['item']}"
+                    if "item" in param
+                    else f"cat:{param['category']}"
+                    if "category" in param
+                    else "",
+                }
+            )
         groups.append(rows)
     return groups
 
@@ -337,8 +404,7 @@ def _parse_condition(row, items_by_label):
     label, _, kind, param_kind = pricing.FIELDS[name]
     op, text = row["op"], (row["value"] or "").strip()
     if op not in pricing.OPERATORS[kind]:
-        raise FeeError(f"« {label} » : choisissez une comparaison parmi "
-                       f"{', '.join(pricing.OPERATORS[kind].values())}.")
+        raise FeeError(f"« {label} » : choisissez une comparaison parmi {', '.join(pricing.OPERATORS[kind].values())}.")
     if kind == pricing.NUMBER:
         numbers = [int(n) for n in re.findall(r"-?\d+", text)]
         expected = 2 if op == "between" else 1
@@ -400,10 +466,17 @@ def _parse_rule(form, season):
         for key in ("categories", "exclude_categories"):
             if values := [v for v in form.getlist(f"target_{key}") if v.strip()]:
                 target[key] = values
-    conditions = [[_parse_condition(row, items_by_label) for row in group if row["field"]]
-                  for group in _posted_groups(form)]
-    return {"name": form.get("name", ""), "group": form.get("group", ""), "notes": form.get("notes", ""),
-            "effect": effect, "target": target, "conditions": [g for g in conditions if g]}
+    conditions = [
+        [_parse_condition(row, items_by_label) for row in group if row["field"]] for group in _posted_groups(form)
+    ]
+    return {
+        "name": form.get("name", ""),
+        "group": form.get("group", ""),
+        "notes": form.get("notes", ""),
+        "effect": effect,
+        "target": target,
+        "conditions": [g for g in conditions if g],
+    }
 
 
 def _rule_form(season, rule):
@@ -440,9 +513,12 @@ def _rule_form(season, rule):
                 if rule is None and form.get("activate"):
                     fees.set_rule_active(saved, True)
                 db.session.commit()
-                flash(f"Règle « {saved.name} » enregistrée"
-                      + ("" if saved.active else " en brouillon : voyez son effet avant de l'activer") + ".",
-                      "success")
+                flash(
+                    f"Règle « {saved.name} » enregistrée"
+                    + ("" if saved.active else " en brouillon : voyez son effet avant de l'activer")
+                    + ".",
+                    "success",
+                )
                 return redirect(url_for(".rules", saison=season.id) + f"#regle-{saved.id}")
             except (FeeError, PricingError, ValueError) as exc:
                 db.session.rollback()
@@ -451,32 +527,56 @@ def _rule_form(season, rule):
         groups = _rule_rows(rule, labels) or [[_empty_row()]]
         effect = rule.effect
         value = effect.get("value")
-        values = {"name": rule.name, "group": rule.exclusive_group or "", "notes": rule.notes or "",
-                  "effect_kind": effect["kind"],
-                  "effect_value": (value.replace(".", ",") if isinstance(value, str) else euros_input(value)
-                                   if value is not None else ""),
-                  "effect_base": effect.get("base", "current"), "effect_item": effect.get("item"),
-                  "effect_per": effect.get("per", "student"),
-                  "target_items": [str(i) for i in rule.target.get("items", [])],
-                  "target_categories": rule.target.get("categories", []),
-                  "target_exclude_items": [str(i) for i in rule.target.get("exclude_items", [])],
-                  "target_exclude_categories": rule.target.get("exclude_categories", []),
-                  "position": rule.position + 1}
+        values = {
+            "name": rule.name,
+            "group": rule.exclusive_group or "",
+            "notes": rule.notes or "",
+            "effect_kind": effect["kind"],
+            "effect_value": (
+                value.replace(".", ",") if isinstance(value, str) else euros_input(value) if value is not None else ""
+            ),
+            "effect_base": effect.get("base", "current"),
+            "effect_item": effect.get("item"),
+            "effect_per": effect.get("per", "student"),
+            "target_items": [str(i) for i in rule.target.get("items", [])],
+            "target_categories": rule.target.get("categories", []),
+            "target_exclude_items": [str(i) for i in rule.target.get("exclude_items", [])],
+            "target_exclude_categories": rule.target.get("exclude_categories", []),
+            "position": rule.position + 1,
+        }
     else:
         groups = [[_empty_row()]]
-        values = {"effect_kind": "percent", "effect_base": "current", "effect_per": "student", "target_items": [],
-                  "target_categories": [], "target_exclude_items": [], "target_exclude_categories": []}
+        values = {
+            "effect_kind": "percent",
+            "effect_base": "current",
+            "effect_per": "student",
+            "target_items": [],
+            "target_categories": [],
+            "target_exclude_items": [],
+            "target_exclude_categories": [],
+        }
     fields_by_level = {}
     for name, (label, level, _, _) in pricing.FIELDS.items():
         fields_by_level.setdefault(level, []).append((name, label))
     operators = {}
     for ops in pricing.OPERATORS.values():
         operators.update(ops)
-    return render_template("fees/rule_form.html", season=season, rule=rule, groups=groups, values=values,
-                           error=error, items=fees.items(season), categories=fees.categories(season),
-                           fields_by_level=fields_by_level, operators=operators, effects=pricing.EFFECTS,
-                           bases=pricing.BASES, count=len(fees.season_rules(season)),
-                           level_names={"household": "Foyer", "student": "Élève", "line": "Élément"})
+    return render_template(
+        "fees/rule_form.html",
+        season=season,
+        rule=rule,
+        groups=groups,
+        values=values,
+        error=error,
+        items=fees.items(season),
+        categories=fees.categories(season),
+        fields_by_level=fields_by_level,
+        operators=operators,
+        effects=pricing.EFFECTS,
+        bases=pricing.BASES,
+        count=len(fees.season_rules(season)),
+        level_names={"household": "Foyer", "student": "Élève", "line": "Élément"},
+    )
 
 
 @bp.route("/regles/<int:rule_id>/deplacer", methods=["POST"])
@@ -515,16 +615,23 @@ def rule_impact(rule_id):
     rule = db.session.get(FeeRule, rule_id) or abort(404)
     impacts = sorted(fees.rule_impact(rule), key=lambda i: (i.delta, fold(i.household.name)))
     labels = _labels(rule.season)
-    return render_template("fees/impact.html", rule=rule, impacts=impacts, season=rule.season,
-                           total=sum(i.delta for i in impacts), households=len(fees.season_households(rule.season)),
-                           conditions=fees.describe_conditions(rule.conditions, labels),
-                           target=fees.describe_target(rule.target, labels),
-                           effect=fees.describe_effect(rule.effect, labels))
+    return render_template(
+        "fees/impact.html",
+        rule=rule,
+        impacts=impacts,
+        season=rule.season,
+        total=sum(i.delta for i in impacts),
+        households=len(fees.season_households(rule.season)),
+        conditions=fees.describe_conditions(rule.conditions, labels),
+        target=fees.describe_target(rule.target, labels),
+        effect=fees.describe_effect(rule.effect, labels),
+    )
 
 
 # ---------------------------------------------------------------------------
 # Simulateur
 # ---------------------------------------------------------------------------
+
 
 @bp.route("/simulateur")
 @require("fee.view")
@@ -538,19 +645,33 @@ def simulator():
     students, picks, form_rows = [], [], []
     error = None
     for k in range(rows):
-        row = {"name": (args.get(f"s{k}-name") or "").strip(), "age": args.get(f"s{k}-age", type=int),
-               "adult": bool(args.get(f"s{k}-adult")), "tags": args.get(f"s{k}-tags", ""),
-               "items": [i for i in args.getlist(f"s{k}-items", type=int) if i in items]}
+        row = {
+            "name": (args.get(f"s{k}-name") or "").strip(),
+            "age": args.get(f"s{k}-age", type=int),
+            "adult": bool(args.get(f"s{k}-adult")),
+            "tags": args.get(f"s{k}-tags", ""),
+            "items": [i for i in args.getlist(f"s{k}-items", type=int) if i in items],
+        }
         form_rows.append(row)
         if row["items"]:
             tags = frozenset(t.strip() for t in row["tags"].split(",") if t.strip())
-            students.append(pricing.Student(k + 1, row["name"] or f"Élève {k + 1}", age=row["age"],
-                                            adult=row["adult"] or (row["age"] or 0) >= 18, tags=tags,
-                                            seniority=args.get(f"s{k}-seniority", type=int) or 0))
+            students.append(
+                pricing.Student(
+                    k + 1,
+                    row["name"] or f"Élève {k + 1}",
+                    age=row["age"],
+                    adult=row["adult"] or (row["age"] or 0) >= 18,
+                    tags=tags,
+                    seniority=args.get(f"s{k}-seniority", type=int) or 0,
+                )
+            )
             picks += [(k + 1, item_id) for item_id in row["items"]]
     resident = {"1": True, "0": False}.get(args.get("resident", ""))
-    household = pricing.Household(qf_band=args.get("band") or None, resident=resident,
-                                  tags=frozenset(t.strip() for t in args.get("htags", "").split(",") if t.strip()))
+    household = pricing.Household(
+        qf_band=args.get("band") or None,
+        resident=resident,
+        tags=frozenset(t.strip() for t in args.get("htags", "").split(",") if t.strip()),
+    )
     drafts = [r for r in fees.season_rules(season) if not r.active and str(r.id) in args.getlist("drafts")]
     result = None
     if picks:
@@ -559,16 +680,27 @@ def simulator():
         except PricingError as exc:
             error = str(exc)
     names = {s.id: s.name for s in students}
-    return render_template("fees/simulator.html", season=season, seasons=seasons, rows=form_rows, items=items.values(),
-                           result=result, names=names, error=error, args=args,
-                           bands=[b["label"] for b in fees.season_settings(season).qf_bands],
-                           drafts=[r for r in fees.season_rules(season) if not r.active],
-                           chosen={r.id for r in drafts}, more=rows + 2 if rows < 12 else None)
+    return render_template(
+        "fees/simulator.html",
+        season=season,
+        seasons=seasons,
+        rows=form_rows,
+        items=items.values(),
+        result=result,
+        names=names,
+        error=error,
+        args=args,
+        bands=[b["label"] for b in fees.season_settings(season).qf_bands],
+        drafts=[r for r in fees.season_rules(season) if not r.active],
+        chosen={r.id for r in drafts},
+        more=rows + 2 if rows < 12 else None,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Copie d'une saison
 # ---------------------------------------------------------------------------
+
 
 @bp.route("/copier", methods=["GET", "POST"])
 @require("fee.edit")
@@ -593,9 +725,12 @@ def copy():
             return redirect(url_for(".copy", depuis=source.id, vers=target.id))
     preview = None
     if source is not None:
-        preview = {"items": len(fees.items(source)), "rules": len(fees.season_rules(source)),
-                   "target_items": len(fees.items(target)) if target else 0,
-                   "target_rules": len(fees.season_rules(target)) if target else 0}
+        preview = {
+            "items": len(fees.items(source)),
+            "rules": len(fees.season_rules(source)),
+            "target_items": len(fees.items(target)) if target else 0,
+            "target_rules": len(fees.season_rules(target)) if target else 0,
+        }
     return render_template("fees/copy.html", seasons=seasons, source=source, target=target, preview=preview)
 
 
@@ -603,14 +738,17 @@ def copy():
 # Cotisations
 # ---------------------------------------------------------------------------
 
+
 @bp.route("/cotisations")
 @require("fee.view")
 def assessments():
     season, seasons = _selected_season()
     rows = []
     if season is not None:
-        existing = {a.household_id: a for a in db.session.scalars(
-            db.select(Assessment).where(Assessment.season_id == season.id))}
+        existing = {
+            a.household_id: a
+            for a in db.session.scalars(db.select(Assessment).where(Assessment.season_id == season.id))
+        }
         households = fees.season_households(season)
         households += [a.household for a in existing.values() if a.household not in households]
         status = request.args.get("statut")
@@ -620,10 +758,19 @@ def assessments():
             if status and status != state:
                 continue
             rows.append((household, assessment))
-    totals = {"count": sum(1 for _, a in rows if a), "validated": sum(1 for _, a in rows if a and a.status == "validated"),
-              "amount": sum(a.total for _, a in rows if a)}
-    return render_template("fees/assessments.html", season=season, seasons=seasons, rows=rows, totals=totals,
-                           status=request.args.get("statut", ""))
+    totals = {
+        "count": sum(1 for _, a in rows if a),
+        "validated": sum(1 for _, a in rows if a and a.status == "validated"),
+        "amount": sum(a.total for _, a in rows if a),
+    }
+    return render_template(
+        "fees/assessments.html",
+        season=season,
+        seasons=seasons,
+        rows=rows,
+        totals=totals,
+        status=request.args.get("statut", ""),
+    )
 
 
 @bp.route("/cotisations/calculer", methods=["POST"])
@@ -632,8 +779,10 @@ def assess_all():
     season = db.session.get(Season, request.form.get("saison", type=int) or 0) or abort(404)
     done, skipped, reasons = fees.assess_season(season)
     db.session.commit()
-    flash(f"{done} cotisation(s) calculée(s)" + (f", {skipped} laissée(s) telle(s) quelle(s)" if skipped else "")
-          + ".", "success")
+    flash(
+        f"{done} cotisation(s) calculée(s)" + (f", {skipped} laissée(s) telle(s) quelle(s)" if skipped else "") + ".",
+        "success",
+    )
     for reason in reasons[:5]:
         flash(reason, "info")
     return redirect(url_for(".assessments", saison=season.id))
@@ -657,14 +806,29 @@ def household(household_id):
     record = fees.situation(household, season)
     settings = fees.season_settings(season)
     students = list(prepared.persons.values())
-    picks = db.session.scalars(db.select(FeePick).join(FeeItem).where(
-        FeePick.household_id == household.id, FeeItem.season_id == season.id).order_by(FeePick.id)).all()
-    return render_template("fees/household.html", household=household, season=season, seasons=seasons,
-                           assessment=assessment, preview=preview, prepared=prepared, drift=drift,
-                           names={p.id: p.full_name for p in prepared.persons.values()},
-                           band=fees.band_of(record, settings),
-                           resident=fees.resident_of(record, household, settings), situation=record,
-                           students=students, picks=picks, items=fees.items(season))
+    picks = db.session.scalars(
+        db.select(FeePick)
+        .join(FeeItem)
+        .where(FeePick.household_id == household.id, FeeItem.season_id == season.id)
+        .order_by(FeePick.id)
+    ).all()
+    return render_template(
+        "fees/household.html",
+        household=household,
+        season=season,
+        seasons=seasons,
+        assessment=assessment,
+        preview=preview,
+        prepared=prepared,
+        drift=drift,
+        names={p.id: p.full_name for p in prepared.persons.values()},
+        band=fees.band_of(record, settings),
+        resident=fees.resident_of(record, household, settings),
+        situation=record,
+        students=students,
+        picks=picks,
+        items=fees.items(season),
+    )
 
 
 def _back(household_id, season_id, anchor=""):
@@ -803,21 +967,29 @@ def delete_assessment(assessment_id):
 # Situation du foyer (quotient familial) : trésorier et direction
 # ---------------------------------------------------------------------------
 
+
 @bp.route("/foyers/<int:household_id>/situation", methods=["GET", "POST"])
 @require("fee.situation")
 def situation(household_id):
     household, season, seasons = _household_and_season(household_id)
     settings = fees.season_settings(season)
-    memberships = [m for member in household.members for m in member.person.memberships
-                   if m.season_id == season.id and m.status == Membership.ACTIVE]
+    memberships = [
+        m
+        for member in household.members
+        for m in member.person.memberships
+        if m.season_id == season.id and m.status == Membership.ACTIVE
+    ]
     record = fees.situation(household, season)
     error = None
     if request.method == "POST":
         form = request.form
         quotient = (form.get("quotient") or "").strip().replace(" ", "")
-        values = {"qf_band": form.get("qf_band"), "qf_proof": form.get("qf_proof"),
-                  "resident": {"1": True, "0": False}.get(form.get("resident", "")),
-                  "tags": (form.get("tags") or "").split(",")}
+        values = {
+            "qf_band": form.get("qf_band"),
+            "qf_proof": form.get("qf_proof"),
+            "resident": {"1": True, "0": False}.get(form.get("resident", "")),
+            "tags": (form.get("tags") or "").split(","),
+        }
         try:
             if quotient and not quotient.isdigit():
                 raise FeeError("Le quotient familial doit être un nombre entier positif.")
@@ -832,6 +1004,15 @@ def situation(household_id):
             db.session.rollback()
             error = str(exc)
             record = fees.situation(household, season)
-    return render_template("fees/situation.html", household=household, season=season, seasons=seasons,
-                           record=record, settings=settings, memberships=memberships, error=error,
-                           band=fees.band_of(record, settings), resident=fees.resident_of(record, household, settings))
+    return render_template(
+        "fees/situation.html",
+        household=household,
+        season=season,
+        seasons=seasons,
+        record=record,
+        settings=settings,
+        memberships=memberships,
+        error=error,
+        band=fees.band_of(record, settings),
+        resident=fees.resident_of(record, household, settings),
+    )

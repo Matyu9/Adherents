@@ -2,6 +2,7 @@
 
 Le protocole lui-même est dans oidc_server.py (Authlib) et blueprints/oidc.py. Les services ne font pas de commit.
 """
+
 import hashlib
 import secrets
 import time
@@ -52,6 +53,7 @@ def issuer():
 # Clés de signature
 # ---------------------------------------------------------------------------
 
+
 def _fernet():
     return crypto.fernet(b"adherents/oidc-signing-key")
 
@@ -59,8 +61,12 @@ def _fernet():
 def _create_key():
     key = RSAKey.generate_key(2048)
     kid = key.thumbprint()
-    row = OidcKey(kid=kid, public_jwk={**key.as_dict(private=False), "kid": kid, "use": "sig", "alg": "RS256"},
-                  private_key=_fernet().encrypt(key.as_pem(private=True)).decode(), created_at=datetime.now())
+    row = OidcKey(
+        kid=kid,
+        public_jwk={**key.as_dict(private=False), "kid": kid, "use": "sig", "alg": "RS256"},
+        private_key=_fernet().encrypt(key.as_pem(private=True)).decode(),
+        created_at=datetime.now(),
+    )
     db.session.add(row)
     db.session.flush()
     return row
@@ -73,8 +79,9 @@ def _retire(row, now=None):
 
 def active_key():
     """(kid, clé privée) de la clé qui signe, créée au premier besoin. La plus récente, si deux workers en ont créé une."""
-    rows = db.session.scalars(db.select(OidcKey).where(OidcKey.retired_at.is_(None))
-                              .order_by(OidcKey.created_at.desc(), OidcKey.kid)).all()
+    rows = db.session.scalars(
+        db.select(OidcKey).where(OidcKey.retired_at.is_(None)).order_by(OidcKey.created_at.desc(), OidcKey.kid)
+    ).all()
     for row in rows:
         try:
             return row.kid, _fernet().decrypt(row.private_key.encode())
@@ -95,8 +102,11 @@ def rotate_key(now=None):
 
 def published_keys(now=None):
     limit = (now or datetime.now()) - RETIRED_KEY_KEPT
-    return db.session.scalars(db.select(OidcKey).where(db.or_(OidcKey.retired_at.is_(None), OidcKey.retired_at > limit))
-                              .order_by(OidcKey.created_at.desc(), OidcKey.kid)).all()
+    return db.session.scalars(
+        db.select(OidcKey)
+        .where(db.or_(OidcKey.retired_at.is_(None), OidcKey.retired_at > limit))
+        .order_by(OidcKey.created_at.desc(), OidcKey.kid)
+    ).all()
 
 
 def jwks():
@@ -135,6 +145,7 @@ def subject_of_hint(raw):
 # Applis clientes
 # ---------------------------------------------------------------------------
 
+
 def set_secret(client):
     """Remplace le secret. Renvoie sa valeur en clair : c'est le seul moment où elle existe. Sans commit."""
     raw = secrets.token_urlsafe(32)
@@ -170,14 +181,15 @@ def redirect_uri_problem(uri):
 
 def may_access(client, account):
     """L'appli est ouverte et cette personne est dans l'un de ses groupes autorisés. Un administrateur n'y échappe pas."""
-    return (client.active and account.active
-            and any(group in client.allowed_groups for group in account.all_groups))
+    return client.active and account.active and any(group in client.allowed_groups for group in account.all_groups)
 
 
 def clients_using(group):
-    return db.session.scalars(db.select(OidcClient).where(db.or_(
-        OidcClient.allowed_groups.any(id=group.id), OidcClient.shared_groups.any(id=group.id)))
-        .order_by(OidcClient.name)).all()
+    return db.session.scalars(
+        db.select(OidcClient)
+        .where(db.or_(OidcClient.allowed_groups.any(id=group.id), OidcClient.shared_groups.any(id=group.id)))
+        .order_by(OidcClient.name)
+    ).all()
 
 
 def all_clients():
@@ -193,6 +205,7 @@ def find_client(client_id):
 # ---------------------------------------------------------------------------
 # Connexion en cours
 # ---------------------------------------------------------------------------
+
 
 def _login_of(account):
     return db.session.get(LoginSession, account.session_token) if account.session_token else None
@@ -228,6 +241,7 @@ def pop_resume():
 # Consentements
 # ---------------------------------------------------------------------------
 
+
 def _meaningful(scope):
     return set(scope.split()) - {"openid"}
 
@@ -247,8 +261,9 @@ def grant_consent(client, account, scope):
 
 
 def consents_of(account):
-    return db.session.scalars(db.select(OidcConsent).filter_by(account_id=account.id)
-                              .order_by(OidcConsent.granted_at.desc())).all()
+    return db.session.scalars(
+        db.select(OidcConsent).filter_by(account_id=account.id).order_by(OidcConsent.granted_at.desc())
+    ).all()
 
 
 def revoke_consent(account, client_id):
@@ -273,6 +288,7 @@ def what_is_shared(client, account, scope):
 # Jetons et informations transmises
 # ---------------------------------------------------------------------------
 
+
 def shared_groups(client, account):
     return sorted(group.key for group in account.all_groups if group in client.shared_groups)
 
@@ -282,8 +298,12 @@ def claims_for(account, client, scope):
     scopes = scope.split()
     claims = {"sub": account.sub}
     if "profile" in scopes:
-        claims.update(name=account.full_name, given_name=account.first_name, family_name=account.last_name,
-                      updated_at=int(account.updated_at.timestamp()))
+        claims.update(
+            name=account.full_name,
+            given_name=account.first_name,
+            family_name=account.last_name,
+            updated_at=int(account.updated_at.timestamp()),
+        )
     if "email" in scopes:
         claims.update(email=account.email, email_verified=account.email_verified)
     if "groups" in scopes:
@@ -297,12 +317,15 @@ def directory(client):
     Une appli de l'association voit tous ses comptes. Une appli tierce ne voit que les personnes qui lui ont donné leur
     accord, et seulement ce qu'elles ont accepté de transmettre : l'export n'en dit pas plus que la connexion.
     """
-    consents = {c.account_id: c.scope for c in
-                db.session.scalars(db.select(OidcConsent).filter_by(client_id=client.id))}
+    consents = {
+        c.account_id: c.scope for c in db.session.scalars(db.select(OidcConsent).filter_by(client_id=client.id))
+    }
     rows = []
-    for account in db.session.scalars(db.select(Account).where(Account.active)
-                                      .order_by(db.func.fold(Account.last_name), db.func.fold(Account.first_name),
-                                                Account.id)):
+    for account in db.session.scalars(
+        db.select(Account)
+        .where(Account.active)
+        .order_by(db.func.fold(Account.last_name), db.func.fold(Account.first_name), Account.id)
+    ):
         if not may_access(client, account):
             continue
         if client.first_party:
@@ -330,14 +353,23 @@ def persons(client):
     personne a un compte qui entre dans cette appli. Ni email, ni adresse, ni date de naissance complète.
     """
     from ..models import Person
+
     rows = []
-    for person in db.session.scalars(db.select(Person).where(Person.archived_at.is_(None))
-                                     .order_by(db.func.fold(Person.last_name), db.func.fold(Person.first_name),
-                                               Person.id)):
+    for person in db.session.scalars(
+        db.select(Person)
+        .where(Person.archived_at.is_(None))
+        .order_by(db.func.fold(Person.last_name), db.func.fold(Person.first_name), Person.id)
+    ):
         account = person.account
-        rows.append({"uuid": person.uuid, "first_name": person.first_name, "last_name": person.last_name,
-                     "birth_year": person.birth_date.year if person.birth_date else None,
-                     "sub": account.sub if account is not None and may_access(client, account) else None})
+        rows.append(
+            {
+                "uuid": person.uuid,
+                "first_name": person.first_name,
+                "last_name": person.last_name,
+                "birth_year": person.birth_date.year if person.birth_date else None,
+                "sub": account.sub if account is not None and may_access(client, account) else None,
+            }
+        )
     return {"issuer": issuer(), "application": client.name, "persons": rows}
 
 
@@ -361,15 +393,18 @@ def revoke_tokens(account=None, client=None, client_id=None):
 def maintain(now=None):
     """Tâche périodique : renouvelle la clé si elle a l'âge, efface ce qui a expiré. Renvoie le nombre d'éléments effacés."""
     now = now or datetime.now()
-    newest = db.session.scalar(db.select(OidcKey).where(OidcKey.retired_at.is_(None))
-                               .order_by(OidcKey.created_at.desc()))
+    newest = db.session.scalar(
+        db.select(OidcKey).where(OidcKey.retired_at.is_(None)).order_by(OidcKey.created_at.desc())
+    )
     if newest is not None and now - newest.created_at >= KEY_ROTATION:
         rotate_key(now)
         log("oidc.key_rotate", "Clé de signature renouvelée automatiquement")
     deleted = 0
     now_utc = now.astimezone(UTC).replace(tzinfo=None)
-    for query in (db.delete(OidcToken).where(OidcToken.expires_at < now_utc),
-                  db.delete(OidcCode).where(OidcCode.expires_at < now_utc - USED_CODE_KEPT),
-                  db.delete(OidcKey).where(OidcKey.retired_at < now - RETIRED_KEY_KEPT)):
+    for query in (
+        db.delete(OidcToken).where(OidcToken.expires_at < now_utc),
+        db.delete(OidcCode).where(OidcCode.expires_at < now_utc - USED_CODE_KEPT),
+        db.delete(OidcKey).where(OidcKey.retired_at < now - RETIRED_KEY_KEPT),
+    ):
         deleted += db.session.execute(query).rowcount
     return deleted

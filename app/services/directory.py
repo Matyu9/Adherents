@@ -1,4 +1,5 @@
 """Annuaire : personnes, foyers, saisons. Les services ne font pas de commit : c'est la route qui valide."""
+
 import re
 from datetime import datetime
 
@@ -29,12 +30,21 @@ from .catalog import move_teaching
 
 CURRENT_SEASON_KEY = "current_season"
 ACCOUNT_MIN_AGE = 16  # en dessous, le responsable gère la fiche depuis son propre compte
-PERSON_FIELDS = ("civility", "first_name", "last_name", "birth_name", "sex", "birth_date", "birth_place", "email",
-                 "emergency_contact", "notes")
+PERSON_FIELDS = (
+    "civility",
+    "first_name",
+    "last_name",
+    "birth_name",
+    "sex",
+    "birth_date",
+    "birth_place",
+    "email",
+    "emergency_contact",
+    "notes",
+)
 ADDRESS_FIELDS = ("address_recipient", "address_street", "postal_code", "city", "country")
 # Filtres de la liste des personnes.
-STATUSES = {"eleves": "Élèves de la saison", "anciens": "Anciens adhérents",
-            "archives": "Archivées"}
+STATUSES = {"eleves": "Élèves de la saison", "anciens": "Anciens adhérents", "archives": "Archivées"}
 
 
 class DirectoryError(ValueError):
@@ -44,6 +54,7 @@ class DirectoryError(ValueError):
 # ---------------------------------------------------------------------------
 # Téléphones
 # ---------------------------------------------------------------------------
+
 
 def normalize_phone(text):
     """Numéro au format international (+33612345678). Lève DirectoryError s'il est impossible à lire."""
@@ -65,7 +76,7 @@ def display_phone(number):
     """+33612345678 → 06 12 34 56 78 ; les numéros étrangers restent au format international."""
     if number and re.fullmatch(r"\+33\d{9}", number):
         national = "0" + number[3:]
-        return " ".join(national[i:i + 2] for i in range(0, 10, 2))
+        return " ".join(national[i : i + 2] for i in range(0, 10, 2))
     return number or ""
 
 
@@ -73,8 +84,11 @@ def add_phone(owner, number, label=None):
     number = normalize_phone(number)
     if any(phone.number == number for phone in owner.phones):
         raise DirectoryError("Ce numéro est déjà sur la fiche.")
-    phone = Phone(number=number, label=(label or "").strip() or None,
-                  position=max((p.position for p in owner.phones), default=-1) + 1)
+    phone = Phone(
+        number=number,
+        label=(label or "").strip() or None,
+        position=max((p.position for p in owner.phones), default=-1) + 1,
+    )
     owner.phones.append(phone)
     return phone
 
@@ -82,6 +96,7 @@ def add_phone(owner, number, label=None):
 # ---------------------------------------------------------------------------
 # Saisons
 # ---------------------------------------------------------------------------
+
 
 def seasons():
     return db.session.scalars(db.select(Season).order_by(Season.starts_on.desc())).all()
@@ -109,11 +124,18 @@ def active_in(season):
 # Recherche
 # ---------------------------------------------------------------------------
 
+
 def search(query, text):
     """Chaque mot cherché doit se trouver dans le nom, le prénom, le nom de naissance ou l'email, sans accents."""
     for word in (text or "").split():
-        query = query.where(db.or_(*(fold_contains(column, word) for column in
-                                     (Person.first_name, Person.last_name, Person.birth_name, Person.email))))
+        query = query.where(
+            db.or_(
+                *(
+                    fold_contains(column, word)
+                    for column in (Person.first_name, Person.last_name, Person.birth_name, Person.email)
+                )
+            )
+        )
     return query
 
 
@@ -141,18 +163,28 @@ def person_query(text=None, status=None, season=None):
 
 
 def household_query(text=None, archived=False):
-    query = db.select(Household).where(Household.archived_at.is_not(None) if archived else Household.archived_at.is_(None))
+    query = db.select(Household).where(
+        Household.archived_at.is_not(None) if archived else Household.archived_at.is_(None)
+    )
     for word in (text or "").split():
-        query = query.where(db.or_(fold_contains(Household.name, word), fold_contains(Household.city, word),
-                                   Household.members.any(HouseholdMember.person.has(
-                                       db.or_(fold_contains(Person.first_name, word),
-                                              fold_contains(Person.last_name, word))))))
+        query = query.where(
+            db.or_(
+                fold_contains(Household.name, word),
+                fold_contains(Household.city, word),
+                Household.members.any(
+                    HouseholdMember.person.has(
+                        db.or_(fold_contains(Person.first_name, word), fold_contains(Person.last_name, word))
+                    )
+                ),
+            )
+        )
     return query
 
 
 # ---------------------------------------------------------------------------
 # Foyers et membres
 # ---------------------------------------------------------------------------
+
 
 def same_email(a, b):
     return bool(a and b) and a.strip().lower() == b.strip().lower()
@@ -188,12 +220,15 @@ def add_member(household, person, role, relationship=None):
             raise DirectoryError("Ce foyer a déjà deux responsables.")
     elif role == HouseholdMember.DEPENDENT:
         if parent := guardian_email_conflict(person, person.email, households=[household]):
-            raise DirectoryError(f"{person.full_name} porte l'adresse email de {parent.full_name}, responsable du "
-                                 "foyer : retirez-la d'abord de sa fiche.")
+            raise DirectoryError(
+                f"{person.full_name} porte l'adresse email de {parent.full_name}, responsable du "
+                "foyer : retirez-la d'abord de sa fiche."
+            )
     else:
         raise DirectoryError("Rôle inconnu.")
-    member = HouseholdMember(person=person, role=role, guardian_rank=rank,
-                             relationship=(relationship or "").strip() or None)
+    member = HouseholdMember(
+        person=person, role=role, guardian_rank=rank, relationship=(relationship or "").strip() or None
+    )
     household.members.append(member)
     return member
 
@@ -239,6 +274,7 @@ def default_household_name(person):
 # Archivage
 # ---------------------------------------------------------------------------
 
+
 def archive(record):
     record.archived_at = datetime.now()
 
@@ -252,10 +288,18 @@ def restore(record):
 # ---------------------------------------------------------------------------
 
 # Champs comparés à la fusion, dans l'ordre de l'écran. « adresse » regroupe ADDRESS_FIELDS.
-PERSON_MERGE_FIELDS = {"civility": "Civilité", "first_name": "Prénom", "last_name": "Nom",
-                       "birth_name": "Nom de naissance", "sex": "Sexe", "birth_date": "Date de naissance",
-                       "birth_place": "Lieu de naissance", "email": "Email", "adresse": "Adresse",
-                       "emergency_contact": "Contact d'urgence"}
+PERSON_MERGE_FIELDS = {
+    "civility": "Civilité",
+    "first_name": "Prénom",
+    "last_name": "Nom",
+    "birth_name": "Nom de naissance",
+    "sex": "Sexe",
+    "birth_date": "Date de naissance",
+    "birth_place": "Lieu de naissance",
+    "email": "Email",
+    "adresse": "Adresse",
+    "emergency_contact": "Contact d'urgence",
+}
 HOUSEHOLD_MERGE_FIELDS = {"name": "Nom du foyer", "adresse": "Adresse"}
 
 
@@ -279,7 +323,9 @@ def merge_plan(keep, drop, fields):
     plan = []
     for field in fields:
         kept, other = _value(keep, field), _value(drop, field)
-        plan.append((field, kept, other, kept is not None and other is not None and _comparable(kept) != _comparable(other)))
+        plan.append(
+            (field, kept, other, kept is not None and other is not None and _comparable(kept) != _comparable(other))
+        )
     return plan
 
 
@@ -308,8 +354,10 @@ def merge_problems(keep, drop):
         return ["Une fiche ne se fusionne pas avec elle-même."]
     problems = []
     if keep.account is not None and drop.account is not None:
-        problems.append(f"Les deux fiches ont chacune un compte ({keep.account.email} et {drop.account.email}) : "
-                        "détachez-en un d'abord.")
+        problems.append(
+            f"Les deux fiches ont chacune un compte ({keep.account.email} et {drop.account.email}) : "
+            "détachez-en un d'abord."
+        )
     return problems
 
 
@@ -329,8 +377,9 @@ def merge_persons(keep, drop, take=()):
         if link.household_id in in_keep:
             summary.append(f"déjà membre de {data[0].name}")
             continue
-        db.session.add(HouseholdMember(household=data[0], person=keep, role=data[1], guardian_rank=data[2],
-                                       relationship=data[3]))
+        db.session.add(
+            HouseholdMember(household=data[0], person=keep, role=data[1], guardian_rank=data[2], relationship=data[3])
+        )
         summary.append(f"foyer {data[0].name} repris")
 
     numbers = {phone.number for phone in keep.phones}
@@ -349,9 +398,14 @@ def merge_persons(keep, drop, take=()):
             for enrollment in list(membership.enrollments):  # ses cours passent sur l'adhésion gardée
                 if enrollment.course_id not in courses:
                     membership.enrollments.remove(enrollment)
-                    kept.enrollments.append(Enrollment(course_id=enrollment.course_id, status=enrollment.status,
-                                                       withdrawn_on=enrollment.withdrawn_on,
-                                                       dossier_id=enrollment.dossier_id))
+                    kept.enrollments.append(
+                        Enrollment(
+                            course_id=enrollment.course_id,
+                            status=enrollment.status,
+                            withdrawn_on=enrollment.withdrawn_on,
+                            dossier_id=enrollment.dossier_id,
+                        )
+                    )
         else:
             membership.person = keep
     db.session.execute(db.update(Consent).where(Consent.person_id == drop.id).values(person_id=keep.id))
@@ -359,8 +413,13 @@ def merge_persons(keep, drop, take=()):
     if drop.teacher is not None:
         if keep.teacher is None:
             old = drop.teacher
-            keep.teacher = Teacher(status=old.status, started_on=old.started_on, left_on=old.left_on,
-                                   work_email=old.work_email, notes=old.notes)
+            keep.teacher = Teacher(
+                status=old.status,
+                started_on=old.started_on,
+                left_on=old.left_on,
+                work_email=old.work_email,
+                notes=old.notes,
+            )
             db.session.flush()
             summary.append("profil de professeur repris")
         if moved := move_teaching(drop.teacher, keep.teacher):
@@ -374,8 +433,9 @@ def merge_persons(keep, drop, take=()):
         keep.account = account
         summary.append(f"compte {account.email} repris")
 
-    db.session.execute(db.update(BankAccount).where(BankAccount.holder_person_id == drop.id)
-                       .values(holder_person_id=keep.id))
+    db.session.execute(
+        db.update(BankAccount).where(BankAccount.holder_person_id == drop.id).values(holder_person_id=keep.id)
+    )
     db.session.execute(db.update(Activity).where(Activity.person_id == drop.id).values(person_id=keep.id))
     db.session.execute(db.update(FeePick).where(FeePick.person_id == drop.id).values(person_id=keep.id))
     db.session.execute(db.update(AssessmentLine).where(AssessmentLine.person_id == drop.id).values(person_id=keep.id))
@@ -402,15 +462,19 @@ def household_merge_problems(keep, drop):
     if drop.bank_accounts and not bank.enabled():
         problems.append("Le foyer à fusionner a des coordonnées bancaires et BANK_DATA_KEYS n'est pas définie.")
     campaigns = set(db.session.scalars(db.select(Dossier.campaign_id).filter_by(household_id=keep.id)))
-    if any(d.campaign_id in campaigns for d in
-           db.session.scalars(db.select(Dossier).filter_by(household_id=drop.id))):
-        problems.append("Les deux foyers ont chacun un dossier pour la même campagne d'inscription : traitez-en "
-                        "un d'abord.")
+    if any(d.campaign_id in campaigns for d in db.session.scalars(db.select(Dossier).filter_by(household_id=drop.id))):
+        problems.append(
+            "Les deux foyers ont chacun un dossier pour la même campagne d'inscription : traitez-en un d'abord."
+        )
     assessed = set(db.session.scalars(db.select(Assessment.season_id).filter_by(household_id=keep.id)))
-    if any(season_id in assessed for season_id in
-           db.session.scalars(db.select(Assessment.season_id).filter_by(household_id=drop.id))):
-        problems.append("Les deux foyers ont chacun une cotisation pour la même saison : supprimez d'abord celle "
-                        "qui n'est pas validée.")
+    if any(
+        season_id in assessed
+        for season_id in db.session.scalars(db.select(Assessment.season_id).filter_by(household_id=drop.id))
+    ):
+        problems.append(
+            "Les deux foyers ont chacun une cotisation pour la même saison : supprimez d'abord celle "
+            "qui n'est pas validée."
+        )
     return problems
 
 
@@ -452,9 +516,17 @@ def merge_households(keep, drop, take=()):
         if record.season_id in kept_seasons:
             summary.append(f"situation {record.season.label} en double : celle du foyer gardé reste")
         else:
-            db.session.add(HouseholdSeason(household=keep, season_id=record.season_id, qf_band=record.qf_band,
-                                           quotient=record.quotient, qf_proof=record.qf_proof,
-                                           resident=record.resident, tags=list(record.tags or [])))
+            db.session.add(
+                HouseholdSeason(
+                    household=keep,
+                    season_id=record.season_id,
+                    qf_band=record.qf_band,
+                    quotient=record.quotient,
+                    qf_proof=record.qf_proof,
+                    resident=record.resident,
+                    tags=list(record.tags or []),
+                )
+            )
     db.session.flush()
     db.session.expire(drop)
     db.session.delete(drop)
@@ -466,20 +538,32 @@ def merge_households(keep, drop, take=()):
 # Comptes de connexion
 # ---------------------------------------------------------------------------
 
+
 def unlinked_accounts():
-    return db.session.scalars(db.select(Account).where(~Account.person.has())
-                             .order_by(Account.last_name, Account.first_name)).all()
+    return db.session.scalars(
+        db.select(Account).where(~Account.person.has()).order_by(Account.last_name, Account.first_name)
+    ).all()
 
 
 def suggestions(account):
     """Fiches qui pourraient être celles du compte, avec la raison. L'email seul ne suffit pas : on montre aussi les
     homonymes, et c'est un humain qui choisit."""
     email = account.email.lower()
-    candidates = db.session.scalars(db.select(Person).where(
-        Person.account_id.is_(None), Person.archived_at.is_(None),
-        db.or_(db.func.lower(Person.email) == email,
-               db.and_(db.func.fold(Person.first_name) == fold(account.first_name),
-                       db.func.fold(Person.last_name) == fold(account.last_name)))).order_by(Person.last_name)).all()
+    candidates = db.session.scalars(
+        db.select(Person)
+        .where(
+            Person.account_id.is_(None),
+            Person.archived_at.is_(None),
+            db.or_(
+                db.func.lower(Person.email) == email,
+                db.and_(
+                    db.func.fold(Person.first_name) == fold(account.first_name),
+                    db.func.fold(Person.last_name) == fold(account.last_name),
+                ),
+            ),
+        )
+        .order_by(Person.last_name)
+    ).all()
     result = []
     for person in candidates:
         reasons = []
@@ -538,9 +622,16 @@ def create_account(person, role=Role.ADHERENT, guardian_consent=False):
     if problem := account_problems(person):
         raise DirectoryError(problem)
     if needs_guardian_consent(person) and not guardian_consent:
-        raise DirectoryError(f"{person.full_name} est mineur(e) : confirmez qu'un responsable légal a donné son accord.")
-    account = Account(first_name=person.first_name, last_name=person.last_name, email=person.email.strip().lower(),
-                      role=role, active=True)
+        raise DirectoryError(
+            f"{person.full_name} est mineur(e) : confirmez qu'un responsable légal a donné son accord."
+        )
+    account = Account(
+        first_name=person.first_name,
+        last_name=person.last_name,
+        email=person.email.strip().lower(),
+        role=role,
+        active=True,
+    )
     db.session.add(account)
     person.account = account
     db.session.flush()

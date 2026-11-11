@@ -1,4 +1,5 @@
 """Garde-fous des données personnelles : limite de lecture, inactivité, fusion d'un compte, journal, en-têtes, fichiers."""
+
 import os
 from datetime import datetime, timedelta
 
@@ -15,6 +16,7 @@ from .test_annuaire import family, person  # noqa: F401
 # ---------------------------------------------------------------------------
 # Limite de lecture
 # ---------------------------------------------------------------------------
+
 
 def test_mass_reading_is_stopped_and_admins_are_told(client, app, manager_client):
     app.config["DIRECTORY_READ_LIMIT"] = 5
@@ -63,6 +65,7 @@ def manager_client(client, accounts):
 # Inactivité
 # ---------------------------------------------------------------------------
 
+
 def _age_sessions(account, hours):
     for login_session in db.session.scalars(db.select(LoginSession).filter_by(account_id=account.id)):
         login_session.last_seen_at = datetime.now() - timedelta(hours=hours)
@@ -100,11 +103,12 @@ def test_idle_timeout_can_be_disabled(client, app, manager_client):
 # Fusion d'une fiche qui a un compte
 # ---------------------------------------------------------------------------
 
+
 def test_merging_a_record_with_an_account_needs_the_accounts_right(client, manager_client, family):
     copy = person("Anne", "Martin", account=make_account(email="anne@asso.test"))
     db.session.commit()
     page = client.get(f"/annuaire/personnes/{family['anne'].id}/fusionner?avec={copy.id}").get_data(as_text=True)
-    assert "droit de gérer les comptes" in page and "<button type=\"submit\">Fusionner" not in page
+    assert "droit de gérer les comptes" in page and '<button type="submit">Fusionner' not in page
     client.post(f"/annuaire/personnes/{family['anne'].id}/fusionner", data={"avec": copy.id})
     assert db.session.get(Person, copy.id) is not None  # refusé côté serveur aussi
 
@@ -120,11 +124,21 @@ def test_admin_can_merge_a_record_with_an_account(client, admin, family):
 # Journal
 # ---------------------------------------------------------------------------
 
+
 def test_personal_fields_never_reach_the_journal(client, admin, family):
     anne = family["anne"]
-    client.post(f"/annuaire/personnes/{anne.id}/modifier", data={
-        "first_name": "Anne", "last_name": "Martin", "email": "anne@asso.test", "country": "FR",
-        "birth_place": "Lisieux", "notes": "dossier social", "emergency_contact": "Sœur 0600000000"})
+    client.post(
+        f"/annuaire/personnes/{anne.id}/modifier",
+        data={
+            "first_name": "Anne",
+            "last_name": "Martin",
+            "email": "anne@asso.test",
+            "country": "FR",
+            "birth_place": "Lisieux",
+            "notes": "dossier social",
+            "emergency_contact": "Sœur 0600000000",
+        },
+    )
     entry = db.session.scalar(db.select(Activity).filter_by(action="person.update"))
     assert set(entry.changes) == {"birth_place", "notes", "emergency_contact"}
     assert all(values == ["(masqué)", "(masqué)"] for values in entry.changes.values())
@@ -139,6 +153,7 @@ def test_diff_can_mask_a_field_for_one_call():
 # ---------------------------------------------------------------------------
 # En-têtes et fichiers
 # ---------------------------------------------------------------------------
+
 
 def test_isolation_headers_everywhere(client):
     headers = client.get("/connexion").headers
@@ -164,6 +179,7 @@ def test_health_warns_about_world_readable_data(app, tmp_path):
 # ---------------------------------------------------------------------------
 # Double authentification
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize("right", ["directory.view", "bank.view", "teacher.manage"])
 def test_reading_personal_data_requires_two_factor(client, app, right):

@@ -1,5 +1,6 @@
 """Rapports de violation de la Content-Security-Policy envoyés par les navigateurs : journalisés, rien n'est stocké.
 Public et sans jeton CSRF (le navigateur les poste lui-même), donc limité en débit et en taille."""
+
 import json
 
 from flask import Blueprint, current_app, request
@@ -15,13 +16,15 @@ MAX_REPORTS = 10  # rapports journalisés par requête (report-to les envoie par
 _by_ip = throttle.Limiter("csp", 60, 3600)
 
 # Champs utiles : (nom journalisé, clé report-uri, clé report-to)
-FIELDS = (("directive", "effective-directive", "effectiveDirective"),
-          ("violée", "violated-directive", None),
-          ("bloqué", "blocked-uri", "blockedURL"),
-          ("page", "document-uri", "documentURL"),
-          ("source", "source-file", "sourceFile"),
-          ("ligne", "line-number", "lineNumber"),
-          ("mode", "disposition", "disposition"))
+FIELDS = (
+    ("directive", "effective-directive", "effectiveDirective"),
+    ("violée", "violated-directive", None),
+    ("bloqué", "blocked-uri", "blockedURL"),
+    ("page", "document-uri", "documentURL"),
+    ("source", "source-file", "sourceFile"),
+    ("ligne", "line-number", "lineNumber"),
+    ("mode", "disposition", "disposition"),
+)
 
 
 def _clean(value):
@@ -33,14 +36,20 @@ def _clean(value):
 def _reports(data, mimetype):
     """Rapports au format commun {nom: valeur}, depuis report-uri ({"csp-report": {…}}) ou report-to ([{…}, …])."""
     if mimetype == "application/reports+json":
-        bodies = [e.get("body") for e in data if isinstance(e, dict) and e.get("type") == "csp-violation"] \
-            if isinstance(data, list) else []
+        bodies = (
+            [e.get("body") for e in data if isinstance(e, dict) and e.get("type") == "csp-violation"]
+            if isinstance(data, list)
+            else []
+        )
         column = 2
     else:
         bodies = [data.get("csp-report")] if isinstance(data, dict) else []
         column = 1
-    return [{field[0]: body.get(field[column]) for field in FIELDS if field[column]}
-            for body in bodies if isinstance(body, dict)][:MAX_REPORTS]
+    return [
+        {field[0]: body.get(field[column]) for field in FIELDS if field[column]}
+        for body in bodies
+        if isinstance(body, dict)
+    ][:MAX_REPORTS]
 
 
 @bp.route("/csp-report", methods=["POST"])
@@ -61,6 +70,8 @@ def report():
     except ValueError:
         return "", 400
     for entry in _reports(data, request.mimetype):
-        current_app.logger.warning("Violation CSP : " + " ".join(
-            f"{name}={_clean(value)}" for name, value in entry.items() if value not in (None, "")))
+        current_app.logger.warning(
+            "Violation CSP : "
+            + " ".join(f"{name}={_clean(value)}" for name, value in entry.items() if value not in (None, ""))
+        )
     return "", 204

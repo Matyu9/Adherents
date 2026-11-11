@@ -1,4 +1,5 @@
 """Envoi d'emails via SMTP (facultatif)."""
+
 import logging
 import re
 import smtplib
@@ -66,22 +67,38 @@ def compose(notification):
 
 
 def compose_test(account):
-    return render(account, "Email de test", "Si vous lisez ceci, l'envoi d'emails de l'appli fonctionne.",
-                  DEFAULT_BUTTON, current_app.config["BASE_URL"], "ok")
+    return render(
+        account,
+        "Email de test",
+        "Si vous lisez ceci, l'envoi d'emails de l'appli fonctionne.",
+        DEFAULT_BUTTON,
+        current_app.config["BASE_URL"],
+        "ok",
+    )
 
 
 def render(account, subject, intro, button, url, tone="brand"):
     subject = _shorten(" ".join(subject.split()))  # pas de retour à la ligne dans un en-tête
     # Paragraphes séparés par une ligne vide ; un simple retour à la ligne est conservé dans le paragraphe.
     paragraphs = [p.strip().splitlines() for p in re.split(r"\n\s*\n", intro.strip()) if p.strip()]
-    context = {"user": account, "subject": subject, "intro": intro.strip(), "paragraphs": paragraphs,
-               "button": button.strip() or DEFAULT_BUTTON, "url": url, "tone": tone}
-    return (f"[{branding.name()}] {subject}", render_template("emails/notification.txt", **context),
-            render_template("emails/notification.html", **context))
+    context = {
+        "user": account,
+        "subject": subject,
+        "intro": intro.strip(),
+        "paragraphs": paragraphs,
+        "button": button.strip() or DEFAULT_BUTTON,
+        "url": url,
+        "tone": tone,
+    }
+    return (
+        f"[{branding.name()}] {subject}",
+        render_template("emails/notification.txt", **context),
+        render_template("emails/notification.html", **context),
+    )
 
 
 def _shorten(text, limit=100):
-    return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
 def deliver_pending(limit=200):
@@ -90,9 +107,12 @@ def deliver_pending(limit=200):
         return 0
     since = datetime.now() - MAX_AGE
     pending = db.session.scalars(
-        db.select(Notification).join(Account).where(
-            Notification.emailed.is_(False), Notification.created_at >= since, Account.active.is_(True))
-        .order_by(Notification.id).limit(limit)).all()
+        db.select(Notification)
+        .join(Account)
+        .where(Notification.emailed.is_(False), Notification.created_at >= since, Account.active.is_(True))
+        .order_by(Notification.id)
+        .limit(limit)
+    ).all()
     sent = 0
     for notification in pending:
         try:

@@ -1,4 +1,5 @@
 """Catalogue (phase 8) : listes de référence, cours d'une saison, disciplines des professeurs, copie de saison."""
+
 from datetime import date, time
 
 import pytest
@@ -24,9 +25,11 @@ def teacher(first="Élodie", last="Martin", **contract):
 def school(app):
     """Deux saisons, une flûtiste qui reste, un pianiste qui part fin juin 2027, des disciplines, niveaux et salles."""
     old, new = season("2026-2027", current=True), season("2027-2028")
-    flute, piano, fm = (Discipline(name="Flûte traversière", category="Instrument"),
-                        Discipline(name="Piano", category="Instrument"),
-                        Discipline(name="Formation musicale", category="Formation musicale"))
+    flute, piano, fm = (
+        Discipline(name="Flûte traversière", category="Instrument"),
+        Discipline(name="Piano", category="Instrument"),
+        Discipline(name="Formation musicale", category="Formation musicale"),
+    )
     c1, c2 = Level(name="Cycle 1", position=1), Level(name="Cycle 2", position=2)
     ecole = Site(name="École", address="2 place de la Mairie")
     salle_a, salle_b = Room(site=ecole, name="Salle A"), Room(site=ecole, name="Salle B")
@@ -34,8 +37,20 @@ def school(app):
     elodie = teacher(status="CDI", started_on=date(2015, 9, 1))
     paul = teacher("Paul", "Durand", status="CDD", left_on=date(2027, 6, 30))
     db.session.commit()
-    return {"old": old, "new": new, "flute": flute, "piano": piano, "fm": fm, "c1": c1, "c2": c2, "ecole": ecole,
-            "a": salle_a, "b": salle_b, "elodie": elodie, "paul": paul}
+    return {
+        "old": old,
+        "new": new,
+        "flute": flute,
+        "piano": piano,
+        "fm": fm,
+        "c1": c1,
+        "c2": c2,
+        "ecole": ecole,
+        "a": salle_a,
+        "b": salle_b,
+        "elodie": elodie,
+        "paul": paul,
+    }
 
 
 def course(s, discipline, **fields):
@@ -59,9 +74,14 @@ def manager(accounts, client):
 # Modèle
 # ---------------------------------------------------------------------------
 
+
 def test_course_constraints(school):
-    for fields in ({"weekday": 7}, {"starts_at": time(17)}, {"weekday": 1, "starts_at": time(18), "ends_at": time(17)},
-                   {"capacity": 0}):
+    for fields in (
+        {"weekday": 7},
+        {"starts_at": time(17)},
+        {"weekday": 1, "starts_at": time(18), "ends_at": time(17)},
+        {"capacity": 0},
+    ):
         with pytest.raises(sa.exc.IntegrityError):
             course(school["old"], school["flute"], **fields)
         db.session.rollback()
@@ -99,22 +119,40 @@ def test_teacher_presence_during_a_season(school):
 
 def test_overlaps_and_conflicts(school):
     old = school["old"]
-    a = course(old, school["flute"], weekday=2, starts_at=time(17), ends_at=time(18), room=school["a"],
-               teacher=school["elodie"])
+    a = course(
+        old,
+        school["flute"],
+        weekday=2,
+        starts_at=time(17),
+        ends_at=time(18),
+        room=school["a"],
+        teacher=school["elodie"],
+    )
     after = course(old, school["piano"], weekday=2, starts_at=time(18), ends_at=time(19), room=school["a"])
     same_room = course(old, school["fm"], weekday=2, starts_at=time(17, 30), ends_at=time(18, 30), room=school["a"])
-    same_teacher = course(old, school["fm"], weekday=2, starts_at=time(17, 45), ends_at=time(18, 15), room=school["b"],
-                          teacher=school["elodie"])
+    same_teacher = course(
+        old,
+        school["fm"],
+        weekday=2,
+        starts_at=time(17, 45),
+        ends_at=time(18, 15),
+        room=school["b"],
+        teacher=school["elodie"],
+    )
     other_day = course(old, school["fm"], weekday=3, starts_at=time(17), ends_at=time(18), room=school["a"])
     assert not a.overlaps(after) and a.overlaps(same_room) and not a.overlaps(other_day)
     found = catalog.season_conflicts([a, after, same_room, same_teacher, other_day])
-    assert {(o.id, why) for o, why in found[a.id]} == {(same_room.id, "même salle"), (same_teacher.id, "même professeur")}
+    assert {(o.id, why) for o, why in found[a.id]} == {
+        (same_room.id, "même salle"),
+        (same_teacher.id, "même professeur"),
+    }
     assert other_day.id not in found
 
 
 # ---------------------------------------------------------------------------
 # Disciplines des professeurs
 # ---------------------------------------------------------------------------
+
 
 def test_a_course_adds_its_discipline_to_the_teacher(school):
     c = course(school["old"], school["flute"], teacher=school["elodie"])
@@ -137,11 +175,23 @@ def test_a_discipline_in_use_cannot_be_removed_from_a_teacher(school):
 # Copie d'une saison sur la suivante
 # ---------------------------------------------------------------------------
 
+
 def test_copy_a_season(school):
     old, new = school["old"], school["new"]
-    flute = course(old, school["flute"], level=school["c1"], teacher=school["elodie"], room=school["a"], weekday=2,
-                   starts_at=time(17), ends_at=time(17, 45), capacity=1, marked_full=True, group_label="A",
-                   notes="à revoir")
+    flute = course(
+        old,
+        school["flute"],
+        level=school["c1"],
+        teacher=school["elodie"],
+        room=school["a"],
+        weekday=2,
+        starts_at=time(17),
+        ends_at=time(17, 45),
+        capacity=1,
+        marked_full=True,
+        group_label="A",
+        notes="à revoir",
+    )
     catalog.set_disciplines(school["elodie"], old, [school["flute"], school["fm"]])
     db.session.commit()
 
@@ -150,12 +200,24 @@ def test_copy_a_season(school):
     assert len(plan.copied) == 1 and not plan.skipped
     (copy,) = db.session.scalars(sa.select(Course).where(Course.season_id == new.id)).all()
     assert copy.id != flute.id
-    assert (copy.discipline, copy.level, copy.teacher, copy.room, copy.weekday, copy.starts_at, copy.ends_at,
-            copy.capacity, copy.group_label, copy.notes) == (
-        school["flute"], school["c1"], school["elodie"], school["a"], 2, time(17), time(17, 45), 1, "A", "à revoir")
+    assert (
+        copy.discipline,
+        copy.level,
+        copy.teacher,
+        copy.room,
+        copy.weekday,
+        copy.starts_at,
+        copy.ends_at,
+        copy.capacity,
+        copy.group_label,
+        copy.notes,
+    ) == (school["flute"], school["c1"], school["elodie"], school["a"], 2, time(17), time(17, 45), 1, "A", "à revoir")
     assert copy.marked_full is False  # une nouvelle saison rouvre les inscriptions
     assert flute.marked_full is True and flute.season == old  # l'original ne bouge pas
-    assert {d.name for d in catalog.disciplines_of(school["elodie"], new)} == {"Flûte traversière", "Formation musicale"}
+    assert {d.name for d in catalog.disciplines_of(school["elodie"], new)} == {
+        "Flûte traversière",
+        "Formation musicale",
+    }
 
 
 def test_copy_with_a_teacher_who_left(school):
@@ -233,10 +295,20 @@ def test_copy_page_defaults_to_the_two_latest_seasons(client, manager, school):
 # Écrans des cours
 # ---------------------------------------------------------------------------
 
+
 def course_data(school, **overrides):
-    data = {"discipline_id": school["flute"].id, "level_id": school["c1"].id, "teacher_id": school["elodie"].person_id,
-            "weekday": "2", "starts_at": "17:00", "ends_at": "17:45", "room_id": school["a"].id, "capacity": "1",
-            "group_label": " A ", "notes": ""}
+    data = {
+        "discipline_id": school["flute"].id,
+        "level_id": school["c1"].id,
+        "teacher_id": school["elodie"].person_id,
+        "weekday": "2",
+        "starts_at": "17:00",
+        "ends_at": "17:45",
+        "room_id": school["a"].id,
+        "capacity": "1",
+        "group_label": " A ",
+        "notes": "",
+    }
     data.update(overrides)
     return data
 
@@ -246,22 +318,32 @@ def test_create_a_course(client, manager, school):
     assert response.status_code == 302
     c = db.session.scalar(sa.select(Course))
     assert (c.season, c.teacher, c.weekday, c.starts_at, c.group_label, c.marked_full) == (
-        school["old"], school["elodie"], 2, time(17), "A", False)
+        school["old"],
+        school["elodie"],
+        2,
+        time(17),
+        "A",
+        False,
+    )
     assert catalog.disciplines_of(school["elodie"], school["old"]) == [school["flute"]]
     assert db.session.scalar(sa.select(Activity).filter_by(action="course.create")).message.startswith(
-        "Cours ajouté : Flûte traversière · Cycle 1 · A (2026-2027, mercredi 17:00-17:45)")
+        "Cours ajouté : Flûte traversière · Cycle 1 · A (2026-2027, mercredi 17:00-17:45)"
+    )
     page = client.get(f"/catalogue?saison={school['old'].id}").get_data(as_text=True)
     assert "Flûte traversière" in page and "Mercredi 17:00-17:45" in page and "Salle A (École)" in page
 
 
-@pytest.mark.parametrize("overrides, message", [
-    ({"starts_at": "18:00", "ends_at": "17:00"}, "La fin doit suivre le début."),
-    ({"ends_at": ""}, "Indiquez le début et la fin"),
-    ({"weekday": ""}, "Un horaire demande un jour."),
-    ({"capacity": "0"}, "Entre 1 et 500."),
-    ({"discipline_id": ""}, "Choisissez la discipline."),
-    ({"discipline_id": "999"}, "Ce choix n&#39;est pas proposé."),
-])
+@pytest.mark.parametrize(
+    "overrides, message",
+    [
+        ({"starts_at": "18:00", "ends_at": "17:00"}, "La fin doit suivre le début."),
+        ({"ends_at": ""}, "Indiquez le début et la fin"),
+        ({"weekday": ""}, "Un horaire demande un jour."),
+        ({"capacity": "0"}, "Entre 1 et 500."),
+        ({"discipline_id": ""}, "Choisissez la discipline."),
+        ({"discipline_id": "999"}, "Ce choix n&#39;est pas proposé."),
+    ],
+)
 def test_invalid_course_is_refused(client, manager, school, overrides, message):
     response = client.post(f"/catalogue/cours/nouveau?saison={school['old'].id}", data=course_data(school, **overrides))
     assert response.status_code == 200 and message in response.get_data(as_text=True)
@@ -276,15 +358,19 @@ def test_a_teacher_who_left_is_not_offered_but_stays_on_his_courses(client, mana
     form = client.get(f"/catalogue/cours/nouveau?saison={old.id}").get_data(as_text=True)
     assert "DURAND Paul (parti le 30 juin 2027)" in form
     # Choisi de force sur la saison suivante : refusé.
-    response = client.post(f"/catalogue/cours/nouveau?saison={new.id}", data=course_data(school, teacher_id=paul.person_id))
+    response = client.post(
+        f"/catalogue/cours/nouveau?saison={new.id}", data=course_data(school, teacher_id=paul.person_id)
+    )
     assert "Ce choix n&#39;est pas proposé." in response.get_data(as_text=True)
     # Un cours existant le garde tant qu'on ne change pas de professeur.
     c = course(old, school["piano"], teacher=paul)
     db.session.commit()
     page = client.get(f"/catalogue/cours/{c.id}/modifier").get_data(as_text=True)
     assert "part le 30 juin 2027" in page
-    client.post(f"/catalogue/cours/{c.id}/modifier", data=course_data(school, discipline_id=school["piano"].id,
-                                                                      teacher_id=paul.person_id))
+    client.post(
+        f"/catalogue/cours/{c.id}/modifier",
+        data=course_data(school, discipline_id=school["piano"].id, teacher_id=paul.person_id),
+    )
     assert db.session.get(Course, c.id).teacher == paul
     listing = client.get(f"/catalogue?saison={old.id}").get_data(as_text=True)
     assert "parti le 30 juin 2027" in listing
@@ -304,16 +390,19 @@ def test_an_archived_value_stays_on_existing_courses_only(client, manager, schoo
 def test_overlap_is_a_warning_not_a_refusal(client, manager, school):
     course(school["old"], school["fm"], weekday=2, starts_at=time(17, 30), ends_at=time(18, 30), room=school["a"])
     db.session.commit()
-    page = client.post(f"/catalogue/cours/nouveau?saison={school['old'].id}", data=course_data(school),
-                       follow_redirects=True).get_data(as_text=True)
+    page = client.post(
+        f"/catalogue/cours/nouveau?saison={school['old'].id}", data=course_data(school), follow_redirects=True
+    ).get_data(as_text=True)
     assert count(Course) == 2 and "Chevauchement (même salle)" in page
 
 
 def test_full_course_is_shown(client, manager, school):
     c = course(school["old"], school["fm"], capacity=10)
     db.session.commit()
-    client.post(f"/catalogue/cours/{c.id}/modifier", data=course_data(school, discipline_id=school["fm"].id,
-                                                                      capacity="10", marked_full="y"))
+    client.post(
+        f"/catalogue/cours/{c.id}/modifier",
+        data=course_data(school, discipline_id=school["fm"].id, capacity="10", marked_full="y"),
+    )
     assert db.session.get(Course, c.id).marked_full
     assert '<span class="badge">complet</span>' in client.get("/catalogue").get_data(as_text=True)
     changes = db.session.scalar(sa.select(Activity).filter_by(action="course.update")).changes
@@ -359,8 +448,12 @@ def test_catalogue_without_any_season(client, manager):
 # Listes de référence
 # ---------------------------------------------------------------------------
 
+
 def test_reference_lists(client, manager, school):
-    assert client.post("/catalogue/disciplines/nouveau", data={"name": "Violon", "category": "Instrument"}).status_code == 302
+    assert (
+        client.post("/catalogue/disciplines/nouveau", data={"name": "Violon", "category": "Instrument"}).status_code
+        == 302
+    )
     response = client.post("/catalogue/disciplines/nouveau", data={"name": "  FLUTE Traversiere "})
     assert "Ce nom existe déjà." in response.get_data(as_text=True)
     assert client.post("/catalogue/niveaux/nouveau", data={"name": "Débutant", "position": "0"}).status_code == 302
@@ -369,7 +462,9 @@ def test_reference_lists(client, manager, school):
     assert client.post("/catalogue/salles/nouveau", data={"site_id": college.id, "name": "Salle A"}).status_code == 302
     response = client.post("/catalogue/salles/nouveau", data={"site_id": college.id, "name": "salle a"})
     assert "Ce nom existe déjà sur ce site." in response.get_data(as_text=True)
-    client.post(f"/catalogue/disciplines/{school['piano'].id}/modifier", data={"name": "Piano classique", "category": ""})
+    client.post(
+        f"/catalogue/disciplines/{school['piano'].id}/modifier", data={"name": "Piano classique", "category": ""}
+    )
     assert school["piano"].name == "Piano classique" and school["piano"].category is None
     actions = set(db.session.scalars(sa.select(Activity.action)))
     assert {"discipline.create", "level.create", "site.create", "room.create", "discipline.update"} <= actions
@@ -380,8 +475,12 @@ def test_reference_lists(client, manager, school):
 def test_used_values_are_archived_not_deleted(client, manager, school):
     course(school["old"], school["flute"], level=school["c1"], room=school["a"])
     db.session.commit()
-    for url in (f"/catalogue/disciplines/{school['flute'].id}", f"/catalogue/niveaux/{school['c1'].id}",
-                f"/catalogue/salles/{school['a'].id}", f"/catalogue/sites/{school['ecole'].id}"):
+    for url in (
+        f"/catalogue/disciplines/{school['flute'].id}",
+        f"/catalogue/niveaux/{school['c1'].id}",
+        f"/catalogue/salles/{school['a'].id}",
+        f"/catalogue/sites/{school['ecole'].id}",
+    ):
         page = client.post(url + "/supprimer", follow_redirects=True).get_data(as_text=True)
         assert "a déjà servi" in page
     assert count(Discipline) == 3 and count(Room) == 2 and count(Site) == 1
@@ -403,6 +502,7 @@ def test_unknown_reference_kind_is_404(client, manager):
 # ---------------------------------------------------------------------------
 # Professeurs
 # ---------------------------------------------------------------------------
+
 
 def test_teacher_disciplines_screen(client, manager, school):
     old, elodie = school["old"], school["elodie"]
@@ -485,6 +585,7 @@ def test_a_season_with_courses_cannot_be_deleted(client, manager, school):
 # ---------------------------------------------------------------------------
 # Droits
 # ---------------------------------------------------------------------------
+
 
 def test_read_only_catalogue(client, school):
     course(school["old"], school["flute"])

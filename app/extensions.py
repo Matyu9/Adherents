@@ -16,8 +16,22 @@ login_manager.login_message = "Veuillez vous connecter pour accéder à cette pa
 login_manager.login_message_category = "warning"
 
 # Ligatures que unaccent (PostgreSQL) développe et que la décomposition Unicode laisse telles quelles.
-_LIGATURES = str.maketrans({"œ": "oe", "Œ": "oe", "æ": "ae", "Æ": "ae", "ß": "ss", "ø": "o", "Ø": "o",
-                            "đ": "d", "Đ": "d", "ł": "l", "Ł": "l", "ı": "i"})
+_LIGATURES = str.maketrans(
+    {
+        "œ": "oe",
+        "Œ": "oe",
+        "æ": "ae",
+        "Æ": "ae",
+        "ß": "ss",
+        "ø": "o",
+        "Ø": "o",
+        "đ": "d",
+        "Đ": "d",
+        "ł": "l",
+        "Ł": "l",
+        "ı": "i",
+    }
+)
 
 # fold() côté base : la même règle que fold() en Python, pour comparer une colonne à un texte saisi.
 # Créée par la migration initiale, et par create_all (tests) grâce à l'écouteur ci-dessous.
@@ -67,6 +81,7 @@ def _is_write_request():
     if has_app_context() and g.get("write_lock"):  # travail hors requête qui écrit (avis de déconnexion)
         return True
     # Trois GET écrivent aussi : le code d'autorisation et le journal, la première clé de signature, la déconnexion.
-    return has_request_context() and (request.method in ("POST", "PUT", "PATCH", "DELETE")
-                                      or request.endpoint in ("oidc.authorize", "oidc.jwks", "oidc.end_session",
-                                                              "oidc.directory"))
+    return has_request_context() and (
+        request.method in ("POST", "PUT", "PATCH", "DELETE")
+        or request.endpoint in ("oidc.authorize", "oidc.jwks", "oidc.end_session", "oidc.directory")
+    )

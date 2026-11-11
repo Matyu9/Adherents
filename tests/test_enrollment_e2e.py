@@ -2,6 +2,7 @@
 
 SCREENSHOT_DIR=… garde une capture de chaque page, en clair et en sombre, pour vérifier la mise en page.
 """
+
 from datetime import date, datetime, time, timedelta
 
 import pytest
@@ -44,10 +45,15 @@ def _family():
         last_year = Course(season=old, discipline=piano)
         this_year = Course(season=new, discipline=piano, weekday=1, starts_at=time(17), ends_at=time(18), capacity=4)
         db.session.add_all([last_year, this_year])
-        household = Household(name="Famille Lefèvre", address_street="3 place du Marché", postal_code="76000",
-                              city="Rouen")
-        mother = Person(first_name="Hélène", last_name="Lefèvre", email="adherent@e2e.test",
-                        account=db.session.scalar(db.select(Account).filter_by(role=Role.ADHERENT)))
+        household = Household(
+            name="Famille Lefèvre", address_street="3 place du Marché", postal_code="76000", city="Rouen"
+        )
+        mother = Person(
+            first_name="Hélène",
+            last_name="Lefèvre",
+            email="adherent@e2e.test",
+            account=db.session.scalar(db.select(Account).filter_by(role=Role.ADHERENT)),
+        )
         child = Person(first_name="Léon", last_name="Lefèvre", birth_date=date(2032, 6, 7))
         db.session.add_all([household, mother, child])
         db.session.flush()
@@ -58,10 +64,16 @@ def _family():
         db.session.add(membership)
         db.session.flush()
         membership.enrollments.append(Enrollment(course=last_year))
-        campaign = Campaign(season=new, title="Réinscriptions 2041-2042", opens_at=datetime.now() - timedelta(days=1),
-                            closes_at=datetime.now() + timedelta(days=30), instructions="Pensez au certificat.")
-        campaign.consents = [CampaignConsent(label="Règlement intérieur", text="J'ai lu le règlement.",
-                                             scope="household", required=True)]
+        campaign = Campaign(
+            season=new,
+            title="Réinscriptions 2041-2042",
+            opens_at=datetime.now() - timedelta(days=1),
+            closes_at=datetime.now() + timedelta(days=30),
+            instructions="Pensez au certificat.",
+        )
+        campaign.consents = [
+            CampaignConsent(label="Règlement intérieur", text="J'ai lu le règlement.", scope="household", required=True)
+        ]
         db.session.add(campaign)
         db.session.commit()
         return campaign.id

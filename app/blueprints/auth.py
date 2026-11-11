@@ -55,9 +55,22 @@ class CodeForm(FlaskForm):
 
 
 # Les pages du serveur OIDC traitent elles-mêmes ces règles : elles doivent pouvoir répondre à l'appli cliente.
-ALWAYS_OPEN = ("auth.logout", "auth.token_link", "static", "csp.report", "settings.logo_file", "oidc.discovery",
-               "oidc.jwks", "oidc.authorize", "oidc.resume", "oidc.token", "oidc.userinfo", "oidc.end_session", "oidc.directory",
-               "oidc.end_session_confirm")
+ALWAYS_OPEN = (
+    "auth.logout",
+    "auth.token_link",
+    "static",
+    "csp.report",
+    "settings.logo_file",
+    "oidc.discovery",
+    "oidc.jwks",
+    "oidc.authorize",
+    "oidc.resume",
+    "oidc.token",
+    "oidc.userinfo",
+    "oidc.end_session",
+    "oidc.directory",
+    "oidc.end_session_confirm",
+)
 
 
 @bp.before_app_request
@@ -74,20 +87,30 @@ def enforce_account_rules():
         return redirect(url_for("auth.password"))
     if request.endpoint != "account.totp" and not current_user.totp_enabled and totp.required(current_user):
         if page:
-            flash("La double authentification est obligatoire pour votre rôle : configurez-la pour continuer.",
-                  "warning")
+            flash(
+                "La double authentification est obligatoire pour votre rôle : configurez-la pour continuer.", "warning"
+            )
         return redirect(url_for("account.totp"))
     # « Mon compte » : c'est là que mène l'écran des codes de secours, à la fin de la double authentification.
-    if (request.method == "GET" and request.endpoint in ("dashboard.index", "account.index")
-            and (query := oidc.pop_resume()) is not None):
+    if (
+        request.method == "GET"
+        and request.endpoint in ("dashboard.index", "account.index")
+        and (query := oidc.pop_resume()) is not None
+    ):
         return redirect(url_for("oidc.resume") + "?" + query)  # l'étape imposée est faite : retour vers l'appli
     return None
 
 
 def safe_next(target, default=None):
     """N'accepte qu'un chemin local (« /… »), jamais « //hôte » ni « /\\hôte » (normalisé en // par les navigateurs)."""
-    if (target and target.startswith("/") and not target.startswith("//") and "\\" not in target
-            and not urlsplit(target).netloc and not urlsplit(target).scheme):
+    if (
+        target
+        and target.startswith("/")
+        and not target.startswith("//")
+        and "\\" not in target
+        and not urlsplit(target).netloc
+        and not urlsplit(target).scheme
+    ):
         return target
     return default or url_for("dashboard.index")
 
@@ -109,16 +132,23 @@ def login():
         if account and account.active and valid:
             target = safe_next(request.args.get("next"))
             if account.totp_enabled:
-                session[PENDING] = {"account": account.id, "remember": bool(form.remember.data), "next": target,
-                                    "at": int(time.time())}
+                session[PENDING] = {
+                    "account": account.id,
+                    "remember": bool(form.remember.data),
+                    "next": target,
+                    "at": int(time.time()),
+                }
                 return redirect(url_for(".two_factor"))
             _failures.clear(keys)
             sessions.start(account, remember=form.remember.data)  # commit
             return redirect(target)
         _failures.hit(keys)
         # Le texte saisi n'est gardé que s'il désigne un compte : ce peut être un mot de passe tapé au mauvais endroit.
-        log("auth.failed", f"Échec de connexion pour {account.email if account else 'une adresse inconnue'} "
-                           f"({request.remote_addr})", target=account)
+        log(
+            "auth.failed",
+            f"Échec de connexion pour {account.email if account else 'une adresse inconnue'} ({request.remote_addr})",
+            target=account,
+        )
         db.session.commit()
         flash("Email ou mot de passe incorrect.", "error")
     return render_template("auth/login.html", form=form)
@@ -151,8 +181,11 @@ def two_factor():
         method = totp.check(account, form.code.data)
         if method is None:
             totp.failures.hit(keys)
-            log("auth.totp_failed", f"Code de double authentification refusé pour {account.email} "
-                                    f"({request.remote_addr})", target=account)
+            log(
+                "auth.totp_failed",
+                f"Code de double authentification refusé pour {account.email} ({request.remote_addr})",
+                target=account,
+            )
             db.session.commit()
             flash("Code incorrect.", "error")
             return render_template("auth/two_factor.html", form=form)
@@ -161,10 +194,16 @@ def two_factor():
         _failures.clear((f"email:{account.email}", f"ip:{request.remote_addr}"))
         if method == "recovery":
             left = totp.remaining_recovery_codes(account)
-            log("auth.recovery_code", f"{account.full_name} s'est connecté avec un code de secours ({left} restant(s))",
-                user=account, target=account)
-            flash(f"Code de secours utilisé. Il vous en reste {left} : "
-                  "pensez à en générer de nouveaux dans Mon compte.", "warning")
+            log(
+                "auth.recovery_code",
+                f"{account.full_name} s'est connecté avec un code de secours ({left} restant(s))",
+                user=account,
+                target=account,
+            )
+            flash(
+                f"Code de secours utilisé. Il vous en reste {left} : pensez à en générer de nouveaux dans Mon compte.",
+                "warning",
+            )
         sessions.start(account, remember=pending["remember"])  # commit
         return redirect(safe_next(pending["next"]))
     return render_template("auth/two_factor.html", form=form)
@@ -214,14 +253,19 @@ def forgot():
         raw = None
         if account and account.active and mailer.smtp_enabled():
             raw = accounts.issue(account, AccountToken.RESET, proves_email=True)
-            log("account.reset_request", f"Lien de réinitialisation demandé pour {account.full_name}", user=account,
-                target=account)
+            log(
+                "account.reset_request",
+                f"Lien de réinitialisation demandé pour {account.full_name}",
+                user=account,
+                target=account,
+            )
         db.session.commit()
         if raw:
             accounts.send_reset_in_background(account, raw)
         # Même réponse que le compte existe ou non : la page ne révèle pas qui a un compte.
-        flash("Si un compte actif correspond à cette adresse, un lien de réinitialisation vient d'y être envoyé.",
-              "info")
+        flash(
+            "Si un compte actif correspond à cette adresse, un lien de réinitialisation vient d'y être envoyé.", "info"
+        )
         return redirect(url_for(".login"))
     return render_template("auth/forgot.html", form=form, smtp=mailer.smtp_enabled())
 
@@ -247,8 +291,13 @@ def token_link(token):
             account.email_verified = True
         accounts.consume(found, AccountToken.INVITE, AccountToken.RESET)
         sessions.revoke(account)  # un appareil volé ne survit pas à la réinitialisation
-        log("account.password", f"{account.full_name} a choisi son mot de passe"
-            + (" (invitation)" if invited else " (mot de passe oublié)"), user=account, target=account)
+        log(
+            "account.password",
+            f"{account.full_name} a choisi son mot de passe"
+            + (" (invitation)" if invited else " (mot de passe oublié)"),
+            user=account,
+            target=account,
+        )
         if account.totp_enabled:
             # Le lien remplace le mot de passe, pas le second facteur : la boîte mail seule n'ouvre pas le compte.
             db.session.commit()
@@ -270,8 +319,14 @@ def _confirm_email(found):
         account.email_verified = True
         accounts.revoke(account)  # y compris un lien de réinitialisation parti vers l'ancienne adresse
         changed = old != account.email
-        log("account.email", f"Email de {account.full_name} modifié : {old} → {account.email}" if changed
-            else f"Email de {account.full_name} confirmé", user=account, target=account)
+        log(
+            "account.email",
+            f"Email de {account.full_name} modifié : {old} → {account.email}"
+            if changed
+            else f"Email de {account.full_name} confirmé",
+            user=account,
+            target=account,
+        )
         db.session.commit()
         if changed:
             accounts.send_email_changed_notice(account, old)

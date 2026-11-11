@@ -29,10 +29,15 @@ def _branding_form():
 
 def _render_index(branding_form=None):
     open_sessions, connected = sessions.stats()
-    return render_template("settings/index.html", cfg=current_app.config, smtp=mailer.smtp_enabled(),
-                           open_sessions=open_sessions, connected=connected,
-                           default_subtitle=branding.DEFAULT_SUBTITLE,
-                           branding_form=branding_form or _branding_form())
+    return render_template(
+        "settings/index.html",
+        cfg=current_app.config,
+        smtp=mailer.smtp_enabled(),
+        open_sessions=open_sessions,
+        connected=connected,
+        default_subtitle=branding.DEFAULT_SUBTITLE,
+        branding_form=branding_form or _branding_form(),
+    )
 
 
 @bp.route("/parametres")
@@ -44,6 +49,7 @@ def index():
 # ---------------------------------------------------------------------------
 # Personnalisation : nom, sous-titre, couleur et logo
 # ---------------------------------------------------------------------------
+
 
 @bp.route("/parametres/apparence", methods=["POST"])
 @require("settings.manage")

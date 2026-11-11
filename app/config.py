@@ -60,9 +60,9 @@ class Config:
     INVENTAIRE_API_TOKEN = os.environ.get("INVENTAIRE_API_TOKEN", "").strip()
 
     # Garde-fous des données personnelles (voir services/guard.py).
-    ELEVATION_MINUTES = int(os.environ.get("ELEVATION_MINUTES", "10"))      # mode sécurisé après un code TOTP
+    ELEVATION_MINUTES = int(os.environ.get("ELEVATION_MINUTES", "10"))  # mode sécurisé après un code TOTP
     DIRECTORY_READ_LIMIT = int(os.environ.get("DIRECTORY_READ_LIMIT", "300"))  # pages de l'annuaire en 15 min
-    IDLE_TIMEOUT_HOURS = float(os.environ.get("IDLE_TIMEOUT_HOURS", "2"))     # 0 : jamais
+    IDLE_TIMEOUT_HOURS = float(os.environ.get("IDLE_TIMEOUT_HOURS", "2"))  # 0 : jamais
 
     # Content-Security-Policy : appliquée par défaut. « 1 » = Report-Only, pour diagnostiquer sans rien bloquer.
     CSP_REPORT_ONLY = os.environ.get("CSP_REPORT_ONLY", "0") == "1"
@@ -73,13 +73,17 @@ def startup_warnings(config):
     warnings = []
     public = (config.get("BASE_URL") or "", config.get("OIDC_ISSUER") or "")
     if any(url.startswith("https://") for url in public) and not config.get("TRUST_PROXY"):
-        warnings.append("BASE_URL ou OIDC_ISSUER est en https:// mais TRUST_PROXY n'est pas à 1 : derrière un reverse proxy, "
-                        "l'adresse des visiteurs et le protocole (cookies Secure, redirections) dépendent des "
-                        "en-têtes X-Forwarded-*, ignorés sans TRUST_PROXY=1.")
+        warnings.append(
+            "BASE_URL ou OIDC_ISSUER est en https:// mais TRUST_PROXY n'est pas à 1 : derrière un reverse proxy, "
+            "l'adresse des visiteurs et le protocole (cookies Secure, redirections) dépendent des "
+            "en-têtes X-Forwarded-*, ignorés sans TRUST_PROXY=1."
+        )
     issuer = urlsplit(config.get("OIDC_ISSUER") or "https://non-renseigne")
     if issuer.scheme != "https" and issuer.hostname not in ("localhost", "127.0.0.1", "::1"):
-        warnings.append("OIDC_ISSUER n'est pas en https:// : les connexions OIDC seront refusées, car les applis "
-                        "clientes transmettraient leurs secrets et recevraient les jetons en clair.")
+        warnings.append(
+            "OIDC_ISSUER n'est pas en https:// : les connexions OIDC seront refusées, car les applis "
+            "clientes transmettraient leurs secrets et recevraient les jetons en clair."
+        )
     return warnings
 
 

@@ -2,6 +2,7 @@
 
 Stockés dans AppSetting ; sans réglage, le nom vient de ASSO_NAME (.env) et la couleur est le bordeaux d'origine.
 """
+
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -58,10 +59,12 @@ def current():
             db.session.rollback()
             values = {}
         palette = values.get("palette")
-        g.branding = Branding(name=values.get("name") or current_app.config["ASSO_NAME"],
-                              subtitle=values.get("subtitle") or DEFAULT_SUBTITLE,
-                              palette=palette if palette in PALETTES else DEFAULT_PALETTE,
-                              logo=values.get("logo"))
+        g.branding = Branding(
+            name=values.get("name") or current_app.config["ASSO_NAME"],
+            subtitle=values.get("subtitle") or DEFAULT_SUBTITLE,
+            palette=palette if palette in PALETTES else DEFAULT_PALETTE,
+            logo=values.get("logo"),
+        )
     return g.branding
 
 

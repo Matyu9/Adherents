@@ -1,4 +1,5 @@
 """Mon compte : chacun gère son profil, son adresse, sa double authentification, son affichage et ses appareils."""
+
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
@@ -35,9 +36,15 @@ class DisplayForm(FlaskForm):
 
 
 class EmailForm(FlaskForm):
-    email = EmailField("Nouvelle adresse", validators=[
-        DataRequired(), Length(max=255), Regexp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", message="Adresse email invalide.")],
-        filters=[lambda value: value.strip() if value else value])
+    email = EmailField(
+        "Nouvelle adresse",
+        validators=[
+            DataRequired(),
+            Length(max=255),
+            Regexp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", message="Adresse email invalide."),
+        ],
+        filters=[lambda value: value.strip() if value else value],
+    )
     password = PasswordField("Mot de passe actuel", validators=[DataRequired()])
 
 
@@ -77,16 +84,26 @@ def _code_ok(field):
 
 def _display_form(formdata=None):
     """Formulaire prérempli : un champ absent de l'envoi garde sa valeur actuelle."""
-    return DisplayForm(formdata=formdata, data={
-        "theme": current_user.theme or "auto",
-        "text_size": current_user.text_size or preferences.DEFAULT_TEXT_SIZE})
+    return DisplayForm(
+        formdata=formdata,
+        data={
+            "theme": current_user.theme or "auto",
+            "text_size": current_user.text_size or preferences.DEFAULT_TEXT_SIZE,
+        },
+    )
 
 
 def _render_index(profile=None, email_form=None):
-    return render_template("account/index.html", profile=profile or ProfileForm(obj=current_user),
-                           display=_display_form(), email_form=email_form or EmailForm(formdata=None),
-                           smtp=mailer.smtp_enabled(), sessions=sessions.of(current_user),
-                           device_label=sessions.device_label, consents=oidc.consents_of(current_user))
+    return render_template(
+        "account/index.html",
+        profile=profile or ProfileForm(obj=current_user),
+        display=_display_form(),
+        email_form=email_form or EmailForm(formdata=None),
+        smtp=mailer.smtp_enabled(),
+        sessions=sessions.of(current_user),
+        device_label=sessions.device_label,
+        consents=oidc.consents_of(current_user),
+    )
 
 
 @bp.route("", methods=["GET", "POST"])
@@ -123,14 +140,20 @@ def change_email():
     raw = None
     if db.session.scalar(db.select(Account.id).filter_by(email=email)) is None:
         raw = accounts.issue(current_user, AccountToken.EMAIL, email=email, proves_email=True)
-        log("account.email_request", f"{current_user.full_name} a demandé à changer son email pour {email}",
-            target=current_user)
+        log(
+            "account.email_request",
+            f"{current_user.full_name} a demandé à changer son email pour {email}",
+            target=current_user,
+        )
     db.session.commit()
     if raw:
         accounts.send_email_confirmation(current_user, email, raw)
     # Même message si l'adresse est déjà prise : ce formulaire ne doit pas révéler qui a un compte.
-    flash(f"Si {email} est disponible, un lien de confirmation vient d'y être envoyé. "
-          "Votre adresse changera une fois confirmée.", "info")
+    flash(
+        f"Si {email} est disponible, un lien de confirmation vient d'y être envoyé. "
+        "Votre adresse changera une fois confirmée.",
+        "info",
+    )
     return redirect(url_for(".index"))
 
 
@@ -158,23 +181,29 @@ def verify_email():
 def totp():
     """Configuration, ou état si elle est déjà active. Le mot de passe protège d'une session volée qui verrouillerait le compte."""
     if current_user.totp_enabled:
-        return render_template("account/totp_active.html", form=TotpForm(formdata=None),
-                               remaining=totp_service.remaining_recovery_codes(current_user),
-                               required=totp_service.required(current_user))
+        return render_template(
+            "account/totp_active.html",
+            form=TotpForm(formdata=None),
+            remaining=totp_service.remaining_recovery_codes(current_user),
+            required=totp_service.required(current_user),
+        )
     secret = totp_service.pending_secret(current_user)
     db.session.commit()  # le même secret après un rechargement, sinon l'application du téléphone ne correspondrait plus
     form = TotpForm()
     if form.validate_on_submit() and _password_ok(form.password) and _code_ok(form.code):
         codes = totp_service.activate(current_user)
         sessions.revoke(current_user, keep_current=True)
-        log("account.totp_enable", f"{current_user.full_name} a activé la double authentification",
-            target=current_user)
+        log("account.totp_enable", f"{current_user.full_name} a activé la double authentification", target=current_user)
         db.session.commit()
         flash("Double authentification activée.", "success")
         return render_template("account/recovery_codes.html", codes=codes)
-    return render_template("account/totp_setup.html", form=form, secret=secret,
-                           qr=totp_service.qr_data_uri(totp_service.uri(current_user, secret)),
-                           required=totp_service.required(current_user))
+    return render_template(
+        "account/totp_setup.html",
+        form=form,
+        secret=secret,
+        qr=totp_service.qr_data_uri(totp_service.uri(current_user, secret)),
+        required=totp_service.required(current_user),
+    )
 
 
 @bp.route("/double-authentification/codes", methods=["POST"])
@@ -184,8 +213,9 @@ def totp_codes():
     form = TotpForm()
     if form.validate_on_submit() and _password_ok(form.password) and _code_ok(form.code):
         codes = totp_service.new_recovery_codes(current_user)
-        log("account.totp_codes", f"{current_user.full_name} a généré de nouveaux codes de secours",
-            target=current_user)
+        log(
+            "account.totp_codes", f"{current_user.full_name} a généré de nouveaux codes de secours", target=current_user
+        )
         db.session.commit()
         return render_template("account/recovery_codes.html", codes=codes)
     return _totp_form_error(form)
@@ -201,8 +231,11 @@ def totp_disable():
     form = TotpForm()
     if form.validate_on_submit() and _password_ok(form.password) and _code_ok(form.code):
         totp_service.disable(current_user)
-        log("account.totp_disable", f"{current_user.full_name} a désactivé la double authentification",
-            target=current_user)
+        log(
+            "account.totp_disable",
+            f"{current_user.full_name} a désactivé la double authentification",
+            target=current_user,
+        )
         db.session.commit()
         flash("Double authentification désactivée.", "success")
         return redirect(url_for(".index"))
@@ -210,9 +243,12 @@ def totp_disable():
 
 
 def _totp_form_error(form):
-    return render_template("account/totp_active.html", form=form,
-                           remaining=totp_service.remaining_recovery_codes(current_user),
-                           required=totp_service.required(current_user))
+    return render_template(
+        "account/totp_active.html",
+        form=form,
+        remaining=totp_service.remaining_recovery_codes(current_user),
+        required=totp_service.required(current_user),
+    )
 
 
 @bp.route("/affichage", methods=["POST"])

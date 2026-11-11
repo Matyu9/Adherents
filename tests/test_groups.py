@@ -1,4 +1,5 @@
 """Groupes de comptes."""
+
 import pytest
 
 from app.extensions import db

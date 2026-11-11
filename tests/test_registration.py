@@ -1,4 +1,5 @@
 """Inscriptions (phase 6) : pré-remplissage, contrôles, envoi, validation dans l'annuaire, IBAN des dossiers."""
+
 from datetime import date, datetime, time, timedelta
 
 import pytest
@@ -40,8 +41,16 @@ def world(app):
     db.session.flush()
     courses = {
         "flute_old": Course(season=old, discipline=flute, level=c1, teacher=prof.teacher, capacity=2),
-        "flute_new": Course(season=new, discipline=flute, level=c1, teacher=prof.teacher, capacity=1,
-                            weekday=2, starts_at=time(17), ends_at=time(18)),
+        "flute_new": Course(
+            season=new,
+            discipline=flute,
+            level=c1,
+            teacher=prof.teacher,
+            capacity=1,
+            weekday=2,
+            starts_at=time(17),
+            ends_at=time(18),
+        ),
         "flute_c2": Course(season=new, discipline=flute, level=c2),
         "fm_new": Course(season=new, discipline=fm, capacity=12),
     }
@@ -56,16 +65,29 @@ def world(app):
     db.session.add(membership)
     db.session.flush()
     membership.enrollments.append(Enrollment(course=courses["flute_old"]))
-    campaign = Campaign(season=new, title="Réinscriptions 2027-2028", opens_at=datetime(2027, 6, 1),
-                        closes_at=datetime(2027, 7, 1), allow_new=True)
+    campaign = Campaign(
+        season=new,
+        title="Réinscriptions 2027-2028",
+        opens_at=datetime(2027, 6, 1),
+        closes_at=datetime(2027, 7, 1),
+        allow_new=True,
+    )
     campaign.consents = [
         CampaignConsent(label="Droit à l'image", text="J'autorise les photos.", scope="student"),
         CampaignConsent(label="Règlement intérieur", text="J'ai lu le règlement.", scope="household", required=True),
     ]
     db.session.add(campaign)
     db.session.commit()
-    return {"old": old, "new": new, "household": household, "anne": anne, "zoe": zoe, "campaign": campaign,
-            "prof": prof, **courses}
+    return {
+        "old": old,
+        "new": new,
+        "household": household,
+        "anne": anne,
+        "zoe": zoe,
+        "campaign": campaign,
+        "prof": prof,
+        **courses,
+    }
 
 
 def answer_consents(dossier, image=True):
@@ -82,13 +104,22 @@ def answer_consents(dossier, image=True):
 # Pré-remplissage
 # ---------------------------------------------------------------------------
 
+
 def test_prefill_from_the_directory(world):
     dossier = registration.dossier_for(world["campaign"], world["household"], None)
     data = dossier.data
     assert data["household"]["city"] == "Rouen" and data["household"]["name"] == "Famille Martin"
-    assert data["guardians"] == [{"person_id": world["anne"].id, "civility": None, "first_name": "Anne",
-                                  "last_name": "Martin", "email": "anne@asso.test", "phone": "+33612345678",
-                                  "relationship": "mère"}]
+    assert data["guardians"] == [
+        {
+            "person_id": world["anne"].id,
+            "civility": None,
+            "first_name": "Anne",
+            "last_name": "Martin",
+            "email": "anne@asso.test",
+            "phone": "+33612345678",
+            "relationship": "mère",
+        }
+    ]
     (zoe,) = data["students"]
     assert zoe["person_id"] == world["zoe"].id and zoe["enrolled"] and zoe["guardian"] is None
     assert zoe["birth_date"] == "2015-05-06" and zoe["school_class"] == "CM2"
@@ -112,6 +143,7 @@ def test_an_adult_learner_is_his_own_student(world):
 # ---------------------------------------------------------------------------
 # Contrôles, envoi, retour à la famille
 # ---------------------------------------------------------------------------
+
 
 def test_problems_before_submission(world):
     dossier = registration.dossier_for(world["campaign"], world["household"], None)
@@ -162,6 +194,7 @@ def test_a_course_that_disappeared_blocks_the_submission(world):
 # Validation
 # ---------------------------------------------------------------------------
 
+
 def submitted(world, **student):
     dossier = registration.dossier_for(world["campaign"], world["household"], None)
     answer_consents(dossier)
@@ -200,14 +233,19 @@ def test_validation_fills_the_directory(world, admin):
     consents = db.session.scalars(sa.select(Consent).order_by(Consent.label)).all()
     assert [(c.label, c.granted, c.person, c.household, c.given_at, c.given_by_name) for c in consents] == [
         ("Droit à l'image", True, zoe, None, NOW, "Anne Martin"),
-        ("Règlement intérieur", True, None, world["household"], NOW, "Anne Martin")]
+        ("Règlement intérieur", True, None, world["household"], NOW, "Anne Martin"),
+    ]
     assert consents[0].text == "J'autorise les photos."
     (account,) = world["household"].bank_accounts
     assert bank.reveal(account) == IBAN and account.holder == anne and account.bic == "AGRIFRPP882"
     assert dossier.status == Dossier.VALIDATED and dossier.validated_by == admin
     # Après validation, plus de différence, mais le report garde ce qui a changé.
-    assert ("Responsable 1 : Anne Martin", "Email", "anne@asso.test", "anne.martin@asso.test") in \
-        registration.changes_at_validation(dossier)
+    assert (
+        "Responsable 1 : Anne Martin",
+        "Email",
+        "anne@asso.test",
+        "anne.martin@asso.test",
+    ) in registration.changes_at_validation(dossier)
     with pytest.raises(RegistrationError):
         registration.validate(dossier, admin)
 
@@ -246,15 +284,44 @@ def test_a_new_family_enters_the_directory(world, admin):
     dossier, token = registration.new_family_dossier(world["campaign"], " Claire@Famille.TEST ")
     assert dossier.email == "claire@famille.test" and registration.find_by_access(token) is dossier
     data = registration.blank_data()
-    data["household"] = {"name": "Famille Petit", "address_street": "4 rue Basse", "postal_code": "76100",
-                         "city": "Rouen", "country": "FR"}
-    data["guardians"] = [{"person_id": None, "first_name": "Claire", "last_name": "Petit", "email": "claire@famille.test",
-                          "phone": "0611111111", "relationship": "mère"}]
+    data["household"] = {
+        "name": "Famille Petit",
+        "address_street": "4 rue Basse",
+        "postal_code": "76100",
+        "city": "Rouen",
+        "country": "FR",
+    }
+    data["guardians"] = [
+        {
+            "person_id": None,
+            "first_name": "Claire",
+            "last_name": "Petit",
+            "email": "claire@famille.test",
+            "phone": "0611111111",
+            "relationship": "mère",
+        }
+    ]
     data["students"] = [
-        {"key": "a", "person_id": None, "guardian": None, "enrolled": True, "first_name": "Hugo", "last_name": "Petit",
-         "birth_date": "2018-03-04", "sex": "M", "courses": [world["fm_new"].id], "consents": {}},
-        {"key": "b", "person_id": None, "guardian": 0, "enrolled": True, "courses": [world["flute_c2"].id],
-         "consents": {}},
+        {
+            "key": "a",
+            "person_id": None,
+            "guardian": None,
+            "enrolled": True,
+            "first_name": "Hugo",
+            "last_name": "Petit",
+            "birth_date": "2018-03-04",
+            "sex": "M",
+            "courses": [world["fm_new"].id],
+            "consents": {},
+        },
+        {
+            "key": "b",
+            "person_id": None,
+            "guardian": 0,
+            "enrolled": True,
+            "courses": [world["flute_c2"].id],
+            "consents": {},
+        },
     ]
     data["consents"] = {str(world["campaign"].consents[1].id): True}
     registration.save(dossier, data)
@@ -272,8 +339,16 @@ def test_a_new_family_enters_the_directory(world, admin):
 
 def test_the_same_new_child_twice_is_refused(world, admin):
     dossier, _ = registration.new_family_dossier(world["campaign"], "x@famille.test")
-    child = {"person_id": None, "guardian": None, "enrolled": True, "first_name": "Hugo", "last_name": "Petit",
-             "birth_date": "2018-03-04", "courses": [world["fm_new"].id], "consents": {}}
+    child = {
+        "person_id": None,
+        "guardian": None,
+        "enrolled": True,
+        "first_name": "Hugo",
+        "last_name": "Petit",
+        "birth_date": "2018-03-04",
+        "courses": [world["fm_new"].id],
+        "consents": {},
+    }
     data = registration.blank_data()
     data["students"] = [dict(child, key="a"), dict(child, key="b", first_name="hugo")]
     dossier.data, dossier.status = data, Dossier.SUBMITTED
@@ -296,6 +371,7 @@ def test_access_link_expires(world):
 
 def test_who_can_open_a_dossier(world, accounts):
     from app.models import Role
+
     dossier = registration.dossier_for(world["campaign"], world["household"], None)
     parent = accounts[Role.ADHERENT]
     assert not registration.can_open(parent, dossier)
@@ -312,6 +388,7 @@ def test_who_can_open_a_dossier(world, accounts):
 # ---------------------------------------------------------------------------
 # IBAN des dossiers
 # ---------------------------------------------------------------------------
+
 
 def test_dossier_iban_is_bound_to_its_dossier(world):
     a = registration.dossier_for(world["campaign"], world["household"], None)
@@ -331,6 +408,7 @@ def test_rotation_includes_dossiers(world, app):
     bank.set_dossier_iban(dossier, IBAN)
     db.session.commit()
     from .test_bank import KEY_2
+
     assert dossier.iban_key_version == 1
     app.config["BANK_DATA_KEYS"] = f"{KEY_2},{app.config['BANK_DATA_KEYS']}"
     assert bank.rotate() == 1 and dossier.iban_key_version == 2
@@ -341,6 +419,7 @@ def test_rotation_includes_dossiers(world, app):
 # ---------------------------------------------------------------------------
 # Fusions
 # ---------------------------------------------------------------------------
+
 
 def test_merging_two_records_keeps_enrollments_and_consents(world, admin):
     registration.validate(submitted(world), admin, now=NOW)

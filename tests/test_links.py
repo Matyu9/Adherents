@@ -1,4 +1,5 @@
 """Liens à usage unique : invitation, mot de passe oublié, changement et vérification d'email."""
+
 import re
 from datetime import datetime, timedelta
 
@@ -28,6 +29,7 @@ def smtp_down(app, monkeypatch):
 
     def fail(*args, **kwargs):
         raise OSError("serveur indisponible")
+
     monkeypatch.setattr(mailer, "send", fail)
 
 
@@ -51,12 +53,13 @@ def forgot(client, email):
 # Mot de passe oublié
 # ---------------------------------------------------------------------------
 
+
 def test_reset_changes_the_password_and_closes_every_session(app, client, smtp):
     account = make_account()
     other = app.test_client()
     login(other, account)
     forgot(client, account.email)
-    (to, subject, text), = smtp
+    ((to, subject, text),) = smtp
     assert to == account.email and "Réinitialisation" in subject
     response = new_password(client, link_in(text))
     assert response.status_code == 302 and response.location == "/"
@@ -124,6 +127,7 @@ def test_without_smtp_the_page_says_so(client):
 def test_background_sending_does_not_wait_for_the_mail_server(app, client, monkeypatch):
     """Sinon la durée de la réponse révélerait si le compte existe."""
     import threading
+
     app.config.update(SMTP_HOST="smtp.test", SMTP_FROM="asso@asso.test", MAIL_IN_BACKGROUND=True)
     release, done, sent = threading.Event(), threading.Event(), []
 
@@ -131,6 +135,7 @@ def test_background_sending_does_not_wait_for_the_mail_server(app, client, monke
         release.wait(5)
         sent.append(to)
         done.set()
+
     monkeypatch.setattr(mailer, "send", slow)
     make_account(email="marie@asso.test")
     assert forgot(client, "marie@asso.test").status_code == 302
@@ -156,6 +161,7 @@ def test_reset_never_bypasses_the_second_factor(client, smtp):
 # ---------------------------------------------------------------------------
 # Comportement commun des liens
 # ---------------------------------------------------------------------------
+
 
 def test_link_is_single_use(client, smtp):
     account = make_account()
@@ -187,11 +193,12 @@ def test_expired_link_is_refused(client, smtp):
     assert db.session.get(Account, account.id).check_password(PASSWORD)
 
 
-@pytest.mark.parametrize("purpose, hours", [(AccountToken.INVITE, 7 * 24), (AccountToken.RESET, 1),
-                                            (AccountToken.EMAIL, 24)])
+@pytest.mark.parametrize(
+    "purpose, hours", [(AccountToken.INVITE, 7 * 24), (AccountToken.RESET, 1), (AccountToken.EMAIL, 24)]
+)
 def test_link_lifetimes(app, purpose, hours):
     accounts.issue(make_account(), purpose)
-    token, = tokens()
+    (token,) = tokens()
     assert abs((token.expires_at - datetime.now()).total_seconds() - hours * 3600) < 5
 
 
@@ -252,6 +259,7 @@ def test_expired_links_are_purged(app):
 # email_verified : vrai uniquement après un clic sur un lien reçu par email
 # ---------------------------------------------------------------------------
 
+
 def test_new_account_is_not_verified(app):
     assert make_account().email_verified is False
 
@@ -270,18 +278,20 @@ def test_requesting_a_link_does_not_verify(client, smtp):
 
 
 def test_invitation_received_by_email_verifies(client, admin, smtp):
-    client.post("/comptes/nouveau", data={"first_name": "A", "last_name": "B", "email": "a@asso.test",
-                                          "role": Role.ADHERENT})
+    client.post(
+        "/comptes/nouveau", data={"first_name": "A", "last_name": "B", "email": "a@asso.test", "role": Role.ADHERENT}
+    )
     client.post("/deconnexion")
-    (_, _, text), = smtp
+    ((_, _, text),) = smtp
     new_password(client, link_in(text))
     assert db.session.scalar(db.select(Account).filter_by(email="a@asso.test")).email_verified is True
 
 
 def test_link_handed_over_manually_does_not_verify(client, admin):
     """Sans SMTP le lien passe par un responsable : il ne prouve rien sur la boîte mail."""
-    html = client.post("/comptes/nouveau", data={"first_name": "A", "last_name": "B", "email": "a@asso.test",
-                                                 "role": Role.ADHERENT}).get_data(as_text=True)
+    html = client.post(
+        "/comptes/nouveau", data={"first_name": "A", "last_name": "B", "email": "a@asso.test", "role": Role.ADHERENT}
+    ).get_data(as_text=True)
     path = re.search(r"http://\S*(/lien/[\w-]+)", html).group(1)
     client.post("/deconnexion")
     new_password(client, path)
@@ -290,8 +300,9 @@ def test_link_handed_over_manually_does_not_verify(client, admin):
 
 
 def test_link_shown_after_a_mail_failure_does_not_verify(client, admin, smtp_down):
-    html = client.post("/comptes/nouveau", data={"first_name": "A", "last_name": "B", "email": "a@asso.test",
-                                                 "role": Role.ADHERENT}).get_data(as_text=True)
+    html = client.post(
+        "/comptes/nouveau", data={"first_name": "A", "last_name": "B", "email": "a@asso.test", "role": Role.ADHERENT}
+    ).get_data(as_text=True)
     assert "pas pu partir" in html
     client.post("/deconnexion")
     new_password(client, re.search(r"http://\S*(/lien/[\w-]+)", html).group(1))
@@ -299,8 +310,9 @@ def test_link_shown_after_a_mail_failure_does_not_verify(client, admin, smtp_dow
 
 
 def test_link_is_hidden_once_the_mail_has_left(client, admin, smtp):
-    html = client.post("/comptes/nouveau", data={"first_name": "A", "last_name": "B", "email": "a@asso.test",
-                                                 "role": Role.ADHERENT}).get_data(as_text=True)
+    html = client.post(
+        "/comptes/nouveau", data={"first_name": "A", "last_name": "B", "email": "a@asso.test", "role": Role.ADHERENT}
+    ).get_data(as_text=True)
     assert "/lien/" not in html and "être envoyée" in html
     assert tokens()[0].proves_email is True
 
@@ -309,7 +321,7 @@ def test_verify_my_address(client, smtp):
     account = make_account()
     login(client, account)
     client.post("/mon-compte/email/verifier")
-    (to, _, text), = smtp
+    ((to, _, text),) = smtp
     assert to == account.email
     assert db.session.get(Account, account.id).email_verified is False
     assert client.get(link_in(text)).status_code == 200
@@ -330,6 +342,7 @@ def test_verify_when_already_verified_sends_nothing(client, smtp):
 # Changer d'adresse depuis Mon compte
 # ---------------------------------------------------------------------------
 
+
 def change(client, email="nouvelle@asso.test", password=PASSWORD):
     return client.post("/mon-compte/email", data={"email": email, "password": password})
 
@@ -345,7 +358,7 @@ def test_change_needs_the_click_on_the_link(client, member_with_smtp, smtp):
     assert change(client).status_code == 302
     account = db.session.get(Account, member_with_smtp.id)
     assert account.email == "ancienne@asso.test" and account.email_verified is True
-    (to, _, text), = smtp
+    ((to, _, text),) = smtp
     assert to == "nouvelle@asso.test"
     client.post(link_in(text))
     account = db.session.get(Account, member_with_smtp.id)
@@ -374,8 +387,9 @@ def test_password_guessing_through_the_change_form_is_limited(client, member_wit
 
 def test_change_to_a_taken_address_reveals_nothing(client, member_with_smtp, smtp):
     make_account(email="prise@asso.test")
-    taken = client.post("/mon-compte/email", data={"email": "prise@asso.test", "password": PASSWORD},
-                        follow_redirects=True).get_data(as_text=True)
+    taken = client.post(
+        "/mon-compte/email", data={"email": "prise@asso.test", "password": PASSWORD}, follow_redirects=True
+    ).get_data(as_text=True)
     assert "Si prise@asso.test est disponible" in taken and "déjà" not in taken
     assert smtp == [] and tokens() == []
 
@@ -411,15 +425,17 @@ def test_change_to_my_own_address(client, member_with_smtp, smtp):
 def test_change_requests_are_limited(client, member_with_smtp, smtp):
     for n in range(5):
         change(client, email=f"n{n}@asso.test")
-    assert "Trop de demandes" in client.post("/mon-compte/email", data={"email": "n9@asso.test", "password": PASSWORD},
-                                             follow_redirects=True).get_data(as_text=True)
+    assert "Trop de demandes" in client.post(
+        "/mon-compte/email", data={"email": "n9@asso.test", "password": PASSWORD}, follow_redirects=True
+    ).get_data(as_text=True)
     assert len(smtp) == 5
 
 
 def test_change_without_smtp_is_refused(client):
     login(client, make_account())
-    assert "pas configuré" in client.post("/mon-compte/email", data={"email": "n@asso.test", "password": PASSWORD},
-                                          follow_redirects=True).get_data(as_text=True)
+    assert "pas configuré" in client.post(
+        "/mon-compte/email", data={"email": "n@asso.test", "password": PASSWORD}, follow_redirects=True
+    ).get_data(as_text=True)
     assert tokens() == []
 
 

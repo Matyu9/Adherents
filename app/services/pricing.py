@@ -16,6 +16,7 @@ Principes (voir docs/tarifs.md) :
 Les règles et réglages sont des dictionnaires (stockés en JSON) : `validate_rule` et `validate_settings` les
 vérifient avant tout enregistrement. Rien n'est jamais évalué comme du code.
 """
+
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
@@ -28,9 +29,11 @@ class PricingError(ValueError):
 # Données d'entrée
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class Item:
     """Élément de cotisation : adhésion, formule, pratique collective, location…"""
+
     id: int
     label: str
     price: int  # prix de base, en centimes
@@ -59,6 +62,7 @@ class Household:
 @dataclass(frozen=True)
 class Order:
     """Ce que le foyer prend : des couples (élève, élément), dans l'ordre des inscriptions."""
+
     household: Household
     students: tuple
     picks: tuple  # ((student_id, item_id), …)
@@ -217,8 +221,12 @@ def _validate_target(target, kind, items):
     if not isinstance(target, dict):
         raise PricingError("Cible de la règle illisible.")
     if kind not in LINE_EFFECTS:
-        if target.get("items") or target.get("categories") or target.get("exclude_items") \
-                or target.get("exclude_categories"):
+        if (
+            target.get("items")
+            or target.get("categories")
+            or target.get("exclude_items")
+            or target.get("exclude_categories")
+        ):
             raise PricingError("Cette règle ne vise pas d'éléments : elle n'a pas de cible.")
         return {}
     result = {}
@@ -254,8 +262,10 @@ def _validate_condition(condition, level, items):
     name = condition["field"]
     label, field_level, kind, param = FIELDS[name]
     if LEVELS.index(field_level) > LEVELS.index(level):
-        raise PricingError(f"« {label} » ne peut pas servir dans cette règle : elle ne porte pas sur "
-                           f"{'un élément' if field_level == LINE else 'un élève'}.")
+        raise PricingError(
+            f"« {label} » ne peut pas servir dans cette règle : elle ne porte pas sur "
+            f"{'un élément' if field_level == LINE else 'un élève'}."
+        )
     op = condition.get("op")
     if op not in OPERATORS[kind]:
         raise PricingError(f"Opérateur inconnu pour « {label} ».")
@@ -329,8 +339,10 @@ def remap_items(rule, mapping, collect=False):
     effect = dict(rule["effect"])
     if "item" in effect:
         effect["item"] = swap(effect["item"])
-    target = {key: sorted(swap(v) for v in values) if key.endswith("items") else values
-              for key, values in rule["target"].items()}
+    target = {
+        key: sorted(swap(v) for v in values) if key.endswith("items") else values
+        for key, values in rule["target"].items()
+    }
     conditions = []
     for group in rule["conditions"]:
         new_group = []
@@ -377,9 +389,11 @@ def _item_id(value, items):
 # Calcul
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Step:
     """Trace d'une règle appliquée : montant avant et après."""
+
     rule: str
     before: int
     after: int
@@ -542,8 +556,14 @@ class _Context:
         ranking = self.settings["ranking"]
         categories = set(self.settings["ranking_categories"])
         present = list(dict.fromkeys(line.student_id for line in self.lines if line.student_id is not None))
-        totals = {sid: sum(line.base for line in self.lines if line.student_id == sid
-                           and (not categories or line.item.category in categories)) for sid in present}
+        totals = {
+            sid: sum(
+                line.base
+                for line in self.lines
+                if line.student_id == sid and (not categories or line.item.category in categories)
+            )
+            for sid in present
+        }
 
         def key(sid):
             first = present.index(sid)
@@ -561,15 +581,22 @@ class _Context:
         key = (line.position, scope)
         if key not in self._line_ranks:
             snapshot = next(ln for ln in self.lines if ln.position == line.position)
-            same = [other for other in self.lines if other.item.category == snapshot.item.category
-                    and (scope == "household" or other.student_id == snapshot.student_id)]
+            same = [
+                other
+                for other in self.lines
+                if other.item.category == snapshot.item.category
+                and (scope == "household" or other.student_id == snapshot.student_id)
+            ]
             same.sort(key=lambda other: (-other.base, self.student_rank(other.student_id) or 0, other.position))
             self._line_ranks[key] = same.index(snapshot) + 1
         return self._line_ranks[key]
 
     def count(self, selection, student_id=None):
-        return sum(1 for line in self.lines
-                   if (student_id is None or line.student_id == student_id) and _selected(selection, line.item))
+        return sum(
+            1
+            for line in self.lines
+            if (student_id is None or line.student_id == student_id) and _selected(selection, line.item)
+        )
 
 
 def _selected(selection, item):
@@ -596,8 +623,14 @@ def _check(condition, context, student, line):
     if kind == NUMBER:
         if op == "between":
             return expected[0] <= value <= expected[1]
-        return {"eq": value == expected, "ne": value != expected, "lt": value < expected,
-                "le": value <= expected, "gt": value > expected, "ge": value >= expected}[op]
+        return {
+            "eq": value == expected,
+            "ne": value != expected,
+            "lt": value < expected,
+            "le": value <= expected,
+            "gt": value > expected,
+            "ge": value >= expected,
+        }[op]
     if kind == BOOL:
         return value is expected
     if kind == CHOICE:

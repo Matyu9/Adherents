@@ -3,6 +3,7 @@
 Ils comptent partout où comptent les groupes : accès aux applis, groupes transmis, qui peut gérer qui, liste des
 comptes d'un groupe. Et ils ne doivent pas permettre à un gestionnaire de donner des groupes qu'il n'a pas.
 """
+
 import pytest
 
 from app.extensions import db
@@ -18,6 +19,7 @@ from .test_oidc import make_client
 @pytest.fixture
 def sent(monkeypatch):
     from app.services import logout
+
     recorder = Sent()
     monkeypatch.setattr(logout, "post", recorder)
     return recorder
@@ -25,8 +27,10 @@ def sent(monkeypatch):
 
 @pytest.fixture
 def groups(app):
-    members, admins = AccessGroup(key="membres", name="Membres"), AccessGroup(key="inventaire-admins",
-                                                                              name="Admins de l'Inventaire")
+    members, admins = (
+        AccessGroup(key="membres", name="Membres"),
+        AccessGroup(key="inventaire-admins", name="Admins de l'Inventaire"),
+    )
     db.session.add_all([members, admins])
     db.session.commit()
     return members, admins
@@ -34,6 +38,7 @@ def groups(app):
 
 def give_role_groups(key, *groups):
     from app.services import roles
+
     role = roles.get(key)
     role.groups = list(groups)
     db.session.commit()
@@ -50,6 +55,7 @@ def admin_http(app):
 # ---------------------------------------------------------------------------
 # Les groupes effectifs
 # ---------------------------------------------------------------------------
+
 
 def test_account_gets_the_groups_of_its_role(groups):
     members, admins = groups
@@ -70,6 +76,7 @@ def test_role_group_opens_the_app_and_is_shared(app, groups, client):
     login(client, person)
     claims = connect(client, application)
     from .test_oidc import decode
+
     assert decode(claims["id_token"])["groups"] == ["membres"]
 
 
@@ -91,10 +98,12 @@ def test_group_explicit_and_by_role_counts_once(groups):
 # Écran Rôles
 # ---------------------------------------------------------------------------
 
+
 def test_role_form_saves_groups_and_journals_them(admin_http, groups):
     members, admins = groups
-    response = admin_http.post("/roles/gestionnaire/modifier", data={"name": "Gestionnaire",
-                                                                     "groups": [admins.id, members.id]})
+    response = admin_http.post(
+        "/roles/gestionnaire/modifier", data={"name": "Gestionnaire", "groups": [admins.id, members.id]}
+    )
     assert response.status_code == 302
     role = db.session.get(Role, Role.GESTIONNAIRE)
     assert [g.key for g in role.groups] == ["inventaire-admins", "membres"]
@@ -152,6 +161,7 @@ def test_deleting_a_role_keeps_its_groups(admin_http, groups):
 # Avis de déconnexion quand les groupes d'un rôle ou le rôle d'un compte changent
 # ---------------------------------------------------------------------------
 
+
 def test_role_groups_change_notifies_the_apps(app, admin_http, groups, sent):
     members, admins = groups
     give_role_groups(Role.ADHERENT, members)
@@ -188,8 +198,15 @@ def test_changing_the_role_of_an_account_notifies_and_cuts_access(app, admin_htt
     login(browser, person)
     token = connect(browser, application)["access_token"]
     sent.clear()
-    response = admin_http.post(f"/comptes/{person.id}/modifier", data={
-        "first_name": person.first_name, "last_name": person.last_name, "email": person.email, "role": Role.ADHERENT})
+    response = admin_http.post(
+        f"/comptes/{person.id}/modifier",
+        data={
+            "first_name": person.first_name,
+            "last_name": person.last_name,
+            "email": person.email,
+            "role": Role.ADHERENT,
+        },
+    )
     assert response.status_code == 302
     assert [claims["sub"] for claims in sent.claims()] == [person.sub]
     assert browser.get("/oidc/userinfo", headers={"Authorization": f"Bearer {token}"}).status_code == 401
@@ -198,6 +215,7 @@ def test_changing_the_role_of_an_account_notifies_and_cuts_access(app, admin_htt
 # ---------------------------------------------------------------------------
 # Fiche d'un compte, liste des comptes, écran Groupes
 # ---------------------------------------------------------------------------
+
 
 def test_account_page_shows_role_groups_as_fixed(admin_http, groups):
     members, admins = groups
@@ -256,10 +274,12 @@ def test_groups_page_counts_and_protects_role_groups(admin_http, groups):
 # Qui peut donner quoi
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def manager(app):
     """Gestionnaire qui gère les comptes, sans le groupe « Admins de l'Inventaire »."""
     from app.services import roles
+
     role = roles.get(Role.GESTIONNAIRE)
     role.permissions = sorted(set(role.permissions) | {"account.manage"})
     db.session.commit()
@@ -290,8 +310,9 @@ def test_manager_cannot_create_an_account_with_that_role(app, manager, groups):
     db.session.commit()
     http = app.test_client()
     login(http, manager)
-    http.post("/comptes/nouveau", data={"first_name": "Pirate", "last_name": "X", "email": "p@asso.test",
-                                        "role": "regie"})
+    http.post(
+        "/comptes/nouveau", data={"first_name": "Pirate", "last_name": "X", "email": "p@asso.test", "role": "regie"}
+    )
     created = db.session.scalar(db.select(Account).filter_by(email="p@asso.test"))
     assert created is None or created.role != "regie"
 
@@ -314,6 +335,7 @@ def test_consent_page_lists_role_groups(app, groups, client):
     third = make_client(allowed=[members], shared=[admins], first_party=False, name="Tierce")
     login(client, person)
     from .test_oidc import Flow, follow
+
     page = follow(client, client.get(Flow(third).url)).get_data(as_text=True)
     assert "Admins de l&#39;Inventaire" in page
     assert OidcClient  # import utilisé par make_client

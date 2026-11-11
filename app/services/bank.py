@@ -9,6 +9,7 @@
 
 Rien ici ne fait de commit, et un IBAN en clair ne doit jamais sortir de ce module ailleurs qu'à l'écran de lecture.
 """
+
 import base64
 import binascii
 import hashlib
@@ -33,8 +34,21 @@ NONCE_BYTES = 12
 # Mandat supprimé 13 mois après son dernier prélèvement (durée de contestation d'un prélèvement non autorisé).
 MANDATE_RETENTION_MONTHS = 13
 # Longueur de l'IBAN par pays, pour les pays de la zone SEPA les plus probables ; les autres : 15 à 34.
-IBAN_LENGTHS = {"FR": 27, "MC": 27, "BE": 16, "LU": 20, "DE": 22, "CH": 21, "ES": 24, "IT": 27, "PT": 25, "NL": 18,
-                "GB": 22, "IE": 22, "AT": 20}
+IBAN_LENGTHS = {
+    "FR": 27,
+    "MC": 27,
+    "BE": 16,
+    "LU": 20,
+    "DE": 22,
+    "CH": 21,
+    "ES": 24,
+    "IT": 27,
+    "PT": 25,
+    "NL": 18,
+    "GB": 22,
+    "IE": 22,
+    "AT": 20,
+}
 
 
 class BankKeyError(RuntimeError):
@@ -48,6 +62,7 @@ class InvalidIban(ValueError):
 # ---------------------------------------------------------------------------
 # Clés
 # ---------------------------------------------------------------------------
+
 
 def parse_keys(text):
     """« 2:clé, 1:clé » → {2: octets, 1: octets}. Chaque clé fait 32 octets, en base64."""
@@ -101,15 +116,19 @@ def check_startup(app):
                 return  # base pas encore migrée
             used = set(db.session.scalars(db.select(BankAccount.key_version).distinct()))
             if inspect(db.engine).has_table("dossier"):
-                used |= set(db.session.scalars(db.select(Dossier.iban_key_version).distinct()
-                                               .where(Dossier.iban_key_version.is_not(None))))
+                used |= set(
+                    db.session.scalars(
+                        db.select(Dossier.iban_key_version).distinct().where(Dossier.iban_key_version.is_not(None))
+                    )
+                )
         finally:
             db.session.remove()
     missing = sorted(used - set(available))
     if missing:
         raise BankKeyError(
             f"Des IBAN ont été chiffrés avec la clé n° {', '.join(map(str, missing))}, absente de BANK_DATA_KEYS : "
-            "l'appli refuse de démarrer plutôt que de les rendre illisibles. Remettez cette clé dans le fichier .env.")
+            "l'appli refuse de démarrer plutôt que de les rendre illisibles. Remettez cette clé dans le fichier .env."
+        )
 
 
 def _derive(key, purpose):
@@ -119,6 +138,7 @@ def _derive(key, purpose):
 # ---------------------------------------------------------------------------
 # IBAN
 # ---------------------------------------------------------------------------
+
 
 def normalize_iban(text):
     """Sans espaces, en majuscules, contrôlé (clé modulo 97). Lève InvalidIban sinon."""
@@ -145,7 +165,7 @@ def normalize_bic(text):
 
 def group(iban):
     """« FR7630006000011234567890189 » → « FR76 3000 6000 0112 3456 7890 189 »."""
-    return " ".join(iban[i:i + 4] for i in range(0, len(iban), 4))
+    return " ".join(iban[i : i + 4] for i in range(0, len(iban), 4))
 
 
 def _aad(household_id):
@@ -172,7 +192,8 @@ def set_iban(account, iban):
     key = keys()[version]
     nonce = os.urandom(NONCE_BYTES)
     account.iban_ciphertext = nonce + AESGCM(_derive(key, b"adherents/iban")).encrypt(
-        nonce, iban.encode(), _aad(account.household_id))
+        nonce, iban.encode(), _aad(account.household_id)
+    )
     account.iban_last4 = iban[-4:]
     account.iban_fingerprint = fingerprint(iban, version)
     account.key_version = version
@@ -185,8 +206,11 @@ def reveal(account):
         raise BankKeyError(f"La clé n° {account.key_version} n'est plus dans BANK_DATA_KEYS.")
     blob = account.iban_ciphertext
     try:
-        return AESGCM(_derive(key, b"adherents/iban")).decrypt(
-            blob[:NONCE_BYTES], blob[NONCE_BYTES:], _aad(account.household_id)).decode()
+        return (
+            AESGCM(_derive(key, b"adherents/iban"))
+            .decrypt(blob[:NONCE_BYTES], blob[NONCE_BYTES:], _aad(account.household_id))
+            .decode()
+        )
     except InvalidTag:
         raise BankKeyError("IBAN indéchiffrable : il a été modifié ou recopié d'un autre foyer.") from None
 
@@ -208,7 +232,8 @@ def set_dossier_iban(dossier, iban):
     version = current_version()
     nonce = os.urandom(NONCE_BYTES)
     dossier.iban_ciphertext = nonce + AESGCM(_derive(keys()[version], b"adherents/iban")).encrypt(
-        nonce, iban.encode(), _dossier_aad(dossier))
+        nonce, iban.encode(), _dossier_aad(dossier)
+    )
     dossier.iban_last4 = iban[-4:]
     dossier.iban_key_version = version
 
@@ -222,8 +247,11 @@ def reveal_dossier_iban(dossier):
         raise BankKeyError(f"La clé n° {dossier.iban_key_version} n'est plus dans BANK_DATA_KEYS.")
     blob = dossier.iban_ciphertext
     try:
-        return AESGCM(_derive(key, b"adherents/iban")).decrypt(
-            blob[:NONCE_BYTES], blob[NONCE_BYTES:], _dossier_aad(dossier)).decode()
+        return (
+            AESGCM(_derive(key, b"adherents/iban"))
+            .decrypt(blob[:NONCE_BYTES], blob[NONCE_BYTES:], _dossier_aad(dossier))
+            .decode()
+        )
     except InvalidTag:
         raise BankKeyError("IBAN du dossier indéchiffrable : il a été modifié ou recopié d'un autre dossier.") from None
 
@@ -273,8 +301,12 @@ def new_rum():
 def _months_ago(today, months):
     year, month = divmod(today.year * 12 + today.month - 1 - months, 12)
     month += 1
-    day = min(today.day, [31, 29 if year % 4 == 0 and (year % 100 or year % 400 == 0) else 28, 31, 30, 31, 30, 31,
-                          31, 30, 31, 30, 31][month - 1])
+    day = min(
+        today.day,
+        [31, 29 if year % 4 == 0 and (year % 100 or year % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][
+            month - 1
+        ],
+    )
     return date(year, month, day)
 
 

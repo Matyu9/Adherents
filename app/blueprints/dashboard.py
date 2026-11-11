@@ -1,4 +1,5 @@
 """Page d'accueil après la connexion."""
+
 from flask import Blueprint, render_template
 from flask_login import current_user, login_required
 
@@ -16,4 +17,5 @@ def index():
         open_sessions, connected = sessions.stats()
         stats = {"sessions": open_sessions, "connected": connected}
     from .enrollment import my_dossiers
+
     return render_template("dashboard/index.html", stats=stats, dossiers=my_dossiers(current_user))

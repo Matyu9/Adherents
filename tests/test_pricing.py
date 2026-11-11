@@ -1,4 +1,5 @@
 """Moteur de tarifs (services/pricing.py) : calcul pur, sans base de données."""
+
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
@@ -34,8 +35,13 @@ PAPA = Student(4, "Papa", age=45, adult=True)
 
 
 def rule(name="Règle", effect=None, conditions=None, target=None, group=None):
-    raw = {"name": name, "effect": effect or {"kind": "free"}, "conditions": conditions or [],
-           "target": target or {}, "group": group}
+    raw = {
+        "name": name,
+        "effect": effect or {"kind": "free"},
+        "conditions": conditions or [],
+        "target": target or {},
+        "group": group,
+    }
     return validate_rule(raw, set(ITEMS))
 
 
@@ -58,6 +64,7 @@ def cond(field, op, value, param=None):
 # ---------------------------------------------------------------------------
 # Sans règle
 # ---------------------------------------------------------------------------
+
 
 def test_grille_vide_rien_a_payer():
     result = run([])
@@ -83,6 +90,7 @@ def test_total_par_regie():
 # ---------------------------------------------------------------------------
 # Effets
 # ---------------------------------------------------------------------------
+
 
 def test_pourcentage_de_reduction():
     result = run([(1, F30)], [rule(effect={"kind": "percent", "value": "-10"})])
@@ -119,7 +127,9 @@ def test_prix_fixe():
 
 
 def test_offert():
-    result = run([(1, F30), (1, CHORALE)], [rule(effect={"kind": "free"}, target={"categories": ["Pratiques collectives"]})])
+    result = run(
+        [(1, F30), (1, CHORALE)], [rule(effect={"kind": "free"}, target={"categories": ["Pratiques collectives"]})]
+    )
     assert amounts(result) == [(1, F30, 42000), (1, CHORALE, 0)]
 
 
@@ -131,8 +141,9 @@ def test_remplacer_par_un_autre_element():
 
 
 def test_ajouter_un_element_par_eleve():
-    result = run([(1, F30), (2, F45), (2, CHORALE)],
-                 [rule("Adhésion", effect={"kind": "add", "item": ADH, "per": "student"})])
+    result = run(
+        [(1, F30), (2, F45), (2, CHORALE)], [rule("Adhésion", effect={"kind": "add", "item": ADH, "per": "student"})]
+    )
     adhesions = [line for line in result.lines if line.item.id == ADH]
     assert [line.student_id for line in adhesions] == [1, 2]  # une seule par élève
     assert adhesions[0].added_by == "Adhésion"
@@ -145,8 +156,9 @@ def test_ajouter_un_element_pour_le_foyer():
 
 
 def test_ajout_sous_condition_eleve():
-    adh_mineurs = rule(effect={"kind": "add", "item": ADH, "per": "student"},
-                       conditions=[[cond("eleve.adulte", "is", False)]])
+    adh_mineurs = rule(
+        effect={"kind": "add", "item": ADH, "per": "student"}, conditions=[[cond("eleve.adulte", "is", False)]]
+    )
     result = run([(1, F30), (4, F30)], [adh_mineurs])
     assert [line.student_id for line in result.lines if line.item.id == ADH] == [1]
 
@@ -166,6 +178,7 @@ def test_montant_sur_le_total():
 # ---------------------------------------------------------------------------
 # Cible
 # ---------------------------------------------------------------------------
+
 
 def test_cible_par_element():
     result = run([(1, F30), (1, F45)], [rule(target={"items": [F45]})])
@@ -187,6 +200,7 @@ def test_exclusion_l_emporte_sur_la_cible():
 # ---------------------------------------------------------------------------
 # Conditions : ET, OU, faits inconnus
 # ---------------------------------------------------------------------------
+
 
 def test_conditions_et():
     r = rule(conditions=[[cond("foyer.tranche_qf", "in", ["A"]), cond("foyer.resident", "is", True)]])
@@ -245,15 +259,19 @@ def test_nombre_d_eleves_du_foyer():
 
 
 def test_nombre_d_elements_d_une_categorie_chez_l_eleve():
-    r = rule(target={"categories": ["Pratiques collectives"]},
-             conditions=[[cond("eleve.nb_elements", "ge", 1, {"category": "Formules"})]])
+    r = rule(
+        target={"categories": ["Pratiques collectives"]},
+        conditions=[[cond("eleve.nb_elements", "ge", 1, {"category": "Formules"})]],
+    )
     result = run([(1, F30), (1, CHORALE), (2, CHORALE)], [r])
     assert amounts(result) == [(1, F30, 42000), (1, CHORALE, 0), (2, CHORALE, 9000)]
 
 
 def test_nombre_d_elements_du_foyer_par_element():
-    r = rule(effect={"kind": "total_amount", "value": -1000},
-             conditions=[[cond("foyer.nb_elements", "ge", 2, {"item": LOC})]])
+    r = rule(
+        effect={"kind": "total_amount", "value": -1000},
+        conditions=[[cond("foyer.nb_elements", "ge", 2, {"item": LOC})]],
+    )
     assert run([(1, LOC), (2, LOC)], [r]).total == 23000
 
 
@@ -266,6 +284,7 @@ def test_element_et_categorie_de_la_ligne():
 # ---------------------------------------------------------------------------
 # Ordre des règles et groupes exclusifs
 # ---------------------------------------------------------------------------
+
 
 def test_ordre_des_regles_en_cascade():
     moins_10 = rule("−10 %", effect={"kind": "percent", "value": "-10"})
@@ -288,10 +307,18 @@ def test_trace_dans_l_ordre():
 
 
 def test_groupe_exclusif_la_premiere_l_emporte():
-    qf_a = rule("QF A", effect={"kind": "percent", "value": "-30"}, group="social",
-                conditions=[[cond("foyer.tranche_qf", "in", ["A"])]])
-    boursier = rule("Boursier", effect={"kind": "percent", "value": "-50"}, group="social",
-                    conditions=[[cond("foyer.etiquettes", "has_any", ["boursier"])]])
+    qf_a = rule(
+        "QF A",
+        effect={"kind": "percent", "value": "-30"},
+        group="social",
+        conditions=[[cond("foyer.tranche_qf", "in", ["A"])]],
+    )
+    boursier = rule(
+        "Boursier",
+        effect={"kind": "percent", "value": "-50"},
+        group="social",
+        conditions=[[cond("foyer.etiquettes", "has_any", ["boursier"])]],
+    )
     famille = rule("Famille", effect={"kind": "percent", "value": "-10"})
     both = Household("A", tags=frozenset({"boursier"}))
     result = run([(1, F30)], [qf_a, boursier, famille], both)
@@ -328,9 +355,15 @@ def test_regle_sur_le_total_calculee_a_sa_place():
 # Rangs : dégressivité
 # ---------------------------------------------------------------------------
 
+
 def famille(rang, pct):
-    return rule(f"Famille {rang}", effect={"kind": "percent", "value": str(pct)}, group="famille",
-                target={"categories": ["Formules"]}, conditions=[[cond("eleve.rang", "ge", rang)]])
+    return rule(
+        f"Famille {rang}",
+        effect={"kind": "percent", "value": str(pct)},
+        group="famille",
+        target={"categories": ["Formules"]},
+        conditions=[[cond("eleve.rang", "ge", rang)]],
+    )
 
 
 DEGRESSIVITE = [famille(3, -20), famille(2, -10)]
@@ -377,30 +410,45 @@ def test_rang_ignore_les_eleves_sans_element():
 def test_rang_fige_pendant_une_regle():
     # Remplacer la formule du premier élève par une moins chère ne fait pas passer le second premier
     # au cours de la même règle.
-    remplace = rule("Famille", effect={"kind": "replace", "item": F30_FAM}, target={"items": [F30, F45]},
-                    conditions=[[cond("eleve.rang", "ge", 2)]])
+    remplace = rule(
+        "Famille",
+        effect={"kind": "replace", "item": F30_FAM},
+        target={"items": [F30, F45]},
+        conditions=[[cond("eleve.rang", "ge", 2)]],
+    )
     result = run([(1, F45), (2, F30)], [remplace])
     assert [line.item.id for line in result.lines] == [F45, F30_FAM]
 
 
 def test_rang_d_une_ligne_fige_pendant_une_regle():
     # La F45 (rang 1) devient une formule famille moins chère que la F30 : la F30 ne devient pas rang 1 pour autant.
-    r = rule(effect={"kind": "replace", "item": F30_FAM}, target={"categories": ["Formules"]},
-             conditions=[[cond("ligne.rang_eleve", "eq", 1)]])
+    r = rule(
+        effect={"kind": "replace", "item": F30_FAM},
+        target={"categories": ["Formules"]},
+        conditions=[[cond("ligne.rang_eleve", "eq", 1)]],
+    )
     result = run([(1, F45), (1, F30)], [r])
     assert [line.item.id for line in result.lines] == [F30_FAM, F30]
 
 
 def test_variante_famille_par_remplacement():
-    remplace = rule("Famille", effect={"kind": "replace", "item": F30_FAM}, target={"items": [F30]},
-                    conditions=[[cond("eleve.rang", "ge", 2)]])
+    remplace = rule(
+        "Famille",
+        effect={"kind": "replace", "item": F30_FAM},
+        target={"items": [F30]},
+        conditions=[[cond("eleve.rang", "ge", 2)]],
+    )
     result = run([(1, F30), (2, F30)], [remplace])
     assert [line.item.id for line in result.lines] == [F30, F30_FAM]
 
 
 def test_deuxieme_instrument_chez_l_eleve():
-    second = rule("2e instrument", effect={"kind": "percent", "value": "-50"}, target={"categories": ["Formules"]},
-                  conditions=[[cond("ligne.rang_eleve", "ge", 2)]])
+    second = rule(
+        "2e instrument",
+        effect={"kind": "percent", "value": "-50"},
+        target={"categories": ["Formules"]},
+        conditions=[[cond("ligne.rang_eleve", "ge", 2)]],
+    )
     result = run([(1, F30), (1, F45), (2, F30)], [second])
     assert amounts(result) == [(1, F30, 21000), (1, F45, 54000), (2, F30, 42000)]
 
@@ -415,6 +463,7 @@ def test_troisieme_pratique_collective_du_foyer_offerte():
 # ---------------------------------------------------------------------------
 # Arrondi
 # ---------------------------------------------------------------------------
+
 
 def test_arrondi_au_decime_par_ligne():
     r = rule(effect={"kind": "percent", "value": "-7"})
@@ -447,64 +496,119 @@ def test_arrondi_sur_le_total():
 # Validation des règles et réglages
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("raw, message", [
-    ({"effect": {"kind": "free"}}, "nom"),
-    ({"name": " ", "effect": {"kind": "free"}}, "nom"),
-    ({"name": "R"}, "Effet"),
-    ({"name": "R", "effect": {"kind": "eval"}}, "Effet"),
-    ({"name": "R", "effect": {"kind": "percent", "value": "abc"}}, "Pourcentage"),
-    ({"name": "R", "effect": {"kind": "percent", "value": "NaN"}}, "Pourcentage"),
-    ({"name": "R", "effect": {"kind": "percent", "value": "-150"}}, "entre"),
-    ({"name": "R", "effect": {"kind": "percent", "value": "-10", "base": "x"}}, "Base"),
-    ({"name": "R", "effect": {"kind": "amount", "value": 1.5}}, "entier"),
-    ({"name": "R", "effect": {"kind": "amount", "value": True}}, "entier"),
-    ({"name": "R", "effect": {"kind": "fixed", "value": -1}}, "négatif"),
-    ({"name": "R", "effect": {"kind": "replace", "item": 999}}, "n'existe pas"),
-    ({"name": "R", "effect": {"kind": "add", "item": 1, "per": "cours"}}, "ajoute"),
-    ({"name": "R", "effect": {"kind": "total_percent", "value": "-5"}, "target": {"items": [1]}}, "cible"),
-    ({"name": "R", "effect": {"kind": "free"}, "conditions": [[{"field": "__import__", "op": "eq", "value": 1}]]},
-     "Critère"),
-    ({"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("eleve.age", "in", [1])]]}, "Opérateur"),
-    ({"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("eleve.age", "between", [10, 5])]]}, "inversées"),
-    ({"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("eleve.age", "between", [1])]]}, "deux"),
-    ({"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("foyer.resident", "is", "oui")]]}, "oui ou non"),
-    ({"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("foyer.tranche_qf", "in", [])]]}, "au moins"),
-    ({"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("ligne.element", "in", [999])]]}, "n'existe pas"),
-    ({"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("eleve.age", "eq", 3, {"category": "X"})]]},
-     "précision"),
-    ({"name": "R", "effect": {"kind": "free"},
-      "conditions": [[cond("eleve.nb_elements", "ge", 1, {"item": 1, "category": "X"})]]}, "précisez"),
-    ({"name": "R", "effect": {"kind": "free"}, "conditions": {"field": "eleve.age"}}, "illisibles"),
-    # une règle sur le foyer ne peut pas consulter un élève ni une ligne
-    ({"name": "R", "effect": {"kind": "total_amount", "value": -1}, "conditions": [[cond("eleve.age", "lt", 18)]]},
-     "un élève"),
-    ({"name": "R", "effect": {"kind": "add", "item": 1, "per": "household"},
-      "conditions": [[cond("eleve.rang", "ge", 2)]]}, "un élève"),
-    ({"name": "R", "effect": {"kind": "add", "item": 1, "per": "student"},
-      "conditions": [[cond("ligne.rang_eleve", "ge", 2)]]}, "un élément"),
-    ({"name": "R", "effect": {"kind": "free"}, "group": "x" * 61}, "groupe"),
-])
+
+@pytest.mark.parametrize(
+    "raw, message",
+    [
+        ({"effect": {"kind": "free"}}, "nom"),
+        ({"name": " ", "effect": {"kind": "free"}}, "nom"),
+        ({"name": "R"}, "Effet"),
+        ({"name": "R", "effect": {"kind": "eval"}}, "Effet"),
+        ({"name": "R", "effect": {"kind": "percent", "value": "abc"}}, "Pourcentage"),
+        ({"name": "R", "effect": {"kind": "percent", "value": "NaN"}}, "Pourcentage"),
+        ({"name": "R", "effect": {"kind": "percent", "value": "-150"}}, "entre"),
+        ({"name": "R", "effect": {"kind": "percent", "value": "-10", "base": "x"}}, "Base"),
+        ({"name": "R", "effect": {"kind": "amount", "value": 1.5}}, "entier"),
+        ({"name": "R", "effect": {"kind": "amount", "value": True}}, "entier"),
+        ({"name": "R", "effect": {"kind": "fixed", "value": -1}}, "négatif"),
+        ({"name": "R", "effect": {"kind": "replace", "item": 999}}, "n'existe pas"),
+        ({"name": "R", "effect": {"kind": "add", "item": 1, "per": "cours"}}, "ajoute"),
+        ({"name": "R", "effect": {"kind": "total_percent", "value": "-5"}, "target": {"items": [1]}}, "cible"),
+        (
+            {
+                "name": "R",
+                "effect": {"kind": "free"},
+                "conditions": [[{"field": "__import__", "op": "eq", "value": 1}]],
+            },
+            "Critère",
+        ),
+        ({"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("eleve.age", "in", [1])]]}, "Opérateur"),
+        (
+            {"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("eleve.age", "between", [10, 5])]]},
+            "inversées",
+        ),
+        ({"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("eleve.age", "between", [1])]]}, "deux"),
+        (
+            {"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("foyer.resident", "is", "oui")]]},
+            "oui ou non",
+        ),
+        ({"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("foyer.tranche_qf", "in", [])]]}, "au moins"),
+        (
+            {"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("ligne.element", "in", [999])]]},
+            "n'existe pas",
+        ),
+        (
+            {"name": "R", "effect": {"kind": "free"}, "conditions": [[cond("eleve.age", "eq", 3, {"category": "X"})]]},
+            "précision",
+        ),
+        (
+            {
+                "name": "R",
+                "effect": {"kind": "free"},
+                "conditions": [[cond("eleve.nb_elements", "ge", 1, {"item": 1, "category": "X"})]],
+            },
+            "précisez",
+        ),
+        ({"name": "R", "effect": {"kind": "free"}, "conditions": {"field": "eleve.age"}}, "illisibles"),
+        # une règle sur le foyer ne peut pas consulter un élève ni une ligne
+        (
+            {
+                "name": "R",
+                "effect": {"kind": "total_amount", "value": -1},
+                "conditions": [[cond("eleve.age", "lt", 18)]],
+            },
+            "un élève",
+        ),
+        (
+            {
+                "name": "R",
+                "effect": {"kind": "add", "item": 1, "per": "household"},
+                "conditions": [[cond("eleve.rang", "ge", 2)]],
+            },
+            "un élève",
+        ),
+        (
+            {
+                "name": "R",
+                "effect": {"kind": "add", "item": 1, "per": "student"},
+                "conditions": [[cond("ligne.rang_eleve", "ge", 2)]],
+            },
+            "un élément",
+        ),
+        ({"name": "R", "effect": {"kind": "free"}, "group": "x" * 61}, "groupe"),
+    ],
+)
 def test_regle_refusee(raw, message):
     with pytest.raises(PricingError, match=message):
         validate_rule(raw, set(ITEMS))
 
 
 def test_regle_normalisee():
-    normalized = validate_rule({
-        "name": "  QF A ", "group": "  ", "effect": {"kind": "percent", "value": "-10.0"},
-        "target": {"categories": ["Formules", " Formules"], "items": []},
-        "conditions": [[], [cond("foyer.tranche_qf", "in", ["B", "A", "A"])]],
-    }, set(ITEMS))
+    normalized = validate_rule(
+        {
+            "name": "  QF A ",
+            "group": "  ",
+            "effect": {"kind": "percent", "value": "-10.0"},
+            "target": {"categories": ["Formules", " Formules"], "items": []},
+            "conditions": [[], [cond("foyer.tranche_qf", "in", ["B", "A", "A"])]],
+        },
+        set(ITEMS),
+    )
     assert normalized == {
-        "name": "QF A", "group": None, "effect": {"kind": "percent", "value": "-10", "base": "current"},
+        "name": "QF A",
+        "group": None,
+        "effect": {"kind": "percent", "value": "-10", "base": "current"},
         "target": {"categories": ["Formules"]},
         "conditions": [[{"field": "foyer.tranche_qf", "op": "in", "value": ["A", "B"]}]],
     }
 
 
 def test_regle_validee_deux_fois_identique():
-    raw = {"name": "R", "effect": {"kind": "percent", "value": "-12.5"},
-           "conditions": [[cond("eleve.nb_elements", "ge", 2, {"category": "Formules"})]]}
+    raw = {
+        "name": "R",
+        "effect": {"kind": "percent", "value": "-12.5"},
+        "conditions": [[cond("eleve.nb_elements", "ge", 2, {"category": "Formules"})]],
+    }
     once = validate_rule(raw, set(ITEMS))
     assert validate_rule(once, set(ITEMS)) == once
 
@@ -515,21 +619,34 @@ def test_regle_sans_liste_d_elements_connus():
 
 def test_tous_les_criteres_ont_des_operateurs():
     from app.services.pricing import OPERATORS
+
     assert all(kind in OPERATORS for _, _, kind, _ in FIELDS.values())
 
 
-@pytest.mark.parametrize("settings", [
-    {"ranking": "hasard"}, {"rounding": "dizaine"}, {"rounding_scope": "regie"}, {"inconnu": 1},
-    {"ranking_categories": "Formules"}, {"ranking_categories": [""]}, [],
-])
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {"ranking": "hasard"},
+        {"rounding": "dizaine"},
+        {"rounding_scope": "regie"},
+        {"inconnu": 1},
+        {"ranking_categories": "Formules"},
+        {"ranking_categories": [""]},
+        [],
+    ],
+)
 def test_reglages_refuses(settings):
     with pytest.raises(PricingError):
         validate_settings(settings)
 
 
 def test_reglages_par_defaut():
-    assert validate_settings({}) == {"ranking": "price_desc", "ranking_categories": [], "rounding": "none",
-                                     "rounding_scope": "line"}
+    assert validate_settings({}) == {
+        "ranking": "price_desc",
+        "ranking_categories": [],
+        "rounding": "none",
+        "rounding_scope": "line",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -566,6 +683,9 @@ def test_arrondi_respecte_le_pas(picks, rounding, scope):
 @given(picks_strategy)
 def test_reduction_ne_fait_jamais_payer_plus(picks):
     without = run(picks, []).total
-    with_reduction = run(picks, DEGRESSIVITE + [rule("2e", effect={"kind": "percent", "value": "-50"},
-                                                    conditions=[[cond("ligne.rang_eleve", "ge", 2)]])]).total
+    with_reduction = run(
+        picks,
+        DEGRESSIVITE
+        + [rule("2e", effect={"kind": "percent", "value": "-50"}, conditions=[[cond("ligne.rang_eleve", "ge", 2)]])],
+    ).total
     assert with_reduction <= without

@@ -4,6 +4,7 @@ Le secret est chiffré en base avec une clé dérivée de SECRET_KEY : une copie
 de codes. Changer SECRET_KEY rend donc les secrets et les codes de secours inutilisables (voir docs/configuration.md).
 Les services ne font pas de commit : c'est la route qui valide.
 """
+
 import base64
 import hashlib
 import hmac
@@ -34,8 +35,13 @@ def required(account):
     lit les données personnelles des autres (annuaire, mineurs compris ; IBAN ; contrats des professeurs)."""
     from .guard import SENSITIVE_RIGHTS
 
-    return (account.is_admin or can(account, "account.manage") or can(account, "group.manage")
-            or can(account, "client.manage") or any(can(account, right) for right in SENSITIVE_RIGHTS))
+    return (
+        account.is_admin
+        or can(account, "account.manage")
+        or can(account, "group.manage")
+        or can(account, "client.manage")
+        or any(can(account, right) for right in SENSITIVE_RIGHTS)
+    )
 
 
 def _fernet():
@@ -108,8 +114,12 @@ def new_recovery_codes(account):
 
 def use_recovery_code(account, code):
     normalized = (code or "").strip().lower()
-    return db.session.execute(db.delete(RecoveryCode).where(
-        RecoveryCode.id == _digest(normalized), RecoveryCode.account_id == account.id)).rowcount > 0
+    return (
+        db.session.execute(
+            db.delete(RecoveryCode).where(RecoveryCode.id == _digest(normalized), RecoveryCode.account_id == account.id)
+        ).rowcount
+        > 0
+    )
 
 
 def remaining_recovery_codes(account):

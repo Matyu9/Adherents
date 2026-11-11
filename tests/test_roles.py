@@ -13,8 +13,14 @@ def test_index_lists_builtin_roles(client, admin):
 
 
 def test_create_role(client, admin):
-    response = client.post("/roles/nouveau", data={"name": "  Régisseur   son ", "description": "Sono",
-                                                   "permissions": ["activity.view", "droit.inexistant"]})
+    response = client.post(
+        "/roles/nouveau",
+        data={
+            "name": "  Régisseur   son ",
+            "description": "Sono",
+            "permissions": ["activity.view", "droit.inexistant"],
+        },
+    )
     assert response.status_code == 302
     role = db.session.get(Role, "regisseur-son")
     assert role.name == "Régisseur son" and role.permissions == ["activity.view"]
@@ -40,7 +46,9 @@ def test_duplicate_prefills_rights(client, admin):
 
 
 def test_edit_builtin_role_saves_it(client, admin):
-    response = client.post(f"/roles/{Role.ADHERENT}/modifier", data={"name": "Membre", "permissions": ["activity.view"]})
+    response = client.post(
+        f"/roles/{Role.ADHERENT}/modifier", data={"name": "Membre", "permissions": ["activity.view"]}
+    )
     assert response.status_code == 302
     role = db.session.get(Role, Role.ADHERENT)
     assert role.name == "Membre" and role.permissions == ["activity.view"]

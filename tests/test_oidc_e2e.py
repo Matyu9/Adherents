@@ -3,6 +3,7 @@
 C'est la preuve que `form-action 'self'` ne bloque pas le retour vers l'appli après un formulaire : Chrome applique
 cette règle aux redirections, pas pytest. Les deux serveurs tournent sur 127.0.0.1 uniquement.
 """
+
 import threading
 
 import pytest
@@ -36,8 +37,13 @@ def client_application(discovery, client_id, secret, callback_port_box, scope="o
     web.secret_key = "appli-cliente-e2e"
     web.config.update(SESSION_COOKIE_NAME="client_session")
     oauth = OAuth(web)
-    remote = oauth.register("idp", server_metadata_url=discovery, client_id=client_id, client_secret=secret,
-                            client_kwargs={"scope": scope, "code_challenge_method": "S256"})
+    remote = oauth.register(
+        "idp",
+        server_metadata_url=discovery,
+        client_id=client_id,
+        client_secret=secret,
+        client_kwargs={"scope": scope, "code_challenge_method": "S256"},
+    )
 
     @web.route("/entrer")
     def enter():
@@ -46,6 +52,7 @@ def client_application(discovery, client_id, secret, callback_port_box, scope="o
     @web.route("/retour")
     def back():
         from flask import request
+
         if "error" in request.args:
             return jsonify(error=request.args["error"])
         token = remote.authorize_access_token()
@@ -63,19 +70,36 @@ def world(tmp_path_factory, module_database):
     port = probe.server_port
     probe.server_close()
     issuer = f"http://127.0.0.1:{port}"
-    idp = create_app(config_for(tmp, SQLALCHEMY_DATABASE_URI=module_database, WTF_CSRF_ENABLED=True,
-                                TESTING=False, PROPAGATE_EXCEPTIONS=False, SECRET_KEY="cle-de-test-e2e-" * 4,
-                                OIDC_ISSUER=issuer, BASE_URL=issuer))
+    idp = create_app(
+        config_for(
+            tmp,
+            SQLALCHEMY_DATABASE_URI=module_database,
+            WTF_CSRF_ENABLED=True,
+            TESTING=False,
+            PROPAGATE_EXCEPTIONS=False,
+            SECRET_KEY="cle-de-test-e2e-" * 4,
+            OIDC_ISSUER=issuer,
+            BASE_URL=issuer,
+        )
+    )
     httpd = make_server("127.0.0.1", port, idp, threaded=True)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     with idp.app_context():
         db.create_all()
         stamp_head()
         group = AccessGroup(key="membres", name="Membres")
-        person = Account(first_name="Élise", last_name="Test", email="elise@e2e.test", role=Role.ADHERENT, active=True,
-                         email_verified=True, groups=[group])
-        admin = Account(first_name="Alice", last_name="Test", email="alice@e2e.test", role=Role.ADMIN, active=True,
-                        groups=[group])
+        person = Account(
+            first_name="Élise",
+            last_name="Test",
+            email="elise@e2e.test",
+            role=Role.ADHERENT,
+            active=True,
+            email_verified=True,
+            groups=[group],
+        )
+        admin = Account(
+            first_name="Alice", last_name="Test", email="alice@e2e.test", role=Role.ADMIN, active=True, groups=[group]
+        )
         outsider = Account(first_name="Olaf", last_name="Test", email="olaf@e2e.test", role=Role.ADHERENT, active=True)
         for account in (person, admin, outsider):
             account.set_password(PASSWORD)
@@ -92,14 +116,20 @@ def world(tmp_path_factory, module_database):
             probe = make_server("127.0.0.1", 0, Flask("x"))
             client_port = probe.server_port
             probe.server_close()
-            client = OidcClient(client_id=oidc.new_client_id(), name=name, first_party=first_party,
-                                redirect_uris=[f"http://127.0.0.1:{client_port}/retour"], allowed_groups=[group],
-                                shared_groups=[group])
+            client = OidcClient(
+                client_id=oidc.new_client_id(),
+                name=name,
+                first_party=first_party,
+                redirect_uris=[f"http://127.0.0.1:{client_port}/retour"],
+                allowed_groups=[group],
+                shared_groups=[group],
+            )
             secret = oidc.set_secret(client)
             db.session.add(client)
             db.session.commit()
-            web = client_application(f"{issuer}/.well-known/openid-configuration", client.client_id, secret,
-                                     {"port": client_port})
+            web = client_application(
+                f"{issuer}/.well-known/openid-configuration", client.client_id, secret, {"port": client_port}
+            )
             apps[name] = make_server("127.0.0.1", client_port, web, threaded=True)
             threading.Thread(target=apps[name].serve_forever, daemon=True).start()
             return f"http://127.0.0.1:{client_port}"
@@ -141,6 +171,7 @@ def sign_in(page, email):
 
 def json_of(page):
     import json
+
     page.wait_for_load_state("load")
     return json.loads(page.inner_text("body"))
 
@@ -233,8 +264,13 @@ def test_nothing_overflows_on_a_phone(browser, world):
     long_uri = "https://inventaire.harmonie-municipale-de-saint-remy-les-chevreuse.example.org/auth/oidc/retour"
     with world["idp"].app_context():
         groups = [AccessGroup(key=f"g{i}", name=f"Professeurs d'instruments à vent {i}") for i in range(5)]
-        client = OidcClient(client_id=oidc.new_client_id(), name="Appli au nom très long " * 3, redirect_uris=[long_uri],
-                            allowed_groups=groups, shared_groups=groups)
+        client = OidcClient(
+            client_id=oidc.new_client_id(),
+            name="Appli au nom très long " * 3,
+            redirect_uris=[long_uri],
+            allowed_groups=groups,
+            shared_groups=groups,
+        )
         oidc.set_secret(client)
         db.session.add(client)
         db.session.execute(db.update(Account).where(Account.email == "alice@e2e.test").values(totp_last_counter=None))

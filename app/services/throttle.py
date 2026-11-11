@@ -3,6 +3,7 @@ l'action est refusée temporairement. La limite vaut pour tous les workers, et r
 
 Les services ne font pas de commit : c'est la route qui valide `hit` et `clear`.
 """
+
 import hashlib
 import hmac
 from datetime import datetime, timedelta
@@ -30,15 +31,15 @@ class Limiter:
         counts = db.session.execute(
             db.select(ThrottleEvent.key_hash, db.func.count())
             .where(ThrottleEvent.key_hash.in_([self._digest(k) for k in keys]), ThrottleEvent.created_at >= since)
-            .group_by(ThrottleEvent.key_hash)).all()
+            .group_by(ThrottleEvent.key_hash)
+        ).all()
         return any(count >= self.limit for _, count in counts)
 
     def hit(self, keys):
         db.session.add_all(ThrottleEvent(key_hash=self._digest(k)) for k in keys)
 
     def clear(self, keys):
-        db.session.execute(db.delete(ThrottleEvent).where(
-            ThrottleEvent.key_hash.in_([self._digest(k) for k in keys])))
+        db.session.execute(db.delete(ThrottleEvent).where(ThrottleEvent.key_hash.in_([self._digest(k) for k in keys])))
 
 
 def purge(now=None):

@@ -1,4 +1,5 @@
 """Rôles : liste ordonnée, création d'une clé, rôle par défaut des rôles de base."""
+
 import re
 
 from ..extensions import db, fold

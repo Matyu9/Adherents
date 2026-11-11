@@ -1,4 +1,5 @@
 """Tarifs (phase 9) : éléments, règles, réglages, situation des foyers, calcul, corrections, copie de saison."""
+
 from datetime import date
 
 import pytest
@@ -31,8 +32,9 @@ def item(s, label, euros, category=None, regie=None):
 
 
 def rule(s, name, effect, conditions=None, target=None, group=None, active=True):
-    record = fees.save_rule(s, {"name": name, "effect": effect, "conditions": conditions or [],
-                                "target": target or {}, "group": group})
+    record = fees.save_rule(
+        s, {"name": name, "effect": effect, "conditions": conditions or [], "target": target or {}, "group": group}
+    )
     if active:
         fees.set_rule_active(record, True)
     return record
@@ -85,9 +87,22 @@ def school(app):
     alice, alice_m = student(household, s, "Alice", date(2012, 3, 1))
     basile, basile_m = student(household, s, "Basile", date(2017, 5, 1))
     db.session.commit()
-    return {"season": s, "emhn": emhn, "ohn": ohn, "adh": adh, "f30": f30, "f45": f45, "chorale": chorale,
-            "orchestre": orchestre, "home": household, "anne": anne, "alice": alice, "basile": basile,
-            "m": {"anne": anne_m, "alice": alice_m, "basile": basile_m}, **courses}
+    return {
+        "season": s,
+        "emhn": emhn,
+        "ohn": ohn,
+        "adh": adh,
+        "f30": f30,
+        "f45": f45,
+        "chorale": chorale,
+        "orchestre": orchestre,
+        "home": household,
+        "anne": anne,
+        "alice": alice,
+        "basile": basile,
+        "m": {"anne": anne_m, "alice": alice_m, "basile": basile_m},
+        **courses,
+    }
 
 
 def totals(result):
@@ -98,6 +113,7 @@ def totals(result):
 # Réglages
 # ---------------------------------------------------------------------------
 
+
 def test_reglages_crees_vides(school):
     settings = fees.season_settings(school["season"])
     assert settings.engine == {} and settings.qf_bands == [] and settings.default_band is None
@@ -105,23 +121,31 @@ def test_reglages_crees_vides(school):
 
 def test_reglages_enregistres_et_journalises(school):
     s = school["season"]
-    fees.save_settings(s, {"rounding": "tenth"}, [{"label": "A", "max": 600}, {"label": "B", "max": 1200},
-                                                  {"label": "C"}], "C", [" Caen ", "Caen", "Hérouville"])
+    fees.save_settings(
+        s,
+        {"rounding": "tenth"},
+        [{"label": "A", "max": 600}, {"label": "B", "max": 1200}, {"label": "C"}],
+        "C",
+        [" Caen ", "Caen", "Hérouville"],
+    )
     settings = fees.season_settings(s)
     assert settings.engine["rounding"] == "tenth" and settings.default_band == "C"
     assert settings.resident_cities == ["Caen", "Hérouville"]
     assert db.session.scalar(db.select(Activity).filter_by(action="fee.settings")) is not None
 
 
-@pytest.mark.parametrize("bands, default, message", [
-    ([{"label": "A"}, {"label": "B"}], None, "plafond"),
-    ([{"label": "A", "max": 600}, {"label": "B", "max": 500}], None, "croissant"),
-    ([{"label": "A", "max": 600}, {"label": "A"}], None, "double"),
-    ([{"label": "", "max": 600}], None, "nom court"),
-    ([{"label": "A", "max": -1}], None, "positif"),
-    ([{"label": "A", "max": True}], None, "positif"),
-    ([{"label": "A"}], "Z", "par défaut"),
-])
+@pytest.mark.parametrize(
+    "bands, default, message",
+    [
+        ([{"label": "A"}, {"label": "B"}], None, "plafond"),
+        ([{"label": "A", "max": 600}, {"label": "B", "max": 500}], None, "croissant"),
+        ([{"label": "A", "max": 600}, {"label": "A"}], None, "double"),
+        ([{"label": "", "max": 600}], None, "nom court"),
+        ([{"label": "A", "max": -1}], None, "positif"),
+        ([{"label": "A", "max": True}], None, "positif"),
+        ([{"label": "A"}], "Z", "par défaut"),
+    ],
+)
 def test_tranches_refusees(school, bands, default, message):
     with pytest.raises(FeeError, match=message):
         fees.save_settings(school["season"], {}, bands, default)
@@ -135,6 +159,7 @@ def test_reglages_moteur_refuses(school):
 # ---------------------------------------------------------------------------
 # Éléments
 # ---------------------------------------------------------------------------
+
 
 def test_element_en_double_refuse(school):
     with pytest.raises(FeeError, match="déjà"):
@@ -157,14 +182,16 @@ def test_regie_archivee_refusee(school):
     with pytest.raises(FeeError, match="archivée"):
         item(school["season"], "Atelier", 50, regie=school["ohn"])
     # un élément qui y était déjà rattaché garde sa régie
-    fees.save_item(school["season"], {"label": "Orchestre", "price": 7000, "regie": school["ohn"]},
-                   school["orchestre"])
+    fees.save_item(school["season"], {"label": "Orchestre", "price": 7000, "regie": school["ohn"]}, school["orchestre"])
     assert school["orchestre"].price == 7000
 
 
 def test_modification_journalisee(school):
-    fees.save_item(school["season"], {"label": "Adhésion", "price": 2500, "regie": school["emhn"],
-                                      "category": "Adhésion"}, school["adh"])
+    fees.save_item(
+        school["season"],
+        {"label": "Adhésion", "price": 2500, "regie": school["emhn"], "category": "Adhésion"},
+        school["adh"],
+    )
     entry = db.session.scalars(db.select(Activity).filter_by(action="fee.item").order_by(Activity.id.desc())).first()
     assert entry.changes == {"price": [2000, 2500]}
 
@@ -198,6 +225,7 @@ def test_categories(school):
 # ---------------------------------------------------------------------------
 # Règles et ordre
 # ---------------------------------------------------------------------------
+
 
 def test_nouvelle_regle_en_brouillon_et_en_dernier(school):
     s = school["season"]
@@ -264,21 +292,30 @@ def test_regle_d_une_autre_saison(school):
 # Situation du foyer
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def bands(school):
-    fees.save_settings(school["season"], {}, [{"label": "A", "max": 600}, {"label": "B", "max": 1200},
-                                              {"label": "C"}], "C", ["Hérouville-Saint-Clair"])
+    fees.save_settings(
+        school["season"],
+        {},
+        [{"label": "A", "max": 600}, {"label": "B", "max": 1200}, {"label": "C"}],
+        "C",
+        ["Hérouville-Saint-Clair"],
+    )
     db.session.commit()
     return school
 
 
-@pytest.mark.parametrize("values, expected", [
-    ({}, "C"),
-    ({"quotient": 599}, "A"),
-    ({"quotient": 600}, "B"),
-    ({"quotient": 5000}, "C"),
-    ({"qf_band": "A", "quotient": 5000}, "A"),
-])
+@pytest.mark.parametrize(
+    "values, expected",
+    [
+        ({}, "C"),
+        ({"quotient": 599}, "A"),
+        ({"quotient": 600}, "B"),
+        ({"quotient": 5000}, "C"),
+        ({"qf_band": "A", "quotient": 5000}, "A"),
+    ],
+)
 def test_tranche_retenue(bands, values, expected):
     record = fees.save_situation(bands["home"], bands["season"], values)
     assert fees.band_of(record, fees.season_settings(bands["season"])) == expected
@@ -300,9 +337,13 @@ def test_residence(bands):
 
 
 def test_situation_refusee(bands):
-    for values, message in (({"qf_band": "Z"}, "Tranche"), ({"quotient": -3}, "quotient"),
-                            ({"quotient": "800"}, "quotient"), ({"resident": "oui"}, "Résident"),
-                            ({"tags": ["x" * 41]}, "40")):
+    for values, message in (
+        ({"qf_band": "Z"}, "Tranche"),
+        ({"quotient": -3}, "quotient"),
+        ({"quotient": "800"}, "quotient"),
+        ({"resident": "oui"}, "Résident"),
+        ({"tags": ["x" * 41]}, "40"),
+    ):
         with pytest.raises(FeeError, match=message):
             fees.save_situation(bands["home"], bands["season"], values)
 
@@ -329,14 +370,18 @@ def test_etiquettes_eleve(school):
 # Ce que le foyer prend
 # ---------------------------------------------------------------------------
 
+
 def test_preparation(school):
     m = school["m"]
     enroll(m["alice"], school["flute30"])
     enroll(m["alice"], school["choeur"])
     enroll(m["basile"], school["piano45"])
     prepared = fees.prepare(school["home"], school["season"])
-    assert prepared.order.picks == ((school["alice"].id, school["f30"].id), (school["alice"].id, school["chorale"].id),
-                                    (school["basile"].id, school["f45"].id))
+    assert prepared.order.picks == (
+        (school["alice"].id, school["f30"].id),
+        (school["alice"].id, school["chorale"].id),
+        (school["basile"].id, school["f45"].id),
+    )
     by_id = {st.id: st for st in prepared.order.students}
     assert by_id[school["alice"].id].age == 14  # âge au début de la saison
     assert by_id[school["alice"].id].disciplines == {"Flûte", "Chœur"}
@@ -419,19 +464,42 @@ def test_cours_relie_a_un_element(school):
 # Calcul, corrections, validation
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def priced(bands):
     """Grille complète : adhésion par élève, QF A, dégressivité, chorale offerte avec une formule, hors commune."""
     s, b = bands["season"], bands
     rule(s, "Adhésion", {"kind": "add", "item": b["adh"].id, "per": "student"})
-    rule(s, "QF A", {"kind": "percent", "value": "-30"}, [[cond("foyer.tranche_qf", "in", ["A"])]],
-         {"categories": ["Formules"]}, "social")
-    rule(s, "Famille 2", {"kind": "percent", "value": "-10"}, [[cond("eleve.rang", "ge", 2)]],
-         {"categories": ["Formules"]}, "famille")
-    rule(s, "Collectif offert", {"kind": "free"},
-         [[cond("eleve.nb_elements", "ge", 1, {"category": "Formules"})]], {"categories": ["Pratiques collectives"]})
-    rule(s, "Hors commune", {"kind": "percent", "value": "20"}, [[cond("foyer.resident", "is", False)]],
-         {"exclude_categories": ["Adhésion"]})
+    rule(
+        s,
+        "QF A",
+        {"kind": "percent", "value": "-30"},
+        [[cond("foyer.tranche_qf", "in", ["A"])]],
+        {"categories": ["Formules"]},
+        "social",
+    )
+    rule(
+        s,
+        "Famille 2",
+        {"kind": "percent", "value": "-10"},
+        [[cond("eleve.rang", "ge", 2)]],
+        {"categories": ["Formules"]},
+        "famille",
+    )
+    rule(
+        s,
+        "Collectif offert",
+        {"kind": "free"},
+        [[cond("eleve.nb_elements", "ge", 1, {"category": "Formules"})]],
+        {"categories": ["Pratiques collectives"]},
+    )
+    rule(
+        s,
+        "Hors commune",
+        {"kind": "percent", "value": "20"},
+        [[cond("foyer.resident", "is", False)]],
+        {"exclude_categories": ["Adhésion"]},
+    )
     m = b["m"]
     enroll(m["alice"], b["flute30"])
     enroll(m["alice"], b["choeur"])
@@ -443,8 +511,13 @@ def priced(bands):
 def test_calcul_complet(priced):
     _, result = fees.compute(priced["home"], priced["season"])
     a, b = priced["alice"].id, priced["basile"].id
-    assert totals(result) == [(a, "Formule 30 min", 37800), (a, "Chorale", 0), (b, "Formule 45 min", 54000),
-                              (a, "Adhésion", 2000), (b, "Adhésion", 2000)]
+    assert totals(result) == [
+        (a, "Formule 30 min", 37800),
+        (a, "Chorale", 0),
+        (b, "Formule 45 min", 54000),
+        (a, "Adhésion", 2000),
+        (b, "Adhésion", 2000),
+    ]
     assert result.total == 95800
 
 
@@ -467,15 +540,24 @@ def test_cotisation_enregistree(priced):
     assert a.status == Assessment.PROPOSED and a.total == a.computed_total == 95800
     first = a.lines[0]
     assert (first.label, first.regie_name, first.base, first.person_name) == (
-        "Formule 30 min", "EMHN", 42000, "Alice Martin")
+        "Formule 30 min",
+        "EMHN",
+        42000,
+        "Alice Martin",
+    )
     assert first.steps == [{"rule": "Famille 2", "before": 42000, "after": 37800, "note": ""}]
 
 
 def test_lignes_sur_le_total_et_arrondi(priced):
     s = priced["season"]
     rule(s, "Remise foyer", {"kind": "total_percent", "value": "-3"})
-    fees.save_settings(s, {"rounding": "euro", "rounding_scope": "total"}, fees.season_settings(s).qf_bands, "C",
-                       ["Hérouville-Saint-Clair"])
+    fees.save_settings(
+        s,
+        {"rounding": "euro", "rounding_scope": "total"},
+        fees.season_settings(s).qf_bands,
+        "C",
+        ["Hérouville-Saint-Clair"],
+    )
     a = fees.assess(priced["home"], s)
     kinds = [(line.kind, line.label, line.amount) for line in a.lines if line.kind != AssessmentLine.ITEM]
     assert kinds == [("adjustment", "Remise foyer", -2874), ("rounding", "Arrondi", -26)]
@@ -589,12 +671,20 @@ def test_calcul_de_la_saison(priced):
 # Effet d'une règle, simulation
 # ---------------------------------------------------------------------------
 
+
 def test_effet_d_une_regle_en_brouillon(priced):
-    draft = rule(priced["season"], "Basile offert", {"kind": "free"},
-                 [[cond("eleve.age", "lt", 10)]], {"categories": ["Formules"]}, active=False)
+    draft = rule(
+        priced["season"],
+        "Basile offert",
+        {"kind": "free"},
+        [[cond("eleve.age", "lt", 10)]],
+        {"categories": ["Formules"]},
+        active=False,
+    )
     impacts = fees.rule_impact(draft)
     assert [(i.household.name, i.before, i.after, i.delta) for i in impacts] == [
-        ("Famille Martin", 95800, 41800, -54000)]
+        ("Famille Martin", 95800, 41800, -54000)
+    ]
 
 
 def test_effet_de_la_desactivation(priced):
@@ -613,8 +703,7 @@ def test_effet_respecte_la_position(priced):
 def test_simulation_d_un_foyer_fictif(priced):
     s = priced["season"]
     draft = rule(s, "Brouillon", {"kind": "total_amount", "value": -500}, active=False)
-    order = pricing.Order(pricing.Household("A", True), (pricing.Student(1, "X", age=8),),
-                          ((1, priced["f30"].id),))
+    order = pricing.Order(pricing.Household("A", True), (pricing.Student(1, "X", age=8),), ((1, priced["f30"].id),))
     assert fees.simulate(s, order).total == 29400 + 2000
     assert fees.simulate(s, order, include_drafts=[draft]).total == 29400 + 2000 - 500
 
@@ -623,10 +712,17 @@ def test_simulation_d_un_foyer_fictif(priced):
 # Copie de saison
 # ---------------------------------------------------------------------------
 
+
 def test_copie_de_saison(priced):
     s = priced["season"]
-    rule(s, "Variante", {"kind": "replace", "item": priced["f45"].id}, [[cond("ligne.element", "in", [priced["f30"].id])]],
-         {"items": [priced["f30"].id]}, active=False)
+    rule(
+        s,
+        "Variante",
+        {"kind": "replace", "item": priced["f45"].id},
+        [[cond("ligne.element", "in", [priced["f30"].id])]],
+        {"items": [priced["f30"].id]},
+        active=False,
+    )
     target = season("2027-2028")
     flute_copy = Course(season=target, discipline=priced["flute30"].discipline, level=priced["flute30"].level)
     unknown = Course(season=target, discipline=Discipline(name="Harpe"))
@@ -646,8 +742,9 @@ def test_copie_de_saison(priced):
     assert fees.season_settings(target).qf_bands == fees.season_settings(s).qf_bands
     assert fees.season_settings(target).resident_cities == ["Hérouville-Saint-Clair"]
     # la saison copiée calcule comme l'ancienne
-    assert all(pricing.referenced_items(r.as_dict()) <= {i.id for i in new_items.values()}
-               for r in fees.season_rules(target))
+    assert all(
+        pricing.referenced_items(r.as_dict()) <= {i.id for i in new_items.values()} for r in fees.season_rules(target)
+    )
 
 
 def test_copie_refusee(priced):
@@ -662,6 +759,7 @@ def test_copie_refusee(priced):
 # ---------------------------------------------------------------------------
 # Fusions de l'annuaire
 # ---------------------------------------------------------------------------
+
 
 def test_fusion_de_foyers(priced):
     s = priced["season"]

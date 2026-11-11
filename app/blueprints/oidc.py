@@ -4,6 +4,7 @@ Après un formulaire (connexion, code, consentement), le retour vers l'appli pas
 applique `form-action 'self'` à toute la chaîne de redirections qui suit un formulaire, et bloquerait la dernière, vers
 l'appli. Une nouvelle navigation casse cette chaîne, sans avoir à assouplir la CSP.
 """
+
 import time
 from urllib.parse import parse_qsl, urlencode
 
@@ -48,8 +49,24 @@ def discovery():
         id_token_signing_alg_values_supported=["RS256"],
         token_endpoint_auth_methods_supported=list(OidcClient.AUTH_METHODS),
         code_challenge_methods_supported=["S256"],
-        claims_supported=["iss", "sub", "aud", "exp", "iat", "auth_time", "nonce", "at_hash", "name", "given_name",
-                          "family_name", "updated_at", "email", "email_verified", "groups", "sid"],
+        claims_supported=[
+            "iss",
+            "sub",
+            "aud",
+            "exp",
+            "iat",
+            "auth_time",
+            "nonce",
+            "at_hash",
+            "name",
+            "given_name",
+            "family_name",
+            "updated_at",
+            "email",
+            "email_verified",
+            "groups",
+            "sid",
+        ],
         prompt_values_supported=["none", "login", "consent"],
         claims_parameter_supported=False,
         request_parameter_supported=False,
@@ -105,8 +122,10 @@ def _error_uri(redirect_uri, error, state):
     return add_params_to_uri(redirect_uri, params)
 
 
-INVALID_REQUEST = ("Cette demande de connexion n'est pas valable\u00a0: l'application n'est pas reconnue, "
-                   "ou son adresse de retour n'est pas celle qui a été déclarée.")
+INVALID_REQUEST = (
+    "Cette demande de connexion n'est pas valable\u00a0: l'application n'est pas reconnue, "
+    "ou son adresse de retour n'est pas celle qui a été déclarée."
+)
 
 
 def _refused_page(message, status, title=None):
@@ -121,10 +140,13 @@ def _oauth_error(error):
 
 
 def _insecure_page():
-    current_app.logger.error("Connexion OIDC refusée : requête reçue sans https (%s). Vérifiez OIDC_ISSUER et "
-                             "TRUST_PROXY.", request.host_url)
-    return _refused_page("Ce serveur doit être joint en https pour connecter une application. "
-                         "Prévenez un responsable de l'association.", 400)
+    current_app.logger.error(
+        "Connexion OIDC refusée : requête reçue sans https (%s). Vérifiez OIDC_ISSUER et TRUST_PROXY.", request.host_url
+    )
+    return _refused_page(
+        "Ce serveur doit être joint en https pour connecter une application. Prévenez un responsable de l'association.",
+        400,
+    )
 
 
 def _must_authenticate_again(args, account):
@@ -176,16 +198,20 @@ def authorize():
         db.session.commit()
         if silent:
             return tell_client("access_denied")
-        return _refused_page(f"Votre compte ne donne pas accès à « {client.name} ». "
-                             "Si vous pensez que c'est une erreur, contactez un responsable de l'association.", 403)
+        return _refused_page(
+            f"Votre compte ne donne pas accès à « {client.name} ». "
+            "Si vous pensez que c'est une erreur, contactez un responsable de l'association.",
+            403,
+        )
     scope = grant.request.scope
     wants_consent = "consent" in args.get("prompt", "").split()
     if wants_consent or not (client.first_party or oidc.consent_covers(client, account, scope)):
         if silent:
             return tell_client("consent_required")
         lines, groups = oidc.what_is_shared(client, account, scope)
-        return render_template("oidc/consent.html", client=client, lines=lines, groups=groups, form=FlaskForm(),
-                               query=_query(args))
+        return render_template(
+            "oidc/consent.html", client=client, lines=lines, groups=groups, form=FlaskForm(), query=_query(args)
+        )
     response = _server().create_authorization_response(grant_user=account, grant=grant)
     log("oidc.authorize", f"{account.full_name} s'est connecté à {client.name}", user=account)
     db.session.commit()
@@ -216,7 +242,9 @@ def consent():
     if request.form.get("decision") != "allow":
         log("oidc.consent_refused", f"{account.full_name} a refusé de se connecter à {client.name}", target=account)
         db.session.commit()
-        return render_template("oidc/continue.html", target=_error_uri(redirect_uri, "access_denied", args.get("state")))
+        return render_template(
+            "oidc/continue.html", target=_error_uri(redirect_uri, "access_denied", args.get("state"))
+        )
     oidc.grant_consent(client, account, client.get_allowed_scope(args.get("scope")))
     log("oidc.consent", f"{account.full_name} a autorisé {client.name}", target=account)
     db.session.commit()
@@ -269,8 +297,10 @@ def userinfo():
 # Déconnexion demandée par une appli (OpenID Connect RP-Initiated Logout 1.0)
 # ---------------------------------------------------------------------------
 
-LOGOUT_INVALID = ("Cette demande de déconnexion n'est pas valable\u00a0: l'application n'est pas reconnue, "
-                  "ou son adresse de retour n'est pas celle qui a été déclarée.")
+LOGOUT_INVALID = (
+    "Cette demande de déconnexion n'est pas valable\u00a0: l'application n'est pas reconnue, "
+    "ou son adresse de retour n'est pas celle qui a été déclarée."
+)
 
 
 def _logout_request(args):
@@ -320,7 +350,11 @@ def end_session():
     client, target, claims = parsed
     if not current_user.is_authenticated:
         return _logged_out(target)
-    if claims and claims["sub"] == current_user.sub and claims.get("sid", sessions.current_sid()) == sessions.current_sid():
+    if (
+        claims
+        and claims["sub"] == current_user.sub
+        and claims.get("sid", sessions.current_sid()) == sessions.current_sid()
+    ):
         sessions.end(via=client.name if client else None)
         return _logged_out(target)
     return render_template("oidc/logout.html", client=client, form=FlaskForm(), query=_query(args))

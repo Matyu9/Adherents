@@ -1,5 +1,6 @@
 """Espace adhérent (phase 7) : chacun ne voit que son foyer ; instruments lus dans l'Inventaire ; personnes de
 l'annuaire transmises aux applis de l'association."""
+
 import base64
 import json
 import uuid
@@ -26,8 +27,16 @@ def family(world, accounts):
     account = BankAccount(household_id=world["household"].id, holder_name="Anne Martin")
     bank.set_iban(account, IBAN)
     db.session.add(account)
-    db.session.add(Consent(person=world["zoe"], season=world["old"], label="Droit à l'image", text="x", granted=True,
-                           given_at=datetime(2026, 9, 1)))
+    db.session.add(
+        Consent(
+            person=world["zoe"],
+            season=world["old"],
+            label="Droit à l'image",
+            text="x",
+            granted=True,
+            given_at=datetime(2026, 9, 1),
+        )
+    )
     other = home("Famille Durand", address_street="9 rue Secrète", postal_code="76000", city="Rouen")
     paul, lea = person("Paul", "Durand", email="paul@durand.test"), person("Léa", "Durand")
     directory.add_member(other, paul, "guardian")
@@ -81,6 +90,7 @@ def test_anonymous_is_sent_to_login(client):
 # Instruments, lus dans l'Inventaire
 # ---------------------------------------------------------------------------
 
+
 class FakeOpener:
     """Remplace l'appel HTTP : garde la requête envoyée et renvoie `answer` (ou lève `error`)."""
 
@@ -105,6 +115,7 @@ class FakeOpener:
 
             def read(self_, size=-1):
                 return body
+
         return Response()
 
 
@@ -116,14 +127,28 @@ def inventaire(app, monkeypatch):
         opener = FakeOpener(**kwargs)
         monkeypatch.setattr(inventory.urllib.request, "build_opener", opener)
         return opener
+
     return install
 
 
 def test_instruments_of_the_children(client, family, inventaire):
     zoe = family["zoe"].uuid
-    opener = inventaire(answer={"persons": {zoe: [{"id": 7, "status": "en_cours", "status_label": "En cours",
-                                                   "start": "2026-09-05", "end": None,
-                                                   "items": [{"name": "Flûte <b>Yamaha</b>", "quantity": 1}]}]}})
+    opener = inventaire(
+        answer={
+            "persons": {
+                zoe: [
+                    {
+                        "id": 7,
+                        "status": "en_cours",
+                        "status_label": "En cours",
+                        "start": "2026-09-05",
+                        "end": None,
+                        "items": [{"name": "Flûte <b>Yamaha</b>", "quantity": 1}],
+                    }
+                ]
+            }
+        }
+    )
     login(client, family["account"])
     page = client.get("/mon-espace").get_data(as_text=True)
     assert "Flûte &lt;b&gt;Yamaha&lt;/b&gt;" in page and "en cours depuis le 2026-09-05" in page
@@ -136,6 +161,7 @@ def test_instruments_of_the_children(client, family, inventaire):
 
 def test_inventaire_down(client, family, inventaire):
     import urllib.error
+
     inventaire(error=urllib.error.URLError("refusé"))
     login(client, family["account"])
     page = client.get("/mon-espace").get_data(as_text=True)
@@ -166,6 +192,7 @@ def test_no_instrument_section_without_inventaire(client, family):
 # Personnes de l'annuaire, pour l'Inventaire
 # ---------------------------------------------------------------------------
 
+
 def basic(client_app):
     raw = f"{client_app.client_id}:{SECRET_OF[client_app.client_id]}".encode()
     return {"Authorization": "Basic " + base64.b64encode(raw).decode()}
@@ -187,8 +214,13 @@ def test_persons_for_a_first_party_app(client, family, inventaire_app):
     data = client.get("/oidc/personnes", headers=basic(inventaire_app)).json
     rows = {(p["first_name"], p["last_name"]): p for p in data["persons"]}
     assert ("Léa", "Durand") not in rows  # archivée
-    assert rows[("Zoé", "Martin")] == {"uuid": family["zoe"].uuid, "first_name": "Zoé", "last_name": "Martin",
-                                       "birth_year": 2015, "sub": None}
+    assert rows[("Zoé", "Martin")] == {
+        "uuid": family["zoe"].uuid,
+        "first_name": "Zoé",
+        "last_name": "Martin",
+        "birth_year": 2015,
+        "sub": None,
+    }
     assert rows[("Anne", "Martin")]["sub"] == family["account"].sub
     assert rows[("Paul", "Durand")]["sub"] is None  # pas de compte
     assert "email" not in json.dumps(data) and "@" not in json.dumps(data)
@@ -196,8 +228,15 @@ def test_persons_for_a_first_party_app(client, family, inventaire_app):
 
 def test_persons_refusals(client, family, inventaire_app):
     assert client.get("/oidc/personnes").status_code == 401
-    assert client.get("/oidc/personnes", headers={"Authorization": "Basic " + base64.b64encode(
-        f"{inventaire_app.client_id}:faux".encode()).decode()}).status_code == 401
+    assert (
+        client.get(
+            "/oidc/personnes",
+            headers={
+                "Authorization": "Basic " + base64.b64encode(f"{inventaire_app.client_id}:faux".encode()).decode()
+            },
+        ).status_code
+        == 401
+    )
     inventaire_app.first_party = False  # une appli tierce ne voit pas les enfants sans compte
     db.session.commit()
     assert client.get("/oidc/personnes", headers=basic(inventaire_app)).status_code == 403
@@ -209,6 +248,7 @@ def test_persons_refusals(client, family, inventaire_app):
 def test_a_teacher_with_an_account_sees_both_spaces(client, family):
     """Un professeur qui est aussi parent : son espace et ses élèves."""
     from app.models import Teacher
+
     family["anne"].teacher = Teacher(status="CDI")
     db.session.commit()
     login(client, family["account"])

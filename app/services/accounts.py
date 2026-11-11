@@ -1,4 +1,5 @@
 """Comptes : liens à usage unique, emails de compte, statut, et qui peut gérer quel compte."""
+
 import hashlib
 import logging
 import secrets
@@ -28,6 +29,7 @@ STATUSES = {"actif": "Actif", "jamais": "Jamais connecté", "invite": "Invitatio
 # Qui peut gérer quoi
 # ---------------------------------------------------------------------------
 
+
 def can_manage(actor, target):
     """Gérer un compte permet d'en prendre le contrôle (un lien d'invitation s'affiche si l'email ne part pas).
 
@@ -37,8 +39,9 @@ def can_manage(actor, target):
         return True
     if target.is_admin or not can(actor, "account.manage"):
         return False
-    return (permissions_of(target.role) <= permissions_of(actor.role)
-            and {g.id for g in target.all_groups} <= {g.id for g in actor.all_groups})
+    return permissions_of(target.role) <= permissions_of(actor.role) and {g.id for g in target.all_groups} <= {
+        g.id for g in actor.all_groups
+    }
 
 
 def assignable_roles(actor):
@@ -50,18 +53,26 @@ def assignable_roles(actor):
     if actor.is_admin:
         return roles.choices()
     own, own_groups = permissions_of(actor.role), {g.id for g in actor.all_groups}
-    return [(role.key, role.name) for role in roles.all_roles()
-            if role.key != Role.ADMIN and permissions_of(role.key) <= own
-            and {g.id for g in role.groups} <= own_groups]
+    return [
+        (role.key, role.name)
+        for role in roles.all_roles()
+        if role.key != Role.ADMIN and permissions_of(role.key) <= own and {g.id for g in role.groups} <= own_groups
+    ]
 
 
 # ---------------------------------------------------------------------------
 # Statut
 # ---------------------------------------------------------------------------
 
+
 def _pending_invitation():
-    return exists().where(and_(AccountToken.account_id == Account.id, AccountToken.purpose == AccountToken.INVITE,
-                               AccountToken.expires_at >= datetime.now()))
+    return exists().where(
+        and_(
+            AccountToken.account_id == Account.id,
+            AccountToken.purpose == AccountToken.INVITE,
+            AccountToken.expires_at >= datetime.now(),
+        )
+    )
 
 
 def status_of(account):
@@ -86,18 +97,29 @@ def status_condition(status):
 # Liens à usage unique
 # ---------------------------------------------------------------------------
 
+
 def _digest(raw):
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
 def issue(account, purpose, email=None, proves_email=False):
     """Crée un lien (et annule les précédents du même type). Renvoie le jeton en clair. Sans commit."""
-    db.session.execute(db.delete(AccountToken).where(AccountToken.account_id == account.id,
-                                                     AccountToken.purpose == purpose))
+    db.session.execute(
+        db.delete(AccountToken).where(AccountToken.account_id == account.id, AccountToken.purpose == purpose)
+    )
     raw = secrets.token_urlsafe(32)
     now = datetime.now()
-    db.session.add(AccountToken(id=_digest(raw), account_id=account.id, purpose=purpose, email=email,
-                                proves_email=proves_email, created_at=now, expires_at=now + TTL[purpose]))
+    db.session.add(
+        AccountToken(
+            id=_digest(raw),
+            account_id=account.id,
+            purpose=purpose,
+            email=email,
+            proves_email=proves_email,
+            created_at=now,
+            expires_at=now + TTL[purpose],
+        )
+    )
     return raw
 
 
@@ -120,8 +142,11 @@ def mark_delivered(raw):
 
 def consume(token, *purposes):
     """Annule le lien utilisé et, pour le même compte, les autres liens des types donnés. Sans commit."""
-    db.session.execute(db.delete(AccountToken).where(AccountToken.account_id == token.account_id,
-                                                     AccountToken.purpose.in_(purposes or (token.purpose,))))
+    db.session.execute(
+        db.delete(AccountToken).where(
+            AccountToken.account_id == token.account_id, AccountToken.purpose.in_(purposes or (token.purpose,))
+        )
+    )
 
 
 def revoke(account):
@@ -130,9 +155,13 @@ def revoke(account):
 
 
 def pending_invitation(account):
-    return db.session.scalar(db.select(AccountToken).where(
-        AccountToken.account_id == account.id, AccountToken.purpose == AccountToken.INVITE,
-        AccountToken.expires_at >= datetime.now()))
+    return db.session.scalar(
+        db.select(AccountToken).where(
+            AccountToken.account_id == account.id,
+            AccountToken.purpose == AccountToken.INVITE,
+            AccountToken.expires_at >= datetime.now(),
+        )
+    )
 
 
 def purge_expired(now=None):
@@ -147,6 +176,7 @@ def link(raw):
 # ---------------------------------------------------------------------------
 # Emails
 # ---------------------------------------------------------------------------
+
 
 def _send(to, account, subject, intro, button, url):
     """Envoie un email de compte. Renvoie True s'il est parti, False sinon (SMTP absent ou en panne)."""
@@ -166,18 +196,27 @@ def _deliver(to, message):
 
 def send_invitation(account, raw):
     asso = branding.name()
-    return _send(account.email, account, f"Votre compte {asso}",
-                 f"Un compte vous a été ouvert à {asso}.\n\nChoisissez votre mot de passe avec le bouton ci-dessous. "
-                 f"Le lien est valable {TTL_LABELS[AccountToken.INVITE]} et ne sert qu'une fois.",
-                 "Choisir mon mot de passe", link(raw))
+    return _send(
+        account.email,
+        account,
+        f"Votre compte {asso}",
+        f"Un compte vous a été ouvert à {asso}.\n\nChoisissez votre mot de passe avec le bouton ci-dessous. "
+        f"Le lien est valable {TTL_LABELS[AccountToken.INVITE]} et ne sert qu'une fois.",
+        "Choisir mon mot de passe",
+        link(raw),
+    )
 
 
 def _reset_message(account, raw):
-    return mailer.render(account, "Réinitialisation de votre mot de passe",
-                         f"Une réinitialisation du mot de passe de votre compte a été demandée.\n\n"
-                         f"Le lien est valable {TTL_LABELS[AccountToken.RESET]} et ne sert qu'une fois. Si vous n'êtes "
-                         f"pas à l'origine de cette demande, ignorez cet email : votre mot de passe ne change pas.",
-                         "Choisir un nouveau mot de passe", link(raw))
+    return mailer.render(
+        account,
+        "Réinitialisation de votre mot de passe",
+        f"Une réinitialisation du mot de passe de votre compte a été demandée.\n\n"
+        f"Le lien est valable {TTL_LABELS[AccountToken.RESET]} et ne sert qu'une fois. Si vous n'êtes "
+        f"pas à l'origine de cette demande, ignorez cet email : votre mot de passe ne change pas.",
+        "Choisir un nouveau mot de passe",
+        link(raw),
+    )
 
 
 def send_reset(account, raw):
@@ -191,22 +230,37 @@ def send_reset_in_background(account, raw):
 
 
 def send_email_confirmation(account, email, raw):
-    return _send(email, account, "Confirmez votre adresse email",
-                 f"Confirmez que cette adresse est bien celle de votre compte {branding.name()} "
-                 f"(lien valable {TTL_LABELS[AccountToken.EMAIL]}). Sans confirmation, rien ne change.",
-                 "Confirmer l'adresse", link(raw))
+    return _send(
+        email,
+        account,
+        "Confirmez votre adresse email",
+        f"Confirmez que cette adresse est bien celle de votre compte {branding.name()} "
+        f"(lien valable {TTL_LABELS[AccountToken.EMAIL]}). Sans confirmation, rien ne change.",
+        "Confirmer l'adresse",
+        link(raw),
+    )
 
 
 def send_email_changed_notice(account, old_email):
     """Prévient l'ancienne adresse : un changement non souhaité se repère tout de suite."""
-    return _send(old_email, account, "Adresse email modifiée",
-                 f"L'adresse email de votre compte est désormais {account.email}.\n\n"
-                 f"Si vous n'êtes pas à l'origine de ce changement, contactez vite un responsable de l'association.",
-                 "Ouvrir mon compte", current_app.config["BASE_URL"])
+    return _send(
+        old_email,
+        account,
+        "Adresse email modifiée",
+        f"L'adresse email de votre compte est désormais {account.email}.\n\n"
+        f"Si vous n'êtes pas à l'origine de ce changement, contactez vite un responsable de l'association.",
+        "Ouvrir mon compte",
+        current_app.config["BASE_URL"],
+    )
 
 
 def send_totp_reset_notice(account):
-    return _send(account.email, account, "Double authentification désactivée",
-                 "Un responsable a désactivé la double authentification de votre compte. Vos appareils ont été "
-                 "déconnectés.\n\nSi vous n'avez rien demandé, contactez vite un responsable de l'association.",
-                 "Ouvrir mon compte", current_app.config["BASE_URL"])
+    return _send(
+        account.email,
+        account,
+        "Double authentification désactivée",
+        "Un responsable a désactivé la double authentification de votre compte. Vos appareils ont été "
+        "déconnectés.\n\nSi vous n'avez rien demandé, contactez vite un responsable de l'association.",
+        "Ouvrir mon compte",
+        current_app.config["BASE_URL"],
+    )

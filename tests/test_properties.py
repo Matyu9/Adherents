@@ -1,4 +1,5 @@
 """Propriétés vérifiées sur des données générées (Hypothesis)."""
+
 import unicodedata
 from datetime import date, datetime
 
@@ -36,6 +37,7 @@ APP = _app()
 @given(st.text(alphabet="/\\:@.?#%aé htps", max_size=30))
 def test_safe_next_never_leaves_the_site(target):
     from urllib.parse import urlsplit
+
     with APP.test_request_context():
         result = safe_next(target)
     parts = urlsplit(result)

@@ -3,6 +3,7 @@
 C'est la seule preuve que la CSP ne casse rien : pytest ne voit pas ce que le navigateur refuse d'exécuter.
 Le serveur tourne dans un thread, sur 127.0.0.1 uniquement. Ignorés si Playwright n'est pas installé.
 """
+
 import threading
 
 import pytest
@@ -18,17 +19,44 @@ from .conftest import TOTP_SECRET, config_for, enroll_totp, stamp_head, totp_cod
 
 pytestmark = pytest.mark.e2e
 PASSWORD = "motdepasse-e2e"
-PAGES = ["/", "/mon-compte", "/mon-compte/double-authentification", "/mot-de-passe", "/notifications", "/journal",
-         "/comptes", "/comptes/nouveau", "/comptes/1", "/comptes/1/modifier", "/groupes", "/groupes/nouveau",
-         "/applications", "/applications/nouvelle", "/roles", "/roles/nouveau", f"/roles/{Role.ADHERENT}/modifier", "/parametres", "/sante", "/nexiste-pas"]
+PAGES = [
+    "/",
+    "/mon-compte",
+    "/mon-compte/double-authentification",
+    "/mot-de-passe",
+    "/notifications",
+    "/journal",
+    "/comptes",
+    "/comptes/nouveau",
+    "/comptes/1",
+    "/comptes/1/modifier",
+    "/groupes",
+    "/groupes/nouveau",
+    "/applications",
+    "/applications/nouvelle",
+    "/roles",
+    "/roles/nouveau",
+    f"/roles/{Role.ADHERENT}/modifier",
+    "/parametres",
+    "/sante",
+    "/nexiste-pas",
+]
 _app = {}
 
 
 @pytest.fixture(scope="module")
 def server(tmp_path_factory, module_database):
     tmp = tmp_path_factory.mktemp("e2e")
-    app = create_app(config_for(tmp, SQLALCHEMY_DATABASE_URI=module_database, WTF_CSRF_ENABLED=True,
-                                TESTING=False, PROPAGATE_EXCEPTIONS=False, SECRET_KEY="cle-de-test-e2e-" * 4))
+    app = create_app(
+        config_for(
+            tmp,
+            SQLALCHEMY_DATABASE_URI=module_database,
+            WTF_CSRF_ENABLED=True,
+            TESTING=False,
+            PROPAGATE_EXCEPTIONS=False,
+            SECRET_KEY="cle-de-test-e2e-" * 4,
+        )
+    )
     with app.app_context():
         db.create_all()
         stamp_head()
@@ -67,10 +95,15 @@ class Page:
         self.context = browser.new_context(base_url=base, **options)
         self.page = self.context.new_page()
         self.problems = []
-        self.page.on("console", lambda m: self.problems.append(m.text) if m.type == "error" and not self._expected(m.text) else None)
+        self.page.on(
+            "console",
+            lambda m: self.problems.append(m.text) if m.type == "error" and not self._expected(m.text) else None,
+        )
         self.page.on("pageerror", lambda e: self.problems.append(str(e)))
-        self.page.add_init_script("document.addEventListener('securitypolicyviolation', e => "
-                                  "console.error('CSP : ' + e.violatedDirective + ' ' + e.blockedURI))")
+        self.page.add_init_script(
+            "document.addEventListener('securitypolicyviolation', e => "
+            "console.error('CSP : ' + e.violatedDirective + ' ' + e.blockedURI))"
+        )
 
     @staticmethod
     def _expected(text):
@@ -83,7 +116,9 @@ class Page:
         self.page.click("button[type=submit]")
         if role == Role.ADMIN:
             self.page.wait_for_url("**/connexion/verification")
-            with _app["app"].app_context():  # plusieurs connexions dans les mêmes 30 secondes : pas un rejeu à tester ici
+            with _app[
+                "app"
+            ].app_context():  # plusieurs connexions dans les mêmes 30 secondes : pas un rejeu à tester ici
                 db.session.scalar(db.select(Account).filter_by(role=Role.ADMIN)).totp_last_counter = None
                 db.session.commit()
             self.page.fill("#code", totp_code(TOTP_SECRET))
@@ -232,7 +267,7 @@ def test_invitation_then_mandatory_totp_in_a_real_browser(session):
 
     invited = session()
     guest = invited.page
-    guest.goto(link[link.index("/lien/"):])  # BASE_URL ne connaît pas le port aléatoire du serveur de test
+    guest.goto(link[link.index("/lien/") :])  # BASE_URL ne connaît pas le port aléatoire du serveur de test
     guest.fill("#new", "un-mot-de-passe-solide")
     guest.fill("#confirm", "un-mot-de-passe-solide")
     guest.click("button[type=submit]")

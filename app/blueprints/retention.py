@@ -1,5 +1,6 @@
 """Conservation des données : durée choisie par l'association, anonymisation des anciens adhérents, purge des
 anciens dossiers d'inscription. Rien n'est automatique : chaque anonymisation est décidée à l'écran."""
+
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_wtf import FlaskForm
 from wtforms import IntegerField
@@ -14,10 +15,12 @@ bp = Blueprint("retention", __name__, url_prefix="/annuaire/conservation")
 
 
 class DurationForm(FlaskForm):
-    seasons = IntegerField("Durée de conservation (en saisons)",
-                           validators=[Optional(), NumberRange(min=1, max=50, message="Entre 1 et 50 saisons.")],
-                           description="Une personne sans adhésion depuis ce nombre de saisons peut être anonymisée. "
-                                       "Vide : pas encore décidé, rien n'est proposé.")
+    seasons = IntegerField(
+        "Durée de conservation (en saisons)",
+        validators=[Optional(), NumberRange(min=1, max=50, message="Entre 1 et 50 saisons.")],
+        description="Une personne sans adhésion depuis ce nombre de saisons peut être anonymisée. "
+        "Vide : pas encore décidé, rien n'est proposé.",
+    )
 
 
 @bp.after_request
@@ -34,14 +37,22 @@ def index():
         before = retention.seasons_kept()
         retention.set_seasons_kept(form.seasons.data)
         if before != form.seasons.data:
-            log("retention.duration", f"Durée de conservation : {form.seasons.data or 'non décidée'} saison(s)",
-                changes={"seasons": [before, form.seasons.data]})
+            log(
+                "retention.duration",
+                f"Durée de conservation : {form.seasons.data or 'non décidée'} saison(s)",
+                changes={"seasons": [before, form.seasons.data]},
+            )
         db.session.commit()
         flash("Durée enregistrée.", "success")
         return redirect(url_for(".index"))
-    return render_template("retention/index.html", form=form, candidates=retention.candidates(),
-                           limit=retention.oldest_kept_season(), dossiers=len(retention.old_dossiers()),
-                           kept=retention.seasons_kept())
+    return render_template(
+        "retention/index.html",
+        form=form,
+        candidates=retention.candidates(),
+        limit=retention.oldest_kept_season(),
+        dossiers=len(retention.old_dossiers()),
+        kept=retention.seasons_kept(),
+    )
 
 
 @bp.route("/anonymiser", methods=["POST"])

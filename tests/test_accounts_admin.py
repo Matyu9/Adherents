@@ -1,4 +1,5 @@
 """Écran de gestion des comptes : création, modification, coupure, sessions, et qui peut gérer qui."""
+
 import re
 
 import pytest
@@ -44,6 +45,7 @@ def manager(client):
 # Création
 # ---------------------------------------------------------------------------
 
+
 def test_create_account_invites_without_password(client, admin):
     html = client.post("/comptes/nouveau", data=DATA).get_data(as_text=True)
     account = by_email("ines@asso.test")
@@ -65,9 +67,18 @@ def test_invited_account_cannot_log_in_before_choosing(client, admin):
     assert response.status_code == 200 and "incorrect" in response.get_data(as_text=True)
 
 
-@pytest.mark.parametrize("field, value", [("first_name", ""), ("last_name", ""), ("email", ""), ("email", "pas-email"),
-                                          ("first_name", "x" * 81), ("email", "x" * 251 + "@a.fr"),
-                                          ("role", "inexistant")])
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("first_name", ""),
+        ("last_name", ""),
+        ("email", ""),
+        ("email", "pas-email"),
+        ("first_name", "x" * 81),
+        ("email", "x" * 251 + "@a.fr"),
+        ("role", "inexistant"),
+    ],
+)
 def test_create_validation(client, admin, field, value):
     assert client.post("/comptes/nouveau", data={**DATA, field: value}).status_code == 200
     assert by_email("ines@asso.test") is None and tokens() == []
@@ -87,6 +98,7 @@ def test_html_in_names_is_escaped(client, admin):
 # ---------------------------------------------------------------------------
 # Liste
 # ---------------------------------------------------------------------------
+
 
 def names(client, query=""):
     return re.findall(r'href="/comptes/\d+">([^<]+)<', client.get(f"/comptes{query}").get_data(as_text=True))
@@ -120,8 +132,9 @@ def test_status_filter_matches_status_of(client, admin):
     make_account(email="coupe@asso.test", first_name="Coupe", active=False)
     for account in db.session.scalars(db.select(Account)):
         assert accounts_service.status_of(account) in accounts_service.STATUSES
-        listed = db.session.scalars(db.select(Account).where(
-            accounts_service.status_condition(accounts_service.status_of(account)))).all()
+        listed = db.session.scalars(
+            db.select(Account).where(accounts_service.status_condition(accounts_service.status_of(account)))
+        ).all()
         assert account in listed
     assert names(client, "?statut=invite") == ["LEFÈVRE Inès"]
     assert "TEST Jamais" in names(client, "?statut=jamais") and "LEFÈVRE Inès" not in names(client, "?statut=jamais")
@@ -130,8 +143,9 @@ def test_status_filter_matches_status_of(client, admin):
 
 
 def test_pagination(client, admin):
-    db.session.add_all(Account(first_name="P", last_name=f"N{n:03}", email=f"p{n}@asso.test", role=Role.ADHERENT)
-                       for n in range(120))
+    db.session.add_all(
+        Account(first_name="P", last_name=f"N{n:03}", email=f"p{n}@asso.test", role=Role.ADHERENT) for n in range(120)
+    )
     db.session.commit()
     assert len(names(client)) == 100
     assert len(names(client, "?page=2")) == 23  # 120 + les 3 comptes de la fixture
@@ -142,9 +156,12 @@ def test_pagination(client, admin):
 # Modification
 # ---------------------------------------------------------------------------
 
+
 def test_edit_changes_names_and_role_with_journal(client, admin, target):
-    client.post(f"/comptes/{target.id}/modifier", data={"first_name": "Nouveau", "last_name": "Nom",
-                                                        "email": target.email, "role": Role.GESTIONNAIRE})
+    client.post(
+        f"/comptes/{target.id}/modifier",
+        data={"first_name": "Nouveau", "last_name": "Nom", "email": target.email, "role": Role.GESTIONNAIRE},
+    )
     target = db.session.get(Account, target.id)
     assert target.full_name == "Nouveau Nom" and target.role == Role.GESTIONNAIRE
     entry = db.session.scalar(db.select(Activity).filter_by(action="account.update"))
@@ -155,8 +172,10 @@ def test_edit_email_loses_verification_and_cancels_links(client, admin, target):
     target.email_verified = True
     raw = accounts_service.issue(target, AccountToken.RESET, proves_email=True)
     db.session.commit()
-    client.post(f"/comptes/{target.id}/modifier", data={"first_name": "C", "last_name": "T",
-                                                        "email": "nouvelle@asso.test", "role": Role.ADHERENT})
+    client.post(
+        f"/comptes/{target.id}/modifier",
+        data={"first_name": "C", "last_name": "T", "email": "nouvelle@asso.test", "role": Role.ADHERENT},
+    )
     target = db.session.get(Account, target.id)
     assert target.email == "nouvelle@asso.test" and target.email_verified is False
     assert accounts_service.find(raw) is None
@@ -166,50 +185,65 @@ def test_edit_warns_the_old_address(app, client, admin, target, monkeypatch):
     app.config.update(SMTP_HOST="smtp.test", SMTP_FROM="asso@asso.test")
     sent = []
     monkeypatch.setattr(mailer, "send", lambda to, *a, **k: sent.append(to))
-    client.post(f"/comptes/{target.id}/modifier", data={"first_name": "C", "last_name": "T",
-                                                        "email": "nouvelle@asso.test", "role": Role.ADHERENT})
+    client.post(
+        f"/comptes/{target.id}/modifier",
+        data={"first_name": "C", "last_name": "T", "email": "nouvelle@asso.test", "role": Role.ADHERENT},
+    )
     assert sent == ["cible@asso.test"]
 
 
 def test_edit_without_email_change_keeps_verification(client, admin, target):
     target.email_verified = True
     db.session.commit()
-    client.post(f"/comptes/{target.id}/modifier", data={"first_name": "Autre", "last_name": "T",
-                                                        "email": "cible@asso.test", "role": Role.ADHERENT})
+    client.post(
+        f"/comptes/{target.id}/modifier",
+        data={"first_name": "Autre", "last_name": "T", "email": "cible@asso.test", "role": Role.ADHERENT},
+    )
     assert db.session.get(Account, target.id).email_verified is True
 
 
 def test_edit_refuses_a_taken_address(client, admin, target):
-    html = client.post(f"/comptes/{target.id}/modifier", data={"first_name": "C", "last_name": "T",
-                                                               "email": admin.email, "role": Role.ADHERENT})
+    html = client.post(
+        f"/comptes/{target.id}/modifier",
+        data={"first_name": "C", "last_name": "T", "email": admin.email, "role": Role.ADHERENT},
+    )
     assert "déjà utilisée" in html.get_data(as_text=True)
 
 
 def test_nobody_changes_their_own_role_or_email_here(client, admin):
-    client.post(f"/comptes/{admin.id}/modifier", data={"first_name": "A", "last_name": "T", "email": admin.email,
-                                                       "role": Role.ADHERENT})
+    client.post(
+        f"/comptes/{admin.id}/modifier",
+        data={"first_name": "A", "last_name": "T", "email": admin.email, "role": Role.ADHERENT},
+    )
     assert db.session.get(Account, admin.id).is_admin
-    client.post(f"/comptes/{admin.id}/modifier", data={"first_name": "A", "last_name": "T", "email": "x@asso.test",
-                                                       "role": Role.ADMIN})
+    client.post(
+        f"/comptes/{admin.id}/modifier",
+        data={"first_name": "A", "last_name": "T", "email": "x@asso.test", "role": Role.ADMIN},
+    )
     assert db.session.get(Account, admin.id).email == admin.email
 
 
 def test_own_names_can_change(client, admin):
-    client.post(f"/comptes/{admin.id}/modifier", data={"first_name": "Zoé", "last_name": "T", "email": admin.email,
-                                                       "role": Role.ADMIN})
+    client.post(
+        f"/comptes/{admin.id}/modifier",
+        data={"first_name": "Zoé", "last_name": "T", "email": admin.email, "role": Role.ADMIN},
+    )
     assert db.session.get(Account, admin.id).first_name == "Zoé"
 
 
 def test_sub_never_changes(client, admin, target):
     sub = target.sub
-    client.post(f"/comptes/{target.id}/modifier", data={"first_name": "C", "last_name": "T", "sub": "pirate",
-                                                        "email": "n@asso.test", "role": Role.ADHERENT})
+    client.post(
+        f"/comptes/{target.id}/modifier",
+        data={"first_name": "C", "last_name": "T", "sub": "pirate", "email": "n@asso.test", "role": Role.ADHERENT},
+    )
     assert db.session.get(Account, target.id).sub == sub
 
 
 # ---------------------------------------------------------------------------
 # Invitation renvoyée
 # ---------------------------------------------------------------------------
+
 
 def test_resend_replaces_the_previous_invitation(client, admin):
     first = client.post("/comptes/nouveau", data=DATA).get_data(as_text=True)
@@ -234,6 +268,7 @@ def test_cut_account_cannot_be_invited(client, admin, target):
 # ---------------------------------------------------------------------------
 # Couper, rétablir
 # ---------------------------------------------------------------------------
+
 
 def test_cut_is_immediate(app, client, admin, target):
     victim = app.test_client()
@@ -271,8 +306,10 @@ def test_restore_reopens_password_login(app, client, admin, target):
 def test_at_least_one_admin_always_remains(client, admin):
     """Un admin ne peut agir sur lui-même ni être géré par un non-admin : le dernier ne peut donc pas disparaître."""
     client.post(f"/comptes/{admin.id}/couper")
-    client.post(f"/comptes/{admin.id}/modifier", data={"first_name": "A", "last_name": "T", "email": admin.email,
-                                                       "role": Role.ADHERENT})
+    client.post(
+        f"/comptes/{admin.id}/modifier",
+        data={"first_name": "A", "last_name": "T", "email": admin.email, "role": Role.ADHERENT},
+    )
     account = db.session.get(Account, admin.id)
     assert account.is_admin and account.active
 
@@ -280,6 +317,7 @@ def test_at_least_one_admin_always_remains(client, admin):
 # ---------------------------------------------------------------------------
 # Sessions et double authentification d'un autre compte
 # ---------------------------------------------------------------------------
+
 
 def test_close_one_session_of_someone(app, client, admin, target):
     victim = app.test_client()
@@ -326,10 +364,17 @@ def test_cannot_reset_my_own_totp_here(client, admin):
 # Qui peut gérer qui
 # ---------------------------------------------------------------------------
 
+
 def post_routes(account_id):
-    return [f"/comptes/{account_id}/inviter", f"/comptes/{account_id}/couper", f"/comptes/{account_id}/retablir",
-            f"/comptes/{account_id}/double-authentification/reinitialiser", f"/comptes/{account_id}/sessions/fermer",
-            f"/comptes/{account_id}/modifier", f"/comptes/{account_id}/groupes"]
+    return [
+        f"/comptes/{account_id}/inviter",
+        f"/comptes/{account_id}/couper",
+        f"/comptes/{account_id}/retablir",
+        f"/comptes/{account_id}/double-authentification/reinitialiser",
+        f"/comptes/{account_id}/sessions/fermer",
+        f"/comptes/{account_id}/modifier",
+        f"/comptes/{account_id}/groupes",
+    ]
 
 
 def test_manager_cannot_touch_an_admin(client, manager, accounts):
@@ -369,8 +414,10 @@ def test_manager_cannot_grant_more_than_they_have(client, manager, target, role)
     db.session.commit()
     client.post("/comptes/nouveau", data={**DATA, "role": role})
     assert by_email("ines@asso.test") is None
-    client.post(f"/comptes/{target.id}/modifier", data={"first_name": "C", "last_name": "T", "email": target.email,
-                                                        "role": role})
+    client.post(
+        f"/comptes/{target.id}/modifier",
+        data={"first_name": "C", "last_name": "T", "email": target.email, "role": role},
+    )
     assert db.session.get(Account, target.id).role == Role.ADHERENT
 
 
@@ -394,8 +441,16 @@ def test_journal_shows_these_actions_in_the_accounts_family(client, admin, targe
 
 
 def test_password_and_codes_never_reach_the_journal(client, admin, target):
-    client.post(f"/comptes/{target.id}/modifier", data={"first_name": "C", "last_name": "T", "email": target.email,
-                                                        "role": Role.ADHERENT, "password": "secret-ne-pas-noter"})
+    client.post(
+        f"/comptes/{target.id}/modifier",
+        data={
+            "first_name": "C",
+            "last_name": "T",
+            "email": target.email,
+            "role": Role.ADHERENT,
+            "password": "secret-ne-pas-noter",
+        },
+    )
     login_code = totp_code()
     text = " ".join(f"{a.message} {a.changes}" for a in db.session.scalars(db.select(Activity)))
     assert "secret-ne-pas-noter" not in text and login_code not in text
@@ -412,6 +467,7 @@ def test_old_link_stays_dead_after_a_restore(client, admin, target):
 
 def test_even_a_role_with_every_right_cannot_touch_an_admin(client):
     from app.permissions import PERMISSIONS
+
     db.session.add(Role(key="tout", name="Presque admin", permissions=sorted(PERMISSIONS)))
     account = make_account("tout", email="tout@asso.test")
     enroll_totp(account)

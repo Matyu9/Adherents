@@ -1,4 +1,5 @@
 """Double authentification : configuration, connexion, anti-rejeu, codes de secours, obligation par rôle."""
+
 import re
 import time
 
@@ -42,6 +43,7 @@ def enrolled(app):
 # ---------------------------------------------------------------------------
 # Connexion
 # ---------------------------------------------------------------------------
+
 
 def test_password_alone_opens_nothing(client, enrolled):
     response = start_login(client, enrolled)
@@ -184,6 +186,7 @@ def test_code_page_is_not_cached(client, enrolled):
 # Secret
 # ---------------------------------------------------------------------------
 
+
 def test_secret_is_encrypted_in_the_database(enrolled):
     assert TOTP_SECRET not in enrolled.totp_secret and totp.secret_of(enrolled) == TOTP_SECRET
 
@@ -200,6 +203,7 @@ def test_changing_secret_key_fails_cleanly(app, client, enrolled):
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def member_client(client):
@@ -280,6 +284,7 @@ def test_setup_closes_other_sessions(app, member_client):
 # Codes de secours
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def with_codes(enrolled):
     codes = totp.new_recovery_codes(enrolled)
@@ -340,6 +345,7 @@ def test_regenerate_needs_password_and_code(member_client, password, valid_code)
 # Désactivation
 # ---------------------------------------------------------------------------
 
+
 def test_member_can_disable(member_client):
     client, account = member_client
     enroll_totp(account)
@@ -369,8 +375,9 @@ def test_code_guessing_while_logged_in_is_limited(member_client):
 
 
 def test_admin_cannot_disable(client, admin):
-    html = client.post(f"{SETUP}/desactiver", data={"password": PASSWORD, "code": totp_code()},
-                       follow_redirects=True).get_data(as_text=True)
+    html = client.post(
+        f"{SETUP}/desactiver", data={"password": PASSWORD, "code": totp_code()}, follow_redirects=True
+    ).get_data(as_text=True)
     assert "obligatoire" in html and db.session.get(Account, admin.id).totp_enabled
     assert "Désactiver" not in client.get(SETUP).get_data(as_text=True)
 
@@ -378,6 +385,7 @@ def test_admin_cannot_disable(client, admin):
 # ---------------------------------------------------------------------------
 # Obligation
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def bare_admin(app):
@@ -387,8 +395,20 @@ def bare_admin(app):
     return account
 
 
-@pytest.mark.parametrize("path", ["/", "/mon-compte", "/comptes", "/roles", "/parametres", "/journal", "/notifications",
-                                  "/groupes", "/mot-de-passe"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/",
+        "/mon-compte",
+        "/comptes",
+        "/roles",
+        "/parametres",
+        "/journal",
+        "/notifications",
+        "/groupes",
+        "/mot-de-passe",
+    ],
+)
 def test_admin_without_totp_can_only_configure_it(client, bare_admin, path):
     start_login(client, bare_admin)
     assert client.get(path).location == SETUP
@@ -396,8 +416,9 @@ def test_admin_without_totp_can_only_configure_it(client, bare_admin, path):
 
 def test_admin_without_totp_cannot_post_either(client, bare_admin):
     start_login(client, bare_admin)
-    response = client.post("/comptes/nouveau", data={"first_name": "A", "last_name": "B", "email": "x@asso.test",
-                                                     "role": Role.ADMIN})
+    response = client.post(
+        "/comptes/nouveau", data={"first_name": "A", "last_name": "B", "email": "x@asso.test", "role": Role.ADMIN}
+    )
     assert response.location == SETUP
     assert db.session.scalar(db.select(Account).filter_by(email="x@asso.test")) is None
 
@@ -451,12 +472,24 @@ def test_forced_password_change_comes_first(client):
 # Accès de secours
 # ---------------------------------------------------------------------------
 
+
 def test_create_admin_rescues_a_lost_phone(app, client):
     account = make_account(Role.ADMIN, email="chef@asso.test")
     totp.new_recovery_codes(account)
     db.session.commit()
-    result = app.test_cli_runner().invoke(args=["create-admin", "--email", "chef@asso.test", "--first-name", "É",
-                                                "--last-name", "L", "--password", "secours-secours"])
+    result = app.test_cli_runner().invoke(
+        args=[
+            "create-admin",
+            "--email",
+            "chef@asso.test",
+            "--first-name",
+            "É",
+            "--last-name",
+            "L",
+            "--password",
+            "secours-secours",
+        ]
+    )
     assert result.exit_code == 0
     account = db.session.get(Account, account.id)
     assert not account.totp_enabled and db.session.scalar(db.select(db.func.count(RecoveryCode.id))) == 0

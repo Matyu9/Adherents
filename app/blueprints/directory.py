@@ -2,6 +2,7 @@
 
 Toutes ses pages contiennent des données personnelles : le navigateur ne les garde pas (Cache-Control: no-store).
 """
+
 from functools import wraps
 from urllib.parse import urlsplit
 
@@ -59,21 +60,33 @@ def _blank(value):
 # Formulaires
 # ---------------------------------------------------------------------------
 
+
 class AddressForm(FlaskForm):
     address_recipient = StringField("Destinataire (s'il diffère)", validators=[Optional(), Length(max=120)])
     address_street = TextAreaField("Adresse", validators=[Optional(), Length(max=500)])
     postal_code = StringField("Code postal", validators=[Optional(), Length(max=10)])
     city = StringField("Ville", validators=[Optional(), Length(max=80)])
-    country = StringField("Pays (code ISO)", default="FR",
-                          validators=[DataRequired(), Regexp(r"^[A-Za-z]{2}$", message="Deux lettres : FR, BE…")])
+    country = StringField(
+        "Pays (code ISO)",
+        default="FR",
+        validators=[DataRequired(), Regexp(r"^[A-Za-z]{2}$", message="Deux lettres : FR, BE…")],
+    )
 
 
 class PersonForm(AddressForm):
-    civility = SelectField("Civilité", default="", coerce=_text, validate_choice=False, choices=[("", "—"), *((c, c) for c in Person.CIVILITIES)])
+    civility = SelectField(
+        "Civilité",
+        default="",
+        coerce=_text,
+        validate_choice=False,
+        choices=[("", "—"), *((c, c) for c in Person.CIVILITIES)],
+    )
     first_name = StringField("Prénom", validators=[DataRequired(), Length(max=80)])
     last_name = StringField("Nom", validators=[DataRequired(), Length(max=80)])
     birth_name = StringField("Nom de naissance", validators=[Optional(), Length(max=80)])
-    sex = SelectField("Sexe", default="", coerce=_text, validate_choice=False, choices=[("", "—"), *Person.SEXES.items()])
+    sex = SelectField(
+        "Sexe", default="", coerce=_text, validate_choice=False, choices=[("", "—"), *Person.SEXES.items()]
+    )
     birth_date = DateField("Date de naissance", validators=[Optional()])
     birth_place = StringField("Lieu de naissance", validators=[Optional(), Length(max=120)])
     email = EmailField("Email personnel", validators=[Optional(), Length(max=255), EMAIL], filters=[_strip])
@@ -91,8 +104,10 @@ class PersonForm(AddressForm):
         probe = self._person or Person(first_name="", last_name="")
         parent = directory.guardian_email_conflict(probe, field.data, households=self._households)
         if parent is not None:
-            raise ValidationError(f"C'est l'adresse de {parent.full_name}, responsable du foyer : celle d'un parent "
-                                  "n'est jamais recopiée sur la fiche de son enfant.")
+            raise ValidationError(
+                f"C'est l'adresse de {parent.full_name}, responsable du foyer : celle d'un parent "
+                "n'est jamais recopiée sur la fiche de son enfant."
+            )
 
     def values(self):
         data = {name: _blank(getattr(self, name).data) for name in directory.PERSON_FIELDS + directory.ADDRESS_FIELDS}
@@ -133,8 +148,11 @@ class MembershipForm(FlaskForm):
 
 
 class SeasonForm(FlaskForm):
-    label = StringField("Saison", validators=[DataRequired(), Regexp(r"^\d{4}-\d{4}$", message="Par exemple 2026-2027.")],
-                        filters=[_strip])
+    label = StringField(
+        "Saison",
+        validators=[DataRequired(), Regexp(r"^\d{4}-\d{4}$", message="Par exemple 2026-2027.")],
+        filters=[_strip],
+    )
     starts_on = DateField("Début", validators=[DataRequired()])
     ends_on = DateField("Fin", validators=[DataRequired()])
 
@@ -172,9 +190,15 @@ class BankAccountForm(FlaskForm):
 
 
 class MandateForm(FlaskForm):
-    rum = StringField("Référence unique du mandat (RUM)", validators=[
-        DataRequired(), Length(max=35), Regexp(r"^[A-Za-z0-9+?/:().,' -]+$", message="Lettres, chiffres et + ? / - : ( ) . , ' seulement.")],
-        filters=[_strip])
+    rum = StringField(
+        "Référence unique du mandat (RUM)",
+        validators=[
+            DataRequired(),
+            Length(max=35),
+            Regexp(r"^[A-Za-z0-9+?/:().,' -]+$", message="Lettres, chiffres et + ? / - : ( ) . , ' seulement."),
+        ],
+        filters=[_strip],
+    )
     signed_on = DateField("Signé le", validators=[DataRequired()])
     first_debit_on = DateField("Premier prélèvement", validators=[Optional()])
     last_debit_on = DateField("Dernier prélèvement", validators=[Optional()])
@@ -198,6 +222,7 @@ class CodeForm(FlaskForm):
 # Outils
 # ---------------------------------------------------------------------------
 
+
 def _person(person_id):
     return db.session.get(Person, person_id) or abort(404)
 
@@ -212,8 +237,12 @@ def _member(household, person_id):
 
 def _history(**where):
     column = Activity.person_id if "person" in where else Activity.household_id
-    return db.session.scalars(db.select(Activity).where(column == next(iter(where.values())).id)
-                              .order_by(Activity.created_at.desc(), Activity.id.desc()).limit(30)).all()
+    return db.session.scalars(
+        db.select(Activity)
+        .where(column == next(iter(where.values())).id)
+        .order_by(Activity.created_at.desc(), Activity.id.desc())
+        .limit(30)
+    ).all()
 
 
 def _page(query, order):
@@ -248,6 +277,7 @@ def phone_filter(number):
 # Personnes
 # ---------------------------------------------------------------------------
 
+
 @bp.route("")
 @require("directory.view")
 def index():
@@ -256,13 +286,32 @@ def index():
     status = status if status in directory.STATUSES else None
     all_seasons = directory.seasons()
     season = db.session.get(Season, request.args.get("saison", type=int) or 0) or directory.current_season()
-    items, total, page, pages = _page(directory.person_query(q, status, season),
-                                      (Person.last_name, Person.first_name, Person.id))
-    args = {k: v for k, v in (("q", q), ("statut", status),
-                              ("saison", season.id if season and request.args.get("saison") else None)) if v}
-    return render_template("directory/index.html", items=items, total=total, page=page, pages=pages, args=args, q=q,
-                           status=status, statuses=directory.STATUSES, season=season, seasons=all_seasons,
-                           current=directory.current_season())
+    items, total, page, pages = _page(
+        directory.person_query(q, status, season), (Person.last_name, Person.first_name, Person.id)
+    )
+    args = {
+        k: v
+        for k, v in (
+            ("q", q),
+            ("statut", status),
+            ("saison", season.id if season and request.args.get("saison") else None),
+        )
+        if v
+    }
+    return render_template(
+        "directory/index.html",
+        items=items,
+        total=total,
+        page=page,
+        pages=pages,
+        args=args,
+        q=q,
+        status=status,
+        statuses=directory.STATUSES,
+        season=season,
+        seasons=all_seasons,
+        current=directory.current_season(),
+    )
 
 
 @bp.route("/personnes/nouvelle", methods=["GET", "POST"])
@@ -270,8 +319,10 @@ def index():
 def create_person():
     household = db.session.get(Household, request.args.get("foyer", type=int) or 0)
     role = request.args.get("role") if request.args.get("role") in HouseholdMember.ROLES else HouseholdMember.DEPENDENT
-    form = PersonForm(households=[household] if household and role == HouseholdMember.DEPENDENT else None,
-                      data={"last_name": household.name.removeprefix("Famille ") if household else None})
+    form = PersonForm(
+        households=[household] if household and role == HouseholdMember.DEPENDENT else None,
+        data={"last_name": household.name.removeprefix("Famille ") if household else None},
+    )
     if form.validate_on_submit():
         person = Person(**form.values())
         db.session.add(person)
@@ -284,8 +335,12 @@ def create_person():
                 db.session.rollback()
                 flash(str(exc), "error")
                 return render_template("directory/person_form.html", form=form, person=None, household=household)
-            log("household.member_add", f"{person.full_name} ajouté(e) au foyer {household.name}",
-                household=household, person=person)
+            log(
+                "household.member_add",
+                f"{person.full_name} ajouté(e) au foyer {household.name}",
+                household=household,
+                person=person,
+            )
         db.session.commit()
         flash("Fiche créée.", "success")
         if household is not None:
@@ -299,12 +354,17 @@ def create_person():
 def person(person_id):
     person = _person(person_id)
     can_account = can(current_user, "account.manage") and can(current_user, "directory.edit")
-    return render_template("directory/person.html", person=person, phone_form=PhoneForm(),
-                           entries=_history(person=person), current=directory.current_season(),
-                           can_account=can_account,
-                           season_count=len(directory.seasons()),
-                           account_problem=directory.account_problems(person) if can_account else None,
-                           needs_consent=directory.needs_guardian_consent(person))
+    return render_template(
+        "directory/person.html",
+        person=person,
+        phone_form=PhoneForm(),
+        entries=_history(person=person),
+        current=directory.current_season(),
+        can_account=can_account,
+        season_count=len(directory.seasons()),
+        account_problem=directory.account_problems(person) if can_account else None,
+        needs_consent=directory.needs_guardian_consent(person),
+    )
 
 
 @bp.route("/personnes/<int:person_id>/modifier", methods=["GET", "POST"])
@@ -378,8 +438,11 @@ def _add_phone(owner, form, back, **where):
 def delete_phone(phone_id):
     phone = db.session.get(Phone, phone_id) or abort(404)
     owner = {"person": phone.person} if phone.person_id else {"household": phone.household}
-    back = (url_for(".person", person_id=phone.person_id) if phone.person_id
-            else url_for(".household", household_id=phone.household_id))
+    back = (
+        url_for(".person", person_id=phone.person_id)
+        if phone.person_id
+        else url_for(".household", household_id=phone.household_id)
+    )
     log("phone.delete", f"Téléphone retiré : {directory.display_phone(phone.number)}", **owner)
     db.session.delete(phone)
     db.session.commit()
@@ -388,6 +451,7 @@ def delete_phone(phone_id):
 
 
 # --- Adhésions -----------------------------------------------------------
+
 
 def _membership_form(person, membership=None):
     form = MembershipForm(obj=membership)
@@ -404,13 +468,23 @@ def create_membership(person_id):
     person = _person(person_id)
     form = _membership_form(person)
     if not form.season_id.choices:
-        flash("Aucune saison disponible : créez d'abord la saison." if not directory.seasons()
-              else "Cette personne a déjà une adhésion sur chaque saison.", "warning")
+        flash(
+            "Aucune saison disponible : créez d'abord la saison."
+            if not directory.seasons()
+            else "Cette personne a déjà une adhésion sur chaque saison.",
+            "warning",
+        )
         return redirect(url_for(".person", person_id=person.id))
     if form.validate_on_submit():
-        membership = Membership(person=person, season_id=form.season_id.data, status=form.status.data,
-                                withdrawn_on=form.withdrawn_date, category=_blank(form.category.data),
-                                school_level=_blank(form.school_level.data), school_class=_blank(form.school_class.data))
+        membership = Membership(
+            person=person,
+            season_id=form.season_id.data,
+            status=form.status.data,
+            withdrawn_on=form.withdrawn_date,
+            category=_blank(form.category.data),
+            school_level=_blank(form.school_level.data),
+            school_class=_blank(form.school_class.data),
+        )
         db.session.add(membership)
         db.session.flush()
         log("membership.create", f"Adhésion {membership.season.label} ajoutée à {person.full_name}", person=person)
@@ -427,15 +501,26 @@ def edit_membership(membership_id):
     person = membership.person
     form = _membership_form(person, membership)
     if form.validate_on_submit():
-        changes = diff(membership, ("season_id", "status", "withdrawn_on", "category", "school_level", "school_class"),
-                       {"season_id": form.season_id.data, "status": form.status.data,
-                        "withdrawn_on": form.withdrawn_date,
-                        "category": _blank(form.category.data), "school_level": _blank(form.school_level.data),
-                        "school_class": _blank(form.school_class.data)})
+        changes = diff(
+            membership,
+            ("season_id", "status", "withdrawn_on", "category", "school_level", "school_class"),
+            {
+                "season_id": form.season_id.data,
+                "status": form.status.data,
+                "withdrawn_on": form.withdrawn_date,
+                "category": _blank(form.category.data),
+                "school_level": _blank(form.school_level.data),
+                "school_class": _blank(form.school_class.data),
+            },
+        )
         if changes:
             db.session.flush()
-            log("membership.update", f"Adhésion {membership.season.label} de {person.full_name} modifiée",
-                changes=changes, person=person)
+            log(
+                "membership.update",
+                f"Adhésion {membership.season.label} de {person.full_name} modifiée",
+                changes=changes,
+                person=person,
+            )
         db.session.commit()
         flash("Adhésion enregistrée.", "success")
         return redirect(url_for(".person", person_id=person.id) + "#adhesions")
@@ -443,6 +528,7 @@ def edit_membership(membership_id):
 
 
 # --- Fusion ----------------------------------------------------------------
+
 
 def _shown(field, value):
     """Valeur lisible d'un champ comparé à la fusion."""
@@ -462,9 +548,16 @@ def _shown(field, value):
 def _merge_rows(keep, other, fields):
     rows = []
     for field, kept, theirs, conflict in directory.merge_plan(keep, other, fields):
-        rows.append({"field": field, "label": fields[field], "kept": _shown(field, kept),
-                     "other": _shown(field, theirs), "conflict": conflict,
-                     "result": _shown(field, kept if kept is not None else theirs)})
+        rows.append(
+            {
+                "field": field,
+                "label": fields[field],
+                "kept": _shown(field, kept),
+                "other": _shown(field, theirs),
+                "conflict": conflict,
+                "result": _shown(field, kept if kept is not None else theirs),
+            }
+        )
     return rows
 
 
@@ -473,8 +566,9 @@ def _person_merge_problems(keep, other):
     ouvrira (l'espace adhérent de la fiche gardée). C'est une décision sur les comptes, pas seulement sur l'annuaire."""
     problems = directory.merge_problems(keep, other)
     if (keep.account or other.account) and not can(current_user, "account.manage"):
-        problems.append("Une des fiches a un compte de connexion : la fusion demande aussi le droit de gérer les "
-                        "comptes.")
+        problems.append(
+            "Une des fiches a un compte de connexion : la fusion demande aussi le droit de gérer les comptes."
+        )
     return problems
 
 
@@ -500,8 +594,12 @@ def merge_person(person_id):
         except DirectoryError as exc:
             flash(str(exc), "error")
             return redirect(url_for(".merge_person", person_id=keep.id, avec=other.id))
-        log("person.merge", f"Fiche de {name} fusionnée dans celle de {keep.full_name}"
-            + (f" ({' ; '.join(summary)})" if summary else ""), person=keep)
+        log(
+            "person.merge",
+            f"Fiche de {name} fusionnée dans celle de {keep.full_name}"
+            + (f" ({' ; '.join(summary)})" if summary else ""),
+            person=keep,
+        )
         db.session.commit()
         flash(f"Fiches fusionnées : celle de {name} n'existe plus.", "success")
         return redirect(url_for(".person", person_id=keep.id))
@@ -510,14 +608,24 @@ def merge_person(person_id):
     if other is None:
         query = directory.search(db.select(Person), q or keep.last_name).where(Person.id != keep.id)
         candidates = db.session.scalars(query.order_by(Person.last_name, Person.first_name).limit(30)).all()
-    fields = {k: v for k, v in directory.PERSON_MERGE_FIELDS.items()
-              if k != "birth_place" or can(current_user, "directory.edit")}
-    return render_template("directory/person_merge.html", keep=keep, other=other, q=q, candidates=candidates,
-                           rows=_merge_rows(keep, other, fields) if other else [],
-                           problems=_person_merge_problems(keep, other) if other else [])
+    fields = {
+        k: v
+        for k, v in directory.PERSON_MERGE_FIELDS.items()
+        if k != "birth_place" or can(current_user, "directory.edit")
+    }
+    return render_template(
+        "directory/person_merge.html",
+        keep=keep,
+        other=other,
+        q=q,
+        candidates=candidates,
+        rows=_merge_rows(keep, other, fields) if other else [],
+        problems=_person_merge_problems(keep, other) if other else [],
+    )
 
 
 # --- Compte de connexion ---------------------------------------------------
+
 
 @bp.route("/personnes/<int:person_id>/compte", methods=["POST"])
 @require("account.manage")
@@ -530,10 +638,15 @@ def create_account(person_id):
     except DirectoryError as exc:
         flash(str(exc), "error")
         return redirect(url_for(".person", person_id=person.id) + "#compte")
-    log("account.create", f"Compte créé depuis l'annuaire : {account.full_name} ({account.role_label})"
+    log(
+        "account.create",
+        f"Compte créé depuis l'annuaire : {account.full_name} ({account.role_label})"
         + (", avec l'accord d'un responsable légal (mineur)" if directory.needs_guardian_consent(person) else ""),
-        target=account, person=person)
+        target=account,
+        person=person,
+    )
     from .accounts import _grant_access
+
     return _grant_access(account)
 
 
@@ -543,8 +656,12 @@ def create_account(person_id):
 def unlink_account(person_id):
     person = _person(person_id)
     if account := directory.unlink(person):
-        log("account.unlink", f"Compte {account.email} détaché de la fiche de {person.full_name}", target=account,
-            person=person)
+        log(
+            "account.unlink",
+            f"Compte {account.email} détaché de la fiche de {person.full_name}",
+            target=account,
+            person=person,
+        )
         db.session.commit()
         flash("Compte détaché : il existe toujours, sans fiche.", "success")
     return redirect(url_for(".person", person_id=person.id))
@@ -554,6 +671,7 @@ def unlink_account(person_id):
 # Foyers
 # ---------------------------------------------------------------------------
 
+
 @bp.route("/foyers")
 @require("directory.view")
 def households():
@@ -561,8 +679,9 @@ def households():
     archived = request.args.get("archives") == "1"
     items, total, page, pages = _page(directory.household_query(q, archived), (Household.name, Household.id))
     args = {k: v for k, v in (("q", q), ("archives", "1" if archived else None)) if v}
-    return render_template("directory/households.html", items=items, total=total, page=page, pages=pages, args=args,
-                           q=q, archived=archived)
+    return render_template(
+        "directory/households.html", items=items, total=total, page=page, pages=pages, args=args, q=q, archived=archived
+    )
 
 
 @bp.route("/foyers/nouveau", methods=["GET", "POST"])
@@ -577,8 +696,12 @@ def create_household():
         log("household.create", f"Foyer créé : {household.name}", household=household)
         if founder is not None:
             directory.add_member(household, founder, HouseholdMember.GUARDIAN)
-            log("household.member_add", f"{founder.full_name} ajouté(e) au foyer {household.name}",
-                household=household, person=founder)
+            log(
+                "household.member_add",
+                f"{founder.full_name} ajouté(e) au foyer {household.name}",
+                household=household,
+                person=founder,
+            )
         db.session.commit()
         flash("Foyer créé.", "success")
         return redirect(url_for(".household", household_id=household.id))
@@ -600,14 +723,24 @@ def household(household_id):
     if can(current_user, "bank.view"):
         for account in household.bank_accounts:
             same_iban[account.id] = db.session.scalars(
-                db.select(Household).join(BankAccount).where(BankAccount.iban_fingerprint == account.iban_fingerprint,
-                                                             BankAccount.id != account.id)
-                .order_by(Household.name).distinct()).all()
-    return render_template("directory/household.html", household=household, phone_form=PhoneForm(), q=q, found=found,
-                           same_iban=same_iban,
-                           secure_left=guard.remaining() if can(current_user, "bank.view") else 0,
-                           entries=_history(household=household), roles=HouseholdMember.ROLES,
-                           bank_enabled=bank.enabled())
+                db.select(Household)
+                .join(BankAccount)
+                .where(BankAccount.iban_fingerprint == account.iban_fingerprint, BankAccount.id != account.id)
+                .order_by(Household.name)
+                .distinct()
+            ).all()
+    return render_template(
+        "directory/household.html",
+        household=household,
+        phone_form=PhoneForm(),
+        q=q,
+        found=found,
+        same_iban=same_iban,
+        secure_left=guard.remaining() if can(current_user, "bank.view") else 0,
+        entries=_history(household=household),
+        roles=HouseholdMember.ROLES,
+        bank_enabled=bank.enabled(),
+    )
 
 
 @bp.route("/foyers/<int:household_id>/modifier", methods=["GET", "POST"])
@@ -657,8 +790,12 @@ def add_member(household_id):
     except DirectoryError as exc:
         flash(str(exc), "error")
     else:
-        log("household.member_add", f"{person.full_name} ajouté(e) au foyer {household.name} ({member.label})",
-            household=household, person=person)
+        log(
+            "household.member_add",
+            f"{person.full_name} ajouté(e) au foyer {household.name} ({member.label})",
+            household=household,
+            person=person,
+        )
         db.session.commit()
         flash(f"{person.full_name} fait maintenant partie du foyer.", "success")
     return redirect(url_for(".household", household_id=household.id) + "#membres")
@@ -676,8 +813,13 @@ def update_member(household_id, person_id):
         flash(str(exc), "error")
         return redirect(url_for(".household", household_id=household.id) + "#membres")
     member.relationship = _blank(request.form.get("relationship"))
-    log("household.member_update", f"{member.person.full_name} dans le foyer {household.name} : {member.label}"
-        + (f", {member.relationship}" if member.relationship else ""), household=household, person=member.person)
+    log(
+        "household.member_update",
+        f"{member.person.full_name} dans le foyer {household.name} : {member.label}"
+        + (f", {member.relationship}" if member.relationship else ""),
+        household=household,
+        person=member.person,
+    )
     db.session.commit()
     flash("Membre modifié.", "success")
     return redirect(url_for(".household", household_id=household.id) + "#membres")
@@ -690,8 +832,12 @@ def remove_member(household_id, person_id):
     member = _member(household, person_id)
     person = member.person
     household.members.remove(member)
-    log("household.member_remove", f"{person.full_name} retiré(e) du foyer {household.name}", household=household,
-        person=person)
+    log(
+        "household.member_remove",
+        f"{person.full_name} retiré(e) du foyer {household.name}",
+        household=household,
+        person=person,
+    )
     db.session.commit()
     flash(f"{person.full_name} ne fait plus partie du foyer. Sa fiche est conservée.", "success")
     return redirect(url_for(".household", household_id=household.id) + "#membres")
@@ -723,8 +869,11 @@ def merge_household(household_id):
             db.session.rollback()
             flash(str(exc), "error")
             return redirect(url_for(".merge_household", household_id=keep.id, avec=other.id))
-        log("household.merge", f"Foyer {name} fusionné dans {keep.name}"
-            + (f" ({' ; '.join(summary)})" if summary else ""), household=keep)
+        log(
+            "household.merge",
+            f"Foyer {name} fusionné dans {keep.name}" + (f" ({' ; '.join(summary)})" if summary else ""),
+            household=keep,
+        )
         db.session.commit()
         flash(f"Foyers fusionnés : « {name} » n'existe plus.", "success")
         return redirect(url_for(".household", household_id=keep.id))
@@ -733,14 +882,21 @@ def merge_household(household_id):
     if other is None:
         query = directory.household_query(q or keep.name.split()[-1]).where(Household.id != keep.id)
         candidates = db.session.scalars(query.order_by(Household.name).limit(30)).all()
-    return render_template("directory/household_merge.html", keep=keep, other=other, q=q, candidates=candidates,
-                           rows=_merge_rows(keep, other, directory.HOUSEHOLD_MERGE_FIELDS) if other else [],
-                           problems=directory.household_merge_problems(keep, other) if other else [])
+    return render_template(
+        "directory/household_merge.html",
+        keep=keep,
+        other=other,
+        q=q,
+        candidates=candidates,
+        rows=_merge_rows(keep, other, directory.HOUSEHOLD_MERGE_FIELDS) if other else [],
+        problems=directory.household_merge_problems(keep, other) if other else [],
+    )
 
 
 # ---------------------------------------------------------------------------
 # Coordonnées bancaires
 # ---------------------------------------------------------------------------
+
 
 def _bank_account(account_id):
     return db.session.get(BankAccount, account_id) or abort(404)
@@ -756,6 +912,7 @@ def _safe_next(path):
 
 def _secure(view):
     """Opération bancaire : il faut être en mode sécurisé (code TOTP récent), sinon on passe par sa page."""
+
     @wraps(view)
     def wrapped(*args, **kwargs):
         if guard.elevated():
@@ -766,6 +923,7 @@ def _secure(view):
         referrer = urlsplit(request.referrer or "")
         back = referrer.path if referrer.netloc == request.host else None
         return redirect(url_for(".elevate", suite=_safe_next(back)))
+
     return wrapped
 
 
@@ -775,8 +933,10 @@ def elevate():
     """Saisie d'un code TOTP : ouvre le mode sécurisé pour quelques minutes, sur cette session seulement."""
     target = _safe_next(request.values.get("suite"))
     if not current_user.totp_enabled:
-        flash("Activez d'abord la double authentification dans Mon compte : elle est exigée pour les données "
-              "bancaires.", "error")
+        flash(
+            "Activez d'abord la double authentification dans Mon compte : elle est exigée pour les données bancaires.",
+            "error",
+        )
         return redirect(url_for("account.totp"))
     if guard.elevated():
         return redirect(target)
@@ -797,8 +957,9 @@ def elevate():
             log("auth.elevate_failed", f"Code refusé pour le mode sécurisé ({current_user.full_name})")
             db.session.commit()
             form.code.errors = ["Code incorrect."]
-    return render_template("directory/elevate.html", form=form, target=target,
-                           minutes=current_app.config.get("ELEVATION_MINUTES", 10))
+    return render_template(
+        "directory/elevate.html", form=form, target=target, minutes=current_app.config.get("ELEVATION_MINUTES", 10)
+    )
 
 
 @bp.route("/mode-securise/quitter", methods=["POST"])
@@ -823,14 +984,21 @@ def create_bank_account(household_id):
         form.holder_person_id.data = household.guardians[0].person_id
         form.holder_name.data = household.guardians[0].person.full_name
     if form.validate_on_submit():
-        account = BankAccount(household_id=household.id, holder_name=form.holder_name.data.strip(), bic=form.bic.data,
-                              holder_person_id=form.holder_person_id.data or None)
+        account = BankAccount(
+            household_id=household.id,
+            holder_name=form.holder_name.data.strip(),
+            bic=form.bic.data,
+            holder_person_id=form.holder_person_id.data or None,
+        )
         bank.set_iban(account, form.iban.data)
         others = bank.same_iban(form.iban.data)
         db.session.add(account)
         db.session.flush()
-        log("bank.create", f"Coordonnées bancaires ajoutées au foyer {household.name} : {account.masked_iban}",
-            household=household)
+        log(
+            "bank.create",
+            f"Coordonnées bancaires ajoutées au foyer {household.name} : {account.masked_iban}",
+            household=household,
+        )
         db.session.commit()
         flash("Coordonnées bancaires enregistrées.", "success")
         for other in others:
@@ -862,8 +1030,11 @@ def reveal_iban(account_id):
 def delete_bank_account(account_id):
     account = _bank_account(account_id)
     household = account.household
-    log("bank.delete", f"Coordonnées bancaires {account.masked_iban} retirées du foyer {household.name}",
-        household=household)
+    log(
+        "bank.delete",
+        f"Coordonnées bancaires {account.masked_iban} retirées du foyer {household.name}",
+        household=household,
+    )
     db.session.delete(account)
     db.session.commit()
     flash("Coordonnées bancaires supprimées, avec leurs mandats.", "success")
@@ -882,8 +1053,11 @@ def create_mandate(account_id):
     if form.validate_on_submit():
         mandate = SepaMandate(bank_account=account, **{f: getattr(form, f).data for f in MANDATE_FIELDS})
         db.session.add(mandate)
-        log("mandate.create", f"Mandat {mandate.rum} ajouté ({account.masked_iban}, foyer {account.household.name})",
-            household=account.household)
+        log(
+            "mandate.create",
+            f"Mandat {mandate.rum} ajouté ({account.masked_iban}, foyer {account.household.name})",
+            household=account.household,
+        )
         db.session.commit()
         flash("Mandat enregistré.", "success")
         return redirect(url_for(".household", household_id=account.household_id) + "#banque")
@@ -911,15 +1085,25 @@ def edit_mandate(mandate_id):
 # Saisons
 # ---------------------------------------------------------------------------
 
+
 @bp.route("/saisons")
 @require("directory.edit")
 def seasons():
-    counts = dict(db.session.execute(db.select(Membership.season_id, db.func.count(Membership.id))
-                                     .group_by(Membership.season_id)).all())
-    courses = dict(db.session.execute(db.select(Course.season_id, db.func.count(Course.id))
-                                      .group_by(Course.season_id)).all())
-    return render_template("directory/seasons.html", seasons=directory.seasons(), counts=counts, courses=courses,
-                           current=directory.current_season())
+    counts = dict(
+        db.session.execute(
+            db.select(Membership.season_id, db.func.count(Membership.id)).group_by(Membership.season_id)
+        ).all()
+    )
+    courses = dict(
+        db.session.execute(db.select(Course.season_id, db.func.count(Course.id)).group_by(Course.season_id)).all()
+    )
+    return render_template(
+        "directory/seasons.html",
+        seasons=directory.seasons(),
+        counts=counts,
+        courses=courses,
+        current=directory.current_season(),
+    )
 
 
 @bp.route("/saisons/nouvelle", methods=["GET", "POST"])
@@ -945,8 +1129,11 @@ def edit_season(season_id):
     season = db.session.get(Season, season_id) or abort(404)
     form = SeasonForm(obj=season, current=season)
     if form.validate_on_submit():
-        changes = diff(season, ("label", "starts_on", "ends_on"),
-                       {"label": form.label.data, "starts_on": form.starts_on.data, "ends_on": form.ends_on.data})
+        changes = diff(
+            season,
+            ("label", "starts_on", "ends_on"),
+            {"label": form.label.data, "starts_on": form.starts_on.data, "ends_on": form.ends_on.data},
+        )
         if changes:
             log("season.update", f"Saison modifiée : {season.label}", changes=changes)
         db.session.commit()
@@ -990,13 +1177,18 @@ def delete_season(season_id):
 # Rattachement des comptes à leur fiche
 # ---------------------------------------------------------------------------
 
+
 @bp.route("/rattachement")
 @require("account.manage")
 @require("directory.edit")
 def link_accounts():
     rows = [(account, directory.suggestions(account)) for account in directory.unlinked_accounts()]
-    return render_template("directory/link_accounts.html", rows=rows, status_of=accounts_service.status_of,
-                           statuses=accounts_service.STATUSES)
+    return render_template(
+        "directory/link_accounts.html",
+        rows=rows,
+        status_of=accounts_service.status_of,
+        statuses=accounts_service.STATUSES,
+    )
 
 
 @bp.route("/rattachement/<int:account_id>", methods=["POST"])
@@ -1010,12 +1202,17 @@ def link_account(account_id):
     except DirectoryError as exc:
         flash(str(exc), "error")
     else:
-        log("account.link", f"Compte {account.email} rattaché à la fiche de {person.full_name}", target=account,
-            person=person)
+        log(
+            "account.link",
+            f"Compte {account.email} rattaché à la fiche de {person.full_name}",
+            target=account,
+            person=person,
+        )
         db.session.commit()
         flash(f"Compte de {account.full_name} rattaché à sa fiche.", "success")
-    return redirect(request.form.get("next") == "fiche" and url_for(".person", person_id=person.id)
-                    or url_for(".link_accounts"))
+    return redirect(
+        request.form.get("next") == "fiche" and url_for(".person", person_id=person.id) or url_for(".link_accounts")
+    )
 
 
 @bp.route("/rattachement/<int:account_id>/fiche", methods=["POST"])

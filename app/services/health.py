@@ -1,4 +1,5 @@
 """État de l'installation (page /sante et /health) : base, migrations, disque, planificateur, emails."""
+
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -14,7 +15,7 @@ from ..models import Account, Notification
 from . import mailer
 
 OK, WARN, ERROR = "ok", "warn", "error"
-MIN_FREE_BYTES = 1024 ** 3
+MIN_FREE_BYTES = 1024**3
 SCHEDULER_MAX_AGE = timedelta(hours=1)
 HEARTBEAT_FILE = "scheduler.last"
 
@@ -56,8 +57,12 @@ def check_database():
     except Exception as exc:  # noqa: BLE001
         return _check("database", "Base de données", ERROR, f"Inaccessible : {exc}")
     if not unaccent:
-        return _check("database", "Base de données", ERROR, "Extension unaccent absente : la recherche sans accents "
-                      "ne marche pas (flask db upgrade).")
+        return _check(
+            "database",
+            "Base de données",
+            ERROR,
+            "Extension unaccent absente : la recherche sans accents ne marche pas (flask db upgrade).",
+        )
     return _check("database", "Base de données", OK, f"PostgreSQL {version}, {_size(size)}")
 
 
@@ -82,9 +87,12 @@ def check_migrations():
         return _check("migrations", "Migrations", OK, f"À jour ({', '.join(sorted(heads))})")
     if not current:
         return _check("migrations", "Migrations", ERROR, "La base n'a jamais été migrée (flask db upgrade).")
-    return _check("migrations", "Migrations", ERROR,
-                  f"Base en version {', '.join(sorted(current))}, attendue {', '.join(sorted(heads))} "
-                  "(flask db upgrade).")
+    return _check(
+        "migrations",
+        "Migrations",
+        ERROR,
+        f"Base en version {', '.join(sorted(current))}, attendue {', '.join(sorted(heads))} (flask db upgrade).",
+    )
 
 
 def check_storage():
@@ -120,22 +128,30 @@ def check_permissions():
         if mode & (stat.S_IROTH | stat.S_IWOTH | stat.S_IXOTH):
             exposed.append(f"{path} ({stat.filemode(mode)})")
     if exposed:
-        return _check("permissions", "Droits des fichiers", WARN,
-                      "Accessibles à tous les comptes du serveur : " + ", ".join(exposed)
-                      + ". Restreignez-les (chmod 700).")
+        return _check(
+            "permissions",
+            "Droits des fichiers",
+            WARN,
+            "Accessibles à tous les comptes du serveur : " + ", ".join(exposed) + ". Restreignez-les (chmod 700).",
+        )
     return _check("permissions", "Droits des fichiers", OK, "Dossier des données réservé à l'appli")
 
 
 def check_scheduler(now=None):
     last = last_scheduler_run()
     if last is None:
-        return _check("scheduler", "Tâches périodiques", WARN,
-                      "Le planificateur n'est jamais passé (service scheduler ou tâche cron absent).")
+        return _check(
+            "scheduler",
+            "Tâches périodiques",
+            WARN,
+            "Le planificateur n'est jamais passé (service scheduler ou tâche cron absent).",
+        )
     age = (now or datetime.now()) - last
     when = f"{last:%d/%m/%Y à %H:%M}"
     if age > SCHEDULER_MAX_AGE:
-        return _check("scheduler", "Tâches périodiques", WARN, f"Dernier passage le {when} : le planificateur "
-                      "semble arrêté.")
+        return _check(
+            "scheduler", "Tâches périodiques", WARN, f"Dernier passage le {when} : le planificateur semble arrêté."
+        )
     return _check("scheduler", "Tâches périodiques", OK, f"Dernier passage le {when}")
 
 
@@ -144,20 +160,36 @@ def check_email():
         return _check("email", "Emails", WARN, "SMTP non configuré : les notifications restent dans l'appli.")
     since = datetime.now() - mailer.MAX_AGE
     pending = db.session.scalar(
-        db.select(db.func.count(Notification.id)).join(Account).where(
-            Notification.emailed.is_(False), Notification.created_at >= since, Account.active.is_(True)))
+        db.select(db.func.count(Notification.id))
+        .join(Account)
+        .where(Notification.emailed.is_(False), Notification.created_at >= since, Account.active.is_(True))
+    )
     if pending > 20:
         return _check("email", "Emails", WARN, f"SMTP configuré, {pending} emails en attente d'envoi")
-    return _check("email", "Emails", OK, f"SMTP configuré ({current_app.config['SMTP_HOST']}), "
-                  f"{pending} email{'s' if pending > 1 else ''} en attente")
+    return _check(
+        "email",
+        "Emails",
+        OK,
+        f"SMTP configuré ({current_app.config['SMTP_HOST']}), {pending} email{'s' if pending > 1 else ''} en attente",
+    )
 
 
 def report(now=None):
     from .. import __version__
 
-    checks = [check_database(), check_migrations(), check_storage(), check_permissions(), check_scheduler(now),
-              check_email()]
+    checks = [
+        check_database(),
+        check_migrations(),
+        check_storage(),
+        check_permissions(),
+        check_scheduler(now),
+        check_email(),
+    ]
     statuses = {c["status"] for c in checks}
     status = ERROR if ERROR in statuses else WARN if WARN in statuses else OK
-    return {"status": status, "version": __version__,
-            "time": (now or datetime.now()).isoformat(timespec="seconds"), "checks": checks}
+    return {
+        "status": status,
+        "version": __version__,
+        "time": (now or datetime.now()).isoformat(timespec="seconds"),
+        "checks": checks,
+    }

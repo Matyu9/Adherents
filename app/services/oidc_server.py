@@ -3,6 +3,7 @@
 Authlib est plus permissif par défaut. Sont donc resserrés ici : PKCE (sinon facultatif pour un client confidentiel, et
 `plain` accepté), le scope `openid` (sinon un simple code OAuth), `redirect_uri` (sinon facultatif).
 """
+
 from datetime import datetime, timedelta
 
 from authlib.integrations.flask_oauth2 import AuthorizationServer
@@ -40,8 +41,11 @@ class StrictPKCE(CodeChallenge):
 class OpenID(OpenIDCode):
     def exists_nonce(self, nonce, request):
         client = oidc.find_client(request.payload.client_id)
-        return client is not None and db.session.scalar(
-            db.select(OidcCode.id).filter_by(client_id=client.id, nonce=nonce).limit(1)) is not None
+        return (
+            client is not None
+            and db.session.scalar(db.select(OidcCode.id).filter_by(client_id=client.id, nonce=nonce).limit(1))
+            is not None
+        )
 
     def resolve_client_private_key(self, client):
         return RSAKey.import_key(oidc.active_key()[1])
@@ -91,11 +95,21 @@ class CodeGrant(grants.AuthorizationCodeGrant):
 
     def save_authorization_code(self, code, request):
         data = request.payload.data
-        db.session.add(OidcCode(
-            id=oidc.digest(code), client_id=request.client.id, account_id=request.user.id,
-            redirect_uri=request.payload.redirect_uri, scope=request.scope, nonce=data.get("nonce"),
-            code_challenge=data["code_challenge"], code_challenge_method=data["code_challenge_method"],
-            auth_time=oidc.auth_time(request.user), sid=oidc.sid_of(request.user), expires_at=oidc.utcnow() + oidc.CODE_LIFETIME))
+        db.session.add(
+            OidcCode(
+                id=oidc.digest(code),
+                client_id=request.client.id,
+                account_id=request.user.id,
+                redirect_uri=request.payload.redirect_uri,
+                scope=request.scope,
+                nonce=data.get("nonce"),
+                code_challenge=data["code_challenge"],
+                code_challenge_method=data["code_challenge_method"],
+                auth_time=oidc.auth_time(request.user),
+                sid=oidc.sid_of(request.user),
+                expires_at=oidc.utcnow() + oidc.CODE_LIFETIME,
+            )
+        )
 
     def query_authorization_code(self, code, client):
         row = db.session.get(OidcCode, oidc.digest(code))
@@ -108,9 +122,11 @@ class CodeGrant(grants.AuthorizationCodeGrant):
 
     def delete_authorization_code(self, authorization_code):
         # Conditionnel : de deux échanges simultanés du même code, un seul aboutit. La route annule l'autre.
-        done = db.session.execute(db.update(OidcCode).where(OidcCode.id == authorization_code.id,
-                                                            OidcCode.used_at.is_(None))
-                                  .values(used_at=datetime.now())).rowcount
+        done = db.session.execute(
+            db.update(OidcCode)
+            .where(OidcCode.id == authorization_code.id, OidcCode.used_at.is_(None))
+            .values(used_at=datetime.now())
+        ).rowcount
         if not done:
             raise InvalidGrantError("Invalid 'code' in request.")
 
@@ -128,16 +144,27 @@ def _on_replay(code):
     """Code rejoué : il a pu fuiter, donc les jetons qu'il a donnés ne sont plus sûrs. Validé tout de suite : la réponse
     sera une erreur, et la route annule tout en cas d'erreur."""
     db.session.execute(db.delete(OidcToken).where(OidcToken.code_id == code.id))
-    log("oidc.replay", f"Code d'autorisation rejoué pour {code.client.name} ({flask_request.remote_addr}) : "
-                       "jetons annulés", user=code.account, target=code.account)
+    log(
+        "oidc.replay",
+        f"Code d'autorisation rejoué pour {code.client.name} ({flask_request.remote_addr}) : jetons annulés",
+        user=code.account,
+        target=code.account,
+    )
     db.session.commit()
 
 
 def _save_token(token, request):
     logout.remember(request.authorization_code, request.user, request.client)
-    db.session.add(OidcToken(id=oidc.digest(token["access_token"]), client_id=request.client.id,
-                             account_id=request.user.id, code_id=request.authorization_code.id, scope=token["scope"],
-                             expires_at=oidc.utcnow() + timedelta(seconds=token["expires_in"])))
+    db.session.add(
+        OidcToken(
+            id=oidc.digest(token["access_token"]),
+            client_id=request.client.id,
+            account_id=request.user.id,
+            code_id=request.authorization_code.id,
+            scope=token["scope"],
+            expires_at=oidc.utcnow() + timedelta(seconds=token["expires_in"]),
+        )
+    )
 
 
 def init_app(app):

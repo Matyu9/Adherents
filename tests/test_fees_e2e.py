@@ -3,6 +3,7 @@ formulaire d'une règle, simulateur.
 
 SCREENSHOT_DIR=… garde une capture de chaque page.
 """
+
 from datetime import date
 
 import pytest

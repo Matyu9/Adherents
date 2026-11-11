@@ -5,6 +5,7 @@ de celles qu'il demande, puis appelle l'API avec le jeton du compte de service (
 Une panne de l'Inventaire ne casse pas l'espace adhérent : la section des instruments dit seulement qu'elle est
 indisponible.
 """
+
 import json
 import logging
 import urllib.error
@@ -42,8 +43,14 @@ def loans(person_uuids):
         return None
     config = current_app.config
     url = f"{config['INVENTAIRE_API_URL']}/annuaire/prets?" + urllib.parse.urlencode([("personne", i) for i in ids])
-    request = urllib.request.Request(url, headers={"Authorization": f"Bearer {config['INVENTAIRE_API_TOKEN']}",
-                                                   "Accept": "application/json", "User-Agent": "Adherents"})
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {config['INVENTAIRE_API_TOKEN']}",
+            "Accept": "application/json",
+            "User-Agent": "Adherents",
+        },
+    )
     try:
         with urllib.request.build_opener(_NoRedirect).open(request, timeout=TIMEOUT) as response:
             data = json.loads(response.read(MAX_BYTES + 1)[:MAX_BYTES])

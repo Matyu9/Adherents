@@ -39,7 +39,9 @@ class FakeSMTP:
 def smtp(app, monkeypatch):
     FakeSMTP.sent, FakeSMTP.fail, FakeSMTP.tls, FakeSMTP.credentials = [], None, False, None
     monkeypatch.setattr(smtplib, "SMTP", FakeSMTP)
-    app.config.update(SMTP_HOST="smtp.test", SMTP_FROM="asso@asso.test", SMTP_USER="u", SMTP_PASSWORD="p", SMTP_TLS=True)
+    app.config.update(
+        SMTP_HOST="smtp.test", SMTP_FROM="asso@asso.test", SMTP_USER="u", SMTP_PASSWORD="p", SMTP_TLS=True
+    )
     return FakeSMTP
 
 

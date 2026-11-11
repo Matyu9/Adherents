@@ -1,4 +1,3 @@
-
 """Inscriptions : campagnes et dossiers des familles. Voir docs/inscriptions.md. Les services ne font pas de commit.
 
 Ce que la famille saisit reste dans `Dossier.data` jusqu'à la validation : l'annuaire n'est modifié que par
@@ -15,6 +14,7 @@ Ce que la famille saisit reste dans `Dossier.data` jusqu'à la validation : l'an
 
 `guardian` (entier ou None) : l'élève est ce responsable lui-même (un adulte qui prend des cours).
 """
+
 import contextlib
 import hashlib
 import secrets
@@ -44,11 +44,25 @@ HOUSEHOLD_FIELDS = ("name", "address_recipient", "address_street", "postal_code"
 GUARDIAN_FIELDS = ("civility", "first_name", "last_name", "email")
 STUDENT_FIELDS = ("first_name", "last_name", "birth_date", "sex")
 MEMBERSHIP_FIELDS = ("category", "school_level", "school_class")
-LABELS = {"name": "Nom du foyer", "address_recipient": "Destinataire", "address_street": "Adresse",
-          "postal_code": "Code postal", "city": "Ville", "country": "Pays", "phone": "Téléphone",
-          "civility": "Civilité", "first_name": "Prénom", "last_name": "Nom", "email": "Email",
-          "birth_date": "Naissance", "sex": "Sexe", "category": "Catégorie", "school_level": "Niveau scolaire",
-          "school_class": "Classe", "relationship": "Lien"}
+LABELS = {
+    "name": "Nom du foyer",
+    "address_recipient": "Destinataire",
+    "address_street": "Adresse",
+    "postal_code": "Code postal",
+    "city": "Ville",
+    "country": "Pays",
+    "phone": "Téléphone",
+    "civility": "Civilité",
+    "first_name": "Prénom",
+    "last_name": "Nom",
+    "email": "Email",
+    "birth_date": "Naissance",
+    "sex": "Sexe",
+    "category": "Catégorie",
+    "school_level": "Niveau scolaire",
+    "school_class": "Classe",
+    "relationship": "Lien",
+}
 
 
 class RegistrationError(ValueError):
@@ -59,32 +73,43 @@ class RegistrationError(ValueError):
 # Campagnes
 # ---------------------------------------------------------------------------
 
+
 def open_campaigns(now=None):
     now = now or datetime.now()
-    return db.session.scalars(db.select(Campaign).where(Campaign.opens_at <= now, Campaign.closes_at > now)
-                              .order_by(Campaign.closes_at)).all()
+    return db.session.scalars(
+        db.select(Campaign).where(Campaign.opens_at <= now, Campaign.closes_at > now).order_by(Campaign.closes_at)
+    ).all()
 
 
 def previous_season(season):
-    return db.session.scalar(db.select(Season).where(Season.starts_on < season.starts_on)
-                             .order_by(Season.starts_on.desc()).limit(1))
+    return db.session.scalar(
+        db.select(Season).where(Season.starts_on < season.starts_on).order_by(Season.starts_on.desc()).limit(1)
+    )
 
 
 def enrolled_count(course):
-    return db.session.scalar(db.select(db.func.count(Enrollment.id)).where(
-        Enrollment.course_id == course.id, Enrollment.status == Enrollment.ACTIVE))
+    return db.session.scalar(
+        db.select(db.func.count(Enrollment.id)).where(
+            Enrollment.course_id == course.id, Enrollment.status == Enrollment.ACTIVE
+        )
+    )
 
 
 def enrolled_counts(season):
-    return dict(db.session.execute(
-        db.select(Enrollment.course_id, db.func.count(Enrollment.id)).join(Course)
-        .where(Course.season_id == season.id, Enrollment.status == Enrollment.ACTIVE)
-        .group_by(Enrollment.course_id)).all())
+    return dict(
+        db.session.execute(
+            db.select(Enrollment.course_id, db.func.count(Enrollment.id))
+            .join(Course)
+            .where(Course.season_id == season.id, Enrollment.status == Enrollment.ACTIVE)
+            .group_by(Enrollment.course_id)
+        ).all()
+    )
 
 
 def offered_courses(campaign):
     """Cours proposés aux familles : ceux de la saison de la campagne, avec leur nombre d'inscrits."""
     from .catalog import sorted_courses
+
     courses = db.session.scalars(db.select(Course).where(Course.season_id == campaign.season_id)).all()
     return sorted_courses(courses), enrolled_counts(campaign.season)
 
@@ -93,13 +118,17 @@ def offered_courses(campaign):
 # Qui accède à quel dossier
 # ---------------------------------------------------------------------------
 
+
 def guarded_households(account):
     """Foyers dont le compte est responsable (par sa fiche de l'annuaire)."""
     person = getattr(account, "person", None)
     if person is None:
         return []
-    return [link.household for link in person.household_links
-            if link.role == HouseholdMember.GUARDIAN and link.household.archived_at is None]
+    return [
+        link.household
+        for link in person.household_links
+        if link.role == HouseholdMember.GUARDIAN and link.household.archived_at is None
+    ]
 
 
 def can_open(account, dossier, session_access=()):
@@ -127,6 +156,7 @@ def dossier_for(campaign, household, account):
 # Nouvelles familles : lien d'accès par email
 # ---------------------------------------------------------------------------
 
+
 def _digest(raw):
     return hashlib.sha256(raw.encode()).hexdigest()
 
@@ -150,6 +180,7 @@ def renew_access(dossier):
 
 def access_url(raw):
     from flask import current_app, url_for
+
     return current_app.config["BASE_URL"] + url_for("enrollment.access", token=raw)
 
 
@@ -165,17 +196,21 @@ def find_by_access(raw):
 def pending_new_dossier(campaign, email):
     """Dossier déjà ouvert avec cette adresse pour la campagne (même envoyé, même validé) : on renvoie un lien vers
     lui plutôt que d'en créer un second."""
-    return db.session.scalar(db.select(Dossier).where(
-        Dossier.campaign_id == campaign.id, Dossier.email == email.strip().lower()).order_by(Dossier.id.desc()).limit(1))
+    return db.session.scalar(
+        db.select(Dossier)
+        .where(Dossier.campaign_id == campaign.id, Dossier.email == email.strip().lower())
+        .order_by(Dossier.id.desc())
+        .limit(1)
+    )
 
 
 # ---------------------------------------------------------------------------
 # Pré-remplissage
 # ---------------------------------------------------------------------------
 
+
 def blank_data():
-    return {"household": {"name": "", "country": "FR"}, "guardians": [], "students": [], "consents": {},
-            "bank": {}}
+    return {"household": {"name": "", "country": "FR"}, "guardians": [], "students": [], "consents": {}, "bank": {}}
 
 
 def _iso(value):
@@ -195,8 +230,14 @@ def prefill(household, campaign):
     guardians = sorted(household.guardians, key=lambda m: m.guardian_rank)
     for link in guardians:
         p = link.person
-        data["guardians"].append({"person_id": p.id, **{f: getattr(p, f) for f in GUARDIAN_FIELDS},
-                                  "phone": _phone(p), "relationship": link.relationship})
+        data["guardians"].append(
+            {
+                "person_id": p.id,
+                **{f: getattr(p, f) for f in GUARDIAN_FIELDS},
+                "phone": _phone(p),
+                "relationship": link.relationship,
+            }
+        )
     candidates = [(link.person, None) for link in household.dependents]
     candidates += [(link.person, index) for index, link in enumerate(guardians) if link.person.memberships]
     for person, guardian in candidates:
@@ -205,14 +246,21 @@ def prefill(household, campaign):
         last = next((m for m in person.memberships if previous and m.season_id == previous.id), None)
         current = next((m for m in person.memberships if m.season_id == campaign.season_id), None)
         source = current or last
-        data["students"].append({
-            "key": uuid.uuid4().hex[:8], "person_id": person.id, "guardian": guardian,
-            "enrolled": bool(current or (last and last.status == Membership.ACTIVE)),
-            **{f: _iso(getattr(person, f)) for f in STUDENT_FIELDS},
-            **{f: getattr(source, f) if source else None for f in MEMBERSHIP_FIELDS},
-            "courses": _same_courses(last, campaign) if last and not current else
-            [e.course_id for e in (current.enrollments if current else []) if e.status == Enrollment.ACTIVE],
-            "wishes": None, "consents": {}})
+        data["students"].append(
+            {
+                "key": uuid.uuid4().hex[:8],
+                "person_id": person.id,
+                "guardian": guardian,
+                "enrolled": bool(current or (last and last.status == Membership.ACTIVE)),
+                **{f: _iso(getattr(person, f)) for f in STUDENT_FIELDS},
+                **{f: getattr(source, f) if source else None for f in MEMBERSHIP_FIELDS},
+                "courses": _same_courses(last, campaign)
+                if last and not current
+                else [e.course_id for e in (current.enrollments if current else []) if e.status == Enrollment.ACTIVE],
+                "wishes": None,
+                "consents": {},
+            }
+        )
     return data
 
 
@@ -235,6 +283,7 @@ def _same_courses(membership, campaign):
 # ---------------------------------------------------------------------------
 # Contrôles et envoi
 # ---------------------------------------------------------------------------
+
 
 def enrolled_students(dossier):
     return [s for s in dossier.data.get("students", []) if s.get("enrolled")]
@@ -265,8 +314,9 @@ def problems(dossier):
     students = enrolled_students(dossier)
     if not students:
         found.append("Inscrivez au moins un élève.")
-    offered = {c.id: c for c in db.session.scalars(
-        db.select(Course).where(Course.season_id == dossier.campaign.season_id))}
+    offered = {
+        c.id: c for c in db.session.scalars(db.select(Course).where(Course.season_id == dossier.campaign.season_id))
+    }
     for s in students:
         name = student_name(s, data) or "un élève"
         if s.get("guardian") is None and (not s.get("first_name") or not s.get("last_name") or not s.get("birth_date")):
@@ -337,6 +387,7 @@ def recipients(dossier):
 # Différences avec l'annuaire, pour la revue et le report
 # ---------------------------------------------------------------------------
 
+
 def _shown(value, field=None):
     if value in (None, ""):
         return None
@@ -386,6 +437,7 @@ def changes(dossier):
 # Validation : le dossier entre dans l'annuaire
 # ---------------------------------------------------------------------------
 
+
 def _apply(record, values):
     for field, value in values.items():
         if field == "birth_date" and isinstance(value, str):
@@ -402,8 +454,11 @@ def _set_phone(owner, number, label=None):
 
 def _students_without_duplicates(dossier):
     data = dossier.data
-    keys = [(fold(s.get("first_name") or ""), fold(s.get("last_name") or ""), s.get("birth_date"))
-            for s in enrolled_students(dossier) if s.get("guardian") is None and not s.get("person_id")]
+    keys = [
+        (fold(s.get("first_name") or ""), fold(s.get("last_name") or ""), s.get("birth_date"))
+        for s in enrolled_students(dossier)
+        if s.get("guardian") is None and not s.get("person_id")
+    ]
     if len(keys) != len(set(keys)):
         raise RegistrationError("Le dossier contient deux fois le même nouvel élève.")
     return data
@@ -486,8 +541,12 @@ def validate(dossier, actor, now=None):
             warnings.append("Cet IBAN était déjà enregistré pour le foyer : il n'a pas été ajouté une seconde fois.")
         else:
             holder = data.get("bank", {}).get("holder_name") or household.name
-            account = BankAccount(household_id=household.id, holder_name=holder, bic=data.get("bank", {}).get("bic"),
-                                  holder=next((p for p in guardians if fold(p.full_name) == fold(holder)), None))
+            account = BankAccount(
+                household_id=household.id,
+                holder_name=holder,
+                bic=data.get("bank", {}).get("bic"),
+                holder=next((p for p in guardians if fold(p.full_name) == fold(holder)), None),
+            )
             bank.set_iban(account, iban)
             db.session.add(account)
             if others := [a for a in bank.same_iban(iban) if a.household_id != household.id]:
@@ -502,10 +561,20 @@ def validate(dossier, actor, now=None):
 
 def _record_consent(dossier, consent, granted, season, person=None, household=None):
     answered_at = dossier.data.get("answered_at")
-    db.session.add(Consent(
-        person=person, household=household, season=season, label=consent.label, text=consent.text,
-        granted=bool(granted), given_at=datetime.fromisoformat(answered_at) if answered_at else dossier.submitted_at,
-        given_by_id=dossier.account_id, given_by_name=dossier.data.get("answered_by"), dossier=dossier))
+    db.session.add(
+        Consent(
+            person=person,
+            household=household,
+            season=season,
+            label=consent.label,
+            text=consent.text,
+            granted=bool(granted),
+            given_at=datetime.fromisoformat(answered_at) if answered_at else dossier.submitted_at,
+            given_by_id=dossier.account_id,
+            given_by_name=dossier.data.get("answered_by"),
+            dossier=dossier,
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -536,6 +605,7 @@ def changes_at_validation(dossier):
 # Relances
 # ---------------------------------------------------------------------------
 
+
 def _week(now):
     year, week, _ = now.isocalendar()
     return f"{year}-{week:02d}"
@@ -547,25 +617,42 @@ def remind(now=None):
     - foyer d'un élève de la saison précédente qui n'a pas encore ouvert son dossier.
     Renvoie le nombre de foyers relancés."""
     from . import notify
+
     now = now or datetime.now()
     reminded = 0
     for campaign in open_campaigns(now):
         previous = previous_season(campaign.season)
-        dossiers = {d.household_id: d for d in db.session.scalars(
-            db.select(Dossier).where(Dossier.campaign_id == campaign.id, Dossier.household_id.is_not(None)))}
+        dossiers = {
+            d.household_id: d
+            for d in db.session.scalars(
+                db.select(Dossier).where(Dossier.campaign_id == campaign.id, Dossier.household_id.is_not(None))
+            )
+        }
         households = set()
         if previous is not None:
-            households = set(db.session.scalars(
-                db.select(Household).join(HouseholdMember).join(Person).join(Membership).where(
-                    Membership.season_id == previous.id, Membership.status == Membership.ACTIVE,
-                    Household.archived_at.is_(None))))
+            households = set(
+                db.session.scalars(
+                    db.select(Household)
+                    .join(HouseholdMember)
+                    .join(Person)
+                    .join(Membership)
+                    .where(
+                        Membership.season_id == previous.id,
+                        Membership.status == Membership.ACTIVE,
+                        Household.archived_at.is_(None),
+                    )
+                )
+            )
         households |= {d.household for d in dossiers.values() if d.status in Dossier.EDITABLE}
         for household in households:
             dossier = dossiers.get(household.id)
             if dossier is not None and not dossier.editable:
                 continue
-            accounts = [link.person.account for link in household.guardians
-                        if link.person.account is not None and link.person.account.active]
+            accounts = [
+                link.person.account
+                for link in household.guardians
+                if link.person.account is not None and link.person.account.active
+            ]
             if not accounts:
                 continue
             if dossier is None:
@@ -576,8 +663,9 @@ def remind(now=None):
                 message = f"Votre dossier « {campaign.title} » n'est pas encore envoyé."
             # Chemins écrits à la main : les tâches périodiques tournent sans requête, donc sans url_for.
             link = f"/inscription/dossier/{dossier.uuid}" if dossier else "/inscription"
-            if notify.notify(accounts, message, link=link,
-                             dedup_key=f"relance:{campaign.id}:{household.id}:{_week(now)}"):
+            if notify.notify(
+                accounts, message, link=link, dedup_key=f"relance:{campaign.id}:{household.id}:{_week(now)}"
+            ):
                 reminded += 1
                 if dossier is not None:
                     dossier.reminded_at = now
@@ -588,17 +676,25 @@ def remind(now=None):
 # Professeurs : leurs élèves
 # ---------------------------------------------------------------------------
 
+
 def students_of(teacher, season):
     """[(cours, [(élève, [responsables])])] : les élèves inscrits aux cours du professeur pendant la saison."""
     from .catalog import sorted_courses
+
     result = []
     for course in sorted_courses(c for c in teacher.courses if c.season_id == season.id):
-        students = sorted((e.membership.person for e in course.enrollments if e.status == Enrollment.ACTIVE),
-                          key=lambda p: (fold(p.last_name), fold(p.first_name)))
+        students = sorted(
+            (e.membership.person for e in course.enrollments if e.status == Enrollment.ACTIVE),
+            key=lambda p: (fold(p.last_name), fold(p.first_name)),
+        )
         rows = []
         for student in students:
-            guardians = [link.person for h in student.household_links for link in h.household.guardians
-                         if h.role == HouseholdMember.DEPENDENT and link.person is not student]
+            guardians = [
+                link.person
+                for h in student.household_links
+                for link in h.household.guardians
+                if h.role == HouseholdMember.DEPENDENT and link.person is not student
+            ]
             rows.append((student, list({p.id: p for p in guardians}.values())))
         result.append((course, rows))
     return result

@@ -1,4 +1,5 @@
 """Applications connectées : les applis qui délèguent leur connexion à ce serveur, et les clés qui signent leurs jetons."""
+
 import json
 import re
 
@@ -19,13 +20,18 @@ bp = Blueprint("applications", __name__, url_prefix="/applications")
 class ApplicationForm(FlaskForm):
     name = StringField("Nom", validators=[DataRequired(), Length(max=80)])
     redirect_uris = TextAreaField("Adresses de retour (une par ligne)", validators=[DataRequired()])
-    post_logout_redirect_uris = TextAreaField("Adresses après déconnexion (une par ligne, facultatif)",
-                                              validators=[Optional()])
-    backchannel_logout_uri = StringField("Adresse des avis de déconnexion (Back-Channel Logout, facultatif)",
-                                         validators=[Optional(), Length(max=oidc.MAX_REDIRECT_URI)])
+    post_logout_redirect_uris = TextAreaField(
+        "Adresses après déconnexion (une par ligne, facultatif)", validators=[Optional()]
+    )
+    backchannel_logout_uri = StringField(
+        "Adresse des avis de déconnexion (Back-Channel Logout, facultatif)",
+        validators=[Optional(), Length(max=oidc.MAX_REDIRECT_URI)],
+    )
     first_party = BooleanField("Appli de l'association : ne pas demander de consentement")
-    directory_access = BooleanField("Peut récupérer la liste des comptes qui y ont accès (avec son identifiant et son "
-                                    "secret) et, pour une appli de l'association, les personnes de l'annuaire")
+    directory_access = BooleanField(
+        "Peut récupérer la liste des comptes qui y ont accès (avec son identifiant et son "
+        "secret) et, pour une appli de l'association, les personnes de l'annuaire"
+    )
 
     def __init__(self, *args, current=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -82,16 +88,27 @@ def _discovery():
 
 def _snapshot(client):
     """Ce que le journal compare quand une application est modifiée."""
-    return {"nom": client.name, "adresses": client.redirect_uris, "après déconnexion": client.post_logout_redirect_uris,
-            "avis de déconnexion": client.backchannel_logout_uri, "association": client.first_party,
-            "liste des comptes": client.directory_access,
-            "autorisés": sorted(g.key for g in client.allowed_groups),
-            "transmis": sorted(g.key for g in client.shared_groups)}
+    return {
+        "nom": client.name,
+        "adresses": client.redirect_uris,
+        "après déconnexion": client.post_logout_redirect_uris,
+        "avis de déconnexion": client.backchannel_logout_uri,
+        "association": client.first_party,
+        "liste des comptes": client.directory_access,
+        "autorisés": sorted(g.key for g in client.allowed_groups),
+        "transmis": sorted(g.key for g in client.shared_groups),
+    }
 
 
 def _render_form(form, client):
-    return render_template("applications/form.html", form=form, client=client, all_groups=groups.all_groups(),
-                           allowed=_form_groups("allowed_groups", client), shared=_form_groups("shared_groups", client))
+    return render_template(
+        "applications/form.html",
+        form=form,
+        client=client,
+        all_groups=groups.all_groups(),
+        allowed=_form_groups("allowed_groups", client),
+        shared=_form_groups("shared_groups", client),
+    )
 
 
 def _form_groups(name, client):
@@ -103,8 +120,13 @@ def _form_groups(name, client):
 @bp.route("")
 @require("client.manage")
 def index():
-    return render_template("applications/index.html", clients=oidc.all_clients(), keys=oidc.published_keys(),
-                           issuer=oidc.issuer(), discovery=_discovery())
+    return render_template(
+        "applications/index.html",
+        clients=oidc.all_clients(),
+        keys=oidc.published_keys(),
+        issuer=oidc.issuer(),
+        discovery=_discovery(),
+    )
 
 
 @bp.route("/nouvelle", methods=["GET", "POST"])
@@ -118,8 +140,9 @@ def create():
         db.session.add(client)
         log("client.create", f"Application créée : {client.name}")
         db.session.commit()
-        return render_template("applications/secret.html", client=client, secret=secret, created=True,
-                               discovery=_discovery())
+        return render_template(
+            "applications/secret.html", client=client, secret=secret, created=True, discovery=_discovery()
+        )
     return _render_form(form, None)
 
 
@@ -127,26 +150,41 @@ def create():
 @require("client.manage")
 def detail(client_pk):
     client = _get(client_pk)
-    return render_template("applications/detail.html", client=client, form=FlaskForm(), discovery=_discovery(),
-                           pending_logouts=logout.pending_for(client), issuer=oidc.issuer())
+    return render_template(
+        "applications/detail.html",
+        client=client,
+        form=FlaskForm(),
+        discovery=_discovery(),
+        pending_logouts=logout.pending_for(client),
+        issuer=oidc.issuer(),
+    )
 
 
 @bp.route("/<int:client_pk>/modifier", methods=["GET", "POST"])
 @require("client.manage")
 def edit(client_pk):
     client = _get(client_pk)
-    form = ApplicationForm(current=client, data={
-        "name": client.name, "redirect_uris": "\n".join(client.redirect_uris),
-        "post_logout_redirect_uris": "\n".join(client.post_logout_redirect_uris),
-        "backchannel_logout_uri": client.backchannel_logout_uri or "", "first_party": client.first_party,
-        "directory_access": client.directory_access})
+    form = ApplicationForm(
+        current=client,
+        data={
+            "name": client.name,
+            "redirect_uris": "\n".join(client.redirect_uris),
+            "post_logout_redirect_uris": "\n".join(client.post_logout_redirect_uris),
+            "backchannel_logout_uri": client.backchannel_logout_uri or "",
+            "first_party": client.first_party,
+            "directory_access": client.directory_access,
+        },
+    )
     if form.validate_on_submit():
         before = _snapshot(client)
         _apply(form, client)
         after = _snapshot(client)
         logout.review_access(clients=[client])  # groupes autorisés ou transmis changés : les applis sont prévenues
-        log("client.update", f"Application modifiée : {client.name}",
-            changes={key: [before[key], after[key]] for key in before if before[key] != after[key]})
+        log(
+            "client.update",
+            f"Application modifiée : {client.name}",
+            changes={key: [before[key], after[key]] for key in before if before[key] != after[key]},
+        )
         db.session.commit()
         flash("Application enregistrée.", "success")
         return redirect(url_for(".detail", client_pk=client.id))
@@ -160,8 +198,9 @@ def new_secret(client_pk):
     secret = oidc.set_secret(client)
     log("client.secret", f"Nouveau secret pour {client.name}")
     db.session.commit()
-    return render_template("applications/secret.html", client=client, secret=secret, created=False,
-                           discovery=_discovery())
+    return render_template(
+        "applications/secret.html", client=client, secret=secret, created=False, discovery=_discovery()
+    )
 
 
 @bp.route("/<int:client_pk>/comptes", methods=["POST"])
@@ -173,8 +212,9 @@ def export_accounts(client_pk):
     log("oidc.export", f"Comptes exportés pour {client.name} ({len(data['accounts'])})")
     db.session.commit()
     name = re.sub(r"[^a-z0-9]+", "-", fold(client.name)).strip("-") or "application"
-    response = current_app.response_class(json.dumps(data, ensure_ascii=False, indent=1) + "\n",
-                                          mimetype="application/json")
+    response = current_app.response_class(
+        json.dumps(data, ensure_ascii=False, indent=1) + "\n", mimetype="application/json"
+    )
     response.headers["Content-Disposition"] = f'attachment; filename="comptes-{name}.json"'
     response.headers["Cache-Control"] = "no-store"
     return response

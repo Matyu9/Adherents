@@ -13,22 +13,48 @@ from .services import branding
 __version__ = "0.5.0"
 
 # Aucun script ni style en ligne : les comportements passent par app.js (data-confirm, data-autosubmit…).
-CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
-       "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; "
-       "frame-ancestors 'none'; report-uri /csp-report; report-to csp-endpoint")
+CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+    "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; "
+    "frame-ancestors 'none'; report-uri /csp-report; report-to csp-endpoint"
+)
 # Pages qui affichent ou reçoivent des données de compte : jamais gardées par le navigateur ou un proxy.
-NO_STORE = ("auth.login", "auth.password", "auth.two_factor", "auth.forgot", "auth.token_link", "account.index",
-            "account.change_email", "account.totp", "account.totp_codes", "account.totp_disable", "accounts.create",
-            "accounts.invite", "accounts.detail", "oidc.authorize", "oidc.resume", "oidc.consent", "oidc.end_session", "oidc.end_session_confirm", "applications.create",
-            "applications.new_secret", "applications.export_accounts", "oidc.directory")
+NO_STORE = (
+    "auth.login",
+    "auth.password",
+    "auth.two_factor",
+    "auth.forgot",
+    "auth.token_link",
+    "account.index",
+    "account.change_email",
+    "account.totp",
+    "account.totp_codes",
+    "account.totp_disable",
+    "accounts.create",
+    "accounts.invite",
+    "accounts.detail",
+    "oidc.authorize",
+    "oidc.resume",
+    "oidc.consent",
+    "oidc.end_session",
+    "oidc.end_session_confirm",
+    "applications.create",
+    "applications.new_secret",
+    "applications.export_accounts",
+    "oidc.directory",
+)
 
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
-    if app.config["SECRET_KEY"] in ("", *UNSAFE_SECRETS) and not (app.debug or app.testing or os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true")):
-        raise RuntimeError("SECRET_KEY n'est pas définie (ou vaut encore la valeur d'exemple) : "
-                           "renseignez-la dans le fichier .env avant de démarrer.")
+    if app.config["SECRET_KEY"] in ("", *UNSAFE_SECRETS) and not (
+        app.debug or app.testing or os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true")
+    ):
+        raise RuntimeError(
+            "SECRET_KEY n'est pas définie (ou vaut encore la valeur d'exemple) : "
+            "renseignez-la dans le fichier .env avant de démarrer."
+        )
     if app.config.get("TRUST_PROXY"):
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     Path(app.config["UPLOAD_DIR"]).mkdir(parents=True, exist_ok=True)
@@ -39,6 +65,7 @@ def create_app(config_class=Config):
     migrate.init_app(app, db)
     from . import models  # noqa: F401  (enregistre les modèles pour Alembic)
     from .services import bank
+
     bank.check_startup(app)  # IBAN en base sans leur clé : on refuse de démarrer
     csrf.init_app(app)
     login_manager.init_app(app)
@@ -124,8 +151,10 @@ def create_app(config_class=Config):
             response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
         # Une réponse qui pose sa propre CSP la garde telle quelle.
         if "Content-Security-Policy" not in response.headers:
-            response.headers.setdefault("Content-Security-Policy-Report-Only" if app.config["CSP_REPORT_ONLY"]
-                                        else "Content-Security-Policy", CSP)
+            response.headers.setdefault(
+                "Content-Security-Policy-Report-Only" if app.config["CSP_REPORT_ONLY"] else "Content-Security-Policy",
+                CSP,
+            )
             response.headers.setdefault("Reporting-Endpoints", 'csp-endpoint="/csp-report"')  # pour report-to
         if request.endpoint in NO_STORE:
             response.headers["Cache-Control"] = "no-store"

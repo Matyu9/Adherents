@@ -8,10 +8,19 @@ from ..models import Activity
 # Durée de conservation des connexions au journal : elles contiennent des adresses IP.
 LOGIN_RETENTION_DAYS = 365
 # Champs jamais recopiés dans le journal, même sous forme d'ancienne et de nouvelle valeur.
-SENSITIVE_FIELDS = frozenset({"password_hash", "iban", "bic", "iban_ciphertext",
-                              # Annuaire : le lieu de naissance est réservé aux gestionnaires, et les observations
-                              # internes ou le contact d'urgence n'ont rien à faire dans un journal lu plus largement.
-                              "birth_place", "notes", "emergency_contact"})
+SENSITIVE_FIELDS = frozenset(
+    {
+        "password_hash",
+        "iban",
+        "bic",
+        "iban_ciphertext",
+        # Annuaire : le lieu de naissance est réservé aux gestionnaires, et les observations
+        # internes ou le contact d'urgence n'ont rien à faire dans un journal lu plus largement.
+        "birth_place",
+        "notes",
+        "emergency_contact",
+    }
+)
 
 
 def log(action, message, *, changes=None, user=None, target=None, person=None, household=None):
@@ -19,9 +28,15 @@ def log(action, message, *, changes=None, user=None, target=None, person=None, h
     `person` et `household` : la fiche de l'annuaire concernée (déjà en base)."""
     if user is None and current_user and current_user.is_authenticated:
         user = current_user
-    entry = Activity(account=user, action=action, message=message[:500], changes=changes or None,
-                     target_account_id=target.id if target else None,
-                     person_id=person.id if person else None, household_id=household.id if household else None)
+    entry = Activity(
+        account=user,
+        action=action,
+        message=message[:500],
+        changes=changes or None,
+        target_account_id=target.id if target else None,
+        person_id=person.id if person else None,
+        household_id=household.id if household else None,
+    )
     db.session.add(entry)
     return entry
 
@@ -29,9 +44,15 @@ def log(action, message, *, changes=None, user=None, target=None, person=None, h
 def purge_expired_logins(now=None):
     """Efface les connexions (à l'appli et aux applis clientes), déconnexions et échecs trop anciens."""
     limit = (now or datetime.now()) - timedelta(days=LOGIN_RETENTION_DAYS)
-    return db.session.execute(db.delete(Activity).where(
-        db.or_(Activity.action.startswith("auth."), Activity.action.in_(("oidc.authorize", "oidc.replay", "oidc.directory"))),
-        Activity.created_at < limit)).rowcount
+    return db.session.execute(
+        db.delete(Activity).where(
+            db.or_(
+                Activity.action.startswith("auth."),
+                Activity.action.in_(("oidc.authorize", "oidc.replay", "oidc.directory")),
+            ),
+            Activity.created_at < limit,
+        )
+    ).rowcount
 
 
 def diff(obj, fields, new_values, mask=()):
@@ -46,7 +67,11 @@ def diff(obj, fields, new_values, mask=()):
             continue
         old, new = getattr(obj, field), new_values[field]
         if old != new:
-            changes[field] = ["(masqué)", "(masqué)"] if field in SENSITIVE_FIELDS or field in mask else [_jsonable(old), _jsonable(new)]
+            changes[field] = (
+                ["(masqué)", "(masqué)"]
+                if field in SENSITIVE_FIELDS or field in mask
+                else [_jsonable(old), _jsonable(new)]
+            )
             setattr(obj, field, new)
     return changes
 

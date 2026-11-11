@@ -2,6 +2,7 @@
 
 Elle ne doit rien dire de plus que ce que l'appli recevrait à la connexion de chacun.
 """
+
 import base64
 import json
 from datetime import datetime, timedelta
@@ -18,8 +19,11 @@ from .test_oidc import SECRET_OF, make_client
 
 @pytest.fixture
 def setup(app):
-    members, regie, other = (AccessGroup(key="membres", name="Membres"), AccessGroup(key="regie", name="Régie"),
-                             AccessGroup(key="autre", name="Autre"))
+    members, regie, other = (
+        AccessGroup(key="membres", name="Membres"),
+        AccessGroup(key="regie", name="Régie"),
+        AccessGroup(key="autre", name="Autre"),
+    )
     db.session.add_all([members, regie, other])
     db.session.commit()
     elise = make_account(email="elise@asso.test", first_name="Élise", email_verified=True)
@@ -42,8 +46,10 @@ def basic(client_id, secret):
 
 
 def fetch(http, application, secret=None):
-    return http.get("/oidc/comptes", headers=basic(application.client_id,
-                                                  secret if secret is not None else SECRET_OF[application.client_id]))
+    return http.get(
+        "/oidc/comptes",
+        headers=basic(application.client_id, secret if secret is not None else SECRET_OF[application.client_id]),
+    )
 
 
 def test_first_party_app_gets_every_account_that_may_enter(client, setup):
@@ -52,8 +58,14 @@ def test_first_party_app_gets_every_account_that_may_enter(client, setup):
     data = response.get_json()
     assert data["issuer"] == "http://localhost:8001" and data["application"] == "Inventaire"
     assert [row["email"] for row in data["accounts"]] == ["elise@asso.test", "paul@asso.test"]
-    assert data["accounts"][0] == {"sub": setup["elise"].sub, "email": "elise@asso.test", "email_verified": True,
-                                   "first_name": "Élise", "last_name": "Test", "groups": ["membres", "regie"]}
+    assert data["accounts"][0] == {
+        "sub": setup["elise"].sub,
+        "email": "elise@asso.test",
+        "email_verified": True,
+        "first_name": "Élise",
+        "last_name": "Test",
+        "groups": ["membres", "regie"],
+    }
 
 
 def test_nothing_secret_is_ever_listed(client, setup):
@@ -73,6 +85,7 @@ def test_third_party_app_sees_only_consenting_people_and_what_they_accepted(clie
 
 def test_role_groups_count(client, setup):
     from app.services import roles
+
     role = roles.get(Role.GESTIONNAIRE)
     role.groups = [setup["members"]]
     db.session.commit()
@@ -87,8 +100,9 @@ def test_closed_by_default(client, setup):
     assert response.status_code == 403 and response.get_json() == {"error": "access_denied"}
 
 
-@pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer x"}, {"Authorization": "Basic !!!"},
-                                     basic("inconnu", "x")])
+@pytest.mark.parametrize(
+    "headers", [{}, {"Authorization": "Bearer x"}, {"Authorization": "Basic !!!"}, basic("inconnu", "x")]
+)
 def test_without_valid_credentials(client, setup, headers):
     response = client.get("/oidc/comptes", headers=headers)
     assert response.status_code == 401 and response.headers["WWW-Authenticate"].startswith("Basic")
@@ -127,6 +141,7 @@ def test_post_is_not_allowed(client, setup):
 # Bouton « Exporter les comptes »
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def admin_http(app):
     http = app.test_client()
@@ -163,10 +178,16 @@ def test_detail_page_offers_the_button_and_explains_the_endpoint(admin_http, set
 
 def test_form_saves_and_journals_directory_access(admin_http, setup):
     application = setup["app"]
-    admin_http.post(f"/applications/{application.id}/modifier", data={
-        "name": application.name, "redirect_uris": "\n".join(application.redirect_uris), "first_party": "y",
-        "allowed_groups": [g.id for g in application.allowed_groups],
-        "shared_groups": [g.id for g in application.shared_groups]})
+    admin_http.post(
+        f"/applications/{application.id}/modifier",
+        data={
+            "name": application.name,
+            "redirect_uris": "\n".join(application.redirect_uris),
+            "first_party": "y",
+            "allowed_groups": [g.id for g in application.allowed_groups],
+            "shared_groups": [g.id for g in application.shared_groups],
+        },
+    )
     assert db.session.get(OidcClient, application.id).directory_access is False
     entry = db.session.scalar(db.select(Activity).filter_by(action="client.update"))
     assert entry.changes["liste des comptes"] == [True, False]

@@ -1,4 +1,5 @@
 """Sessions de connexion enregistrées en base, pour pouvoir les révoquer (déconnexion, mot de passe changé)."""
+
 import re
 import secrets
 from datetime import datetime, timedelta
@@ -30,12 +31,22 @@ def start(user, remember=False, via=None):
     purge_expired()
     user.session_token = secrets.token_urlsafe(32)
     now = datetime.now()
-    db.session.add(LoginSession(id=user.session_token, account_id=user.id, created_at=now, last_seen_at=now,
-                                user_agent=(request.user_agent.string or "")[:255] or None,
-                                ip=request.remote_addr))
+    db.session.add(
+        LoginSession(
+            id=user.session_token,
+            account_id=user.id,
+            created_at=now,
+            last_seen_at=now,
+            user_agent=(request.user_agent.string or "")[:255] or None,
+            ip=request.remote_addr,
+        )
+    )
     user.last_login_at = now
-    log("auth.login", f"Connexion de {user.full_name}" + (f" via {via}" if via else "") + f" ({request.remote_addr})",
-        user=user)
+    log(
+        "auth.login",
+        f"Connexion de {user.full_name}" + (f" via {via}" if via else "") + f" ({request.remote_addr})",
+        user=user,
+    )
     db.session.commit()
     login_user(user, remember=remember)
 
@@ -80,8 +91,11 @@ def current_sid():
 
 def of(user):
     """Sessions ouvertes de `user`, la plus récemment active d'abord."""
-    return db.session.scalars(db.select(LoginSession).where(LoginSession.account_id == user.id).order_by(
-        db.func.coalesce(LoginSession.last_seen_at, LoginSession.created_at).desc())).all()
+    return db.session.scalars(
+        db.select(LoginSession)
+        .where(LoginSession.account_id == user.id)
+        .order_by(db.func.coalesce(LoginSession.last_seen_at, LoginSession.created_at).desc())
+    ).all()
 
 
 # Mise à jour de « vu pour la dernière fois » au plus toutes les 5 minutes : pas d'écriture à chaque requête.
@@ -110,8 +124,16 @@ def touch(login):
 
 
 _BROWSERS = (("Edg", "Edge"), ("OPR", "Opera"), ("Firefox", "Firefox"), ("Chrome", "Chrome"), ("Safari", "Safari"))
-_SYSTEMS = (("iPhone", "iPhone"), ("iPad", "iPad"), ("Android", "Android"), ("Windows", "Windows"),
-            ("Mac OS X", "macOS"), ("Macintosh", "macOS"), ("CrOS", "ChromeOS"), ("Linux", "Linux"))
+_SYSTEMS = (
+    ("iPhone", "iPhone"),
+    ("iPad", "iPad"),
+    ("Android", "Android"),
+    ("Windows", "Windows"),
+    ("Mac OS X", "macOS"),
+    ("Macintosh", "macOS"),
+    ("CrOS", "ChromeOS"),
+    ("Linux", "Linux"),
+)
 
 
 def device_label(user_agent):
@@ -130,6 +152,7 @@ def revoke_all():
 
 def stats():
     """(sessions ouvertes, personnes connectées), pour la page Paramètres."""
-    row = db.session.execute(db.select(db.func.count(LoginSession.id),
-                                       db.func.count(db.distinct(LoginSession.account_id)))).one()
+    row = db.session.execute(
+        db.select(db.func.count(LoginSession.id), db.func.count(db.distinct(LoginSession.account_id)))
+    ).one()
     return tuple(row)

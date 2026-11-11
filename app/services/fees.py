@@ -3,6 +3,7 @@
 Le calcul lui-même est dans services/pricing.py ; ce module lit la base, prépare ce que le moteur attend et garde ses
 résultats. Les services ne font pas de commit.
 """
+
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -39,6 +40,7 @@ MAX_PRICE = 100_000_00  # 100 000 € : au-delà, c'est une faute de frappe
 # Régies
 # ---------------------------------------------------------------------------
 
+
 def regies(include_archived=False):
     query = db.select(Regie).order_by(Regie.name)
     if not include_archived:
@@ -62,6 +64,7 @@ def create_regie(name):
 # Réglages de la saison
 # ---------------------------------------------------------------------------
 
+
 def season_settings(season):
     """Réglages des tarifs de la saison, créés vides au premier accès."""
     if season.fee_season is None:
@@ -83,8 +86,12 @@ def save_settings(season, engine=None, qf_bands=None, default_band=None, residen
         raise FeeError("La tranche par défaut doit être l'une des tranches définies.")
     cities = sorted({c.strip() for c in (resident_cities or []) if c and c.strip()}, key=fold)
     changes = {}
-    for name, value in (("engine", engine), ("qf_bands", bands), ("default_band", default_band),
-                        ("resident_cities", cities)):
+    for name, value in (
+        ("engine", engine),
+        ("qf_bands", bands),
+        ("default_band", default_band),
+        ("resident_cities", cities),
+    ):
         if getattr(settings, name) != value:
             changes[name] = [getattr(settings, name), value]
             setattr(settings, name, value)
@@ -122,9 +129,13 @@ def _validate_bands(bands):
 # Éléments
 # ---------------------------------------------------------------------------
 
+
 def items(season):
-    return list(db.session.scalars(db.select(FeeItem).where(FeeItem.season_id == season.id)
-                                   .order_by(FeeItem.position, FeeItem.label)))
+    return list(
+        db.session.scalars(
+            db.select(FeeItem).where(FeeItem.season_id == season.id).order_by(FeeItem.position, FeeItem.label)
+        )
+    )
 
 
 def categories(season):
@@ -139,19 +150,24 @@ def save_item(season, data, item=None):
     price = data.get("price")
     if isinstance(price, bool) or not isinstance(price, int) or not 0 <= price <= MAX_PRICE:
         raise FeeError("Le prix doit être un montant positif.")
-    same = db.session.scalar(db.select(FeeItem).where(FeeItem.season_id == season.id,
-                                                      db.func.lower(FeeItem.label) == label.lower()))
+    same = db.session.scalar(
+        db.select(FeeItem).where(FeeItem.season_id == season.id, db.func.lower(FeeItem.label) == label.lower())
+    )
     if same is not None and same is not item:
         raise FeeError(f"La saison a déjà un élément « {label} ».")
     regie = data.get("regie")
     if regie is not None and regie.archived and (item is None or item.regie is not regie):
         raise FeeError("Cette régie est archivée.")
-    values = {"label": label, "price": price, "category": (data.get("category") or "").strip() or None,
-              "code": (data.get("code") or "").strip() or None, "regie": regie,
-              "notes": (data.get("notes") or "").strip() or None}
+    values = {
+        "label": label,
+        "price": price,
+        "category": (data.get("category") or "").strip() or None,
+        "code": (data.get("code") or "").strip() or None,
+        "regie": regie,
+        "notes": (data.get("notes") or "").strip() or None,
+    }
     if item is None:
-        position = db.session.scalar(db.select(db.func.max(FeeItem.position))
-                                     .where(FeeItem.season_id == season.id))
+        position = db.session.scalar(db.select(db.func.max(FeeItem.position)).where(FeeItem.season_id == season.id))
         item = FeeItem(season=season, position=(position or 0) + 1, **values)
         db.session.add(item)
         db.session.flush()
@@ -163,8 +179,10 @@ def save_item(season, data, item=None):
     for name, value in values.items():
         old = getattr(item, name)
         if old != value:
-            changes[name] = [old.name if isinstance(old, Regie) else old,
-                             value.name if isinstance(value, Regie) else value]
+            changes[name] = [
+                old.name if isinstance(old, Regie) else old,
+                value.name if isinstance(value, Regie) else value,
+            ]
             setattr(item, name, value)
     if changes:
         log("fee.item", f"Élément « {label} » modifié ({season.label})", changes=changes)
@@ -199,6 +217,7 @@ def delete_item(item):
 # Règles
 # ---------------------------------------------------------------------------
 
+
 def season_rules(season, active_only=False):
     query = db.select(FeeRule).where(FeeRule.season_id == season.id).order_by(FeeRule.position, FeeRule.id)
     if active_only:
@@ -214,9 +233,14 @@ def save_rule(season, raw, rule=None):
         normalized = pricing.validate_rule(raw, known)
     except PricingError as error:
         raise FeeError(str(error)) from None
-    values = {"name": normalized["name"], "conditions": normalized["conditions"], "target": normalized["target"],
-              "effect": normalized["effect"], "exclusive_group": normalized["group"],
-              "notes": (raw.get("notes") or "").strip() or None}
+    values = {
+        "name": normalized["name"],
+        "conditions": normalized["conditions"],
+        "target": normalized["target"],
+        "effect": normalized["effect"],
+        "exclusive_group": normalized["group"],
+        "notes": (raw.get("notes") or "").strip() or None,
+    }
     if rule is None:
         rules = season_rules(season)
         rule = FeeRule(season=season, position=len(rules), active=False, **values)
@@ -240,8 +264,7 @@ def save_rule(season, raw, rule=None):
 def set_rule_active(rule, active):
     if rule.active != active:
         rule.active = active
-        log("fee.rule", f"Règle « {rule.name} » {'activée' if active else 'remise en brouillon'} "
-                        f"({rule.season.label})")
+        log("fee.rule", f"Règle « {rule.name} » {'activée' if active else 'remise en brouillon'} ({rule.season.label})")
         db.session.flush()
 
 
@@ -318,8 +341,13 @@ def save_situation(household, season, values):
     if record is None:
         record = HouseholdSeason(household=household, season=season, tags=[])
         db.session.add(record)
-    new = {"qf_band": band, "quotient": quotient, "qf_proof": (values.get("qf_proof") or "").strip() or None,
-           "resident": resident, "tags": tags}
+    new = {
+        "qf_band": band,
+        "quotient": quotient,
+        "qf_proof": (values.get("qf_proof") or "").strip() or None,
+        "resident": resident,
+        "tags": tags,
+    }
     changes = {}
     for name in SITUATION_FIELDS:
         if getattr(record, name) != new[name]:
@@ -327,8 +355,12 @@ def save_situation(household, season, values):
             changes[name] = ["(masqué)", "(masqué)"] if name == "quotient" else [getattr(record, name), new[name]]
             setattr(record, name, new[name])
     if changes:
-        log("fee.situation", f"Situation du foyer {household.name} modifiée ({season.label})", changes=changes,
-            household=household)
+        log(
+            "fee.situation",
+            f"Situation du foyer {household.name} modifiée ({season.label})",
+            changes=changes,
+            household=household,
+        )
     db.session.flush()
     return record
 
@@ -336,8 +368,12 @@ def save_situation(household, season, values):
 def set_student_tags(membership, tags):
     tags = _clean_tags(tags)
     if membership.fee_tags != tags:
-        log("fee.situation", f"Étiquettes de {membership.person.full_name} modifiées ({membership.season.label})",
-            changes={"fee_tags": [membership.fee_tags, tags]}, person=membership.person)
+        log(
+            "fee.situation",
+            f"Étiquettes de {membership.person.full_name} modifiées ({membership.season.label})",
+            changes={"fee_tags": [membership.fee_tags, tags]},
+            person=membership.person,
+        )
         membership.fee_tags = tags
         db.session.flush()
 
@@ -373,9 +409,11 @@ def resident_of(record, household, settings):
 # Ce que le foyer prend
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Prepared:
     """Ce que le moteur reçoit pour un foyer, et ce qu'il faut savoir pour le relire."""
+
     order: pricing.Order
     items: dict
     persons: dict  # id → Person
@@ -384,9 +422,14 @@ class Prepared:
 
 def season_households(season):
     """Foyers dont au moins un membre a une adhésion active dans la saison."""
-    query = (db.select(Household).join(HouseholdMember).join(Membership, Membership.person_id == HouseholdMember.person_id)
-             .where(Membership.season_id == season.id, Membership.status == Membership.ACTIVE)
-             .distinct().order_by(Household.name, Household.id))
+    query = (
+        db.select(Household)
+        .join(HouseholdMember)
+        .join(Membership, Membership.person_id == HouseholdMember.person_id)
+        .where(Membership.season_id == season.id, Membership.status == Membership.ACTIVE)
+        .distinct()
+        .order_by(Household.name, Household.id)
+    )
     return list(db.session.scalars(query))
 
 
@@ -399,48 +442,66 @@ def prepare(household, season):
     students, picks, persons = [], [], {}
     for member in household.members:
         person = member.person
-        membership = next((m for m in person.memberships if m.season_id == season.id
-                           and m.status == Membership.ACTIVE), None)
+        membership = next(
+            (m for m in person.memberships if m.season_id == season.id and m.status == Membership.ACTIVE), None
+        )
         if membership is None:
             continue
         persons[person.id] = person
         if len(person.household_links) > 1:
-            warnings.append(f"{person.full_name} fait partie de plusieurs foyers : sa cotisation est comptée dans "
-                            "chacun.")
+            warnings.append(
+                f"{person.full_name} fait partie de plusieurs foyers : sa cotisation est comptée dans chacun."
+            )
         age = person.age(season.starts_on)
         enrollments = sorted((e for e in membership.enrollments if e.status == Enrollment.ACTIVE), key=lambda e: e.id)
-        seniority = sum(1 for m in person.memberships if m.status == Membership.ACTIVE
-                        and m.season.starts_on < season.starts_on)
-        students.append(pricing.Student(
-            id=person.id, name=person.full_name, age=age,
-            adult=age >= 18 if age is not None else member.role == HouseholdMember.GUARDIAN,
-            tags=frozenset(membership.fee_tags or ()), disciplines=frozenset(e.course.discipline.name for e in enrollments),
-            seniority=seniority))
+        seniority = sum(
+            1 for m in person.memberships if m.status == Membership.ACTIVE and m.season.starts_on < season.starts_on
+        )
+        students.append(
+            pricing.Student(
+                id=person.id,
+                name=person.full_name,
+                age=age,
+                adult=age >= 18 if age is not None else member.role == HouseholdMember.GUARDIAN,
+                tags=frozenset(membership.fee_tags or ()),
+                disciplines=frozenset(e.course.discipline.name for e in enrollments),
+                seniority=seniority,
+            )
+        )
         for enrollment in enrollments:
             course = enrollment.course
             if course.fee_item_id is None:
                 warnings.append(f"{person.full_name} : le cours « {course.title} » ne facture aucun élément.")
             elif course.fee_item_id not in known:
-                warnings.append(f"{person.full_name} : le cours « {course.title} » facture un élément d'une autre "
-                                "saison.")
+                warnings.append(
+                    f"{person.full_name} : le cours « {course.title} » facture un élément d'une autre saison."
+                )
             else:
                 picks.append((person.id, course.fee_item_id))
-    picked = db.session.scalars(db.select(FeePick).join(FeeItem)
-                                .where(FeePick.household_id == household.id, FeeItem.season_id == season.id)
-                                .order_by(FeePick.id))
+    picked = db.session.scalars(
+        db.select(FeePick)
+        .join(FeeItem)
+        .where(FeePick.household_id == household.id, FeeItem.season_id == season.id)
+        .order_by(FeePick.id)
+    )
     for pick in picked:
         if pick.person_id not in persons:
-            warnings.append(f"« {pick.item.label} » est pris pour {pick.person.full_name}, qui n'est pas élève cette "
-                            "saison : il n'est pas compté.")
+            warnings.append(
+                f"« {pick.item.label} » est pris pour {pick.person.full_name}, qui n'est pas élève cette "
+                "saison : il n'est pas compté."
+            )
             continue
         picks.append((pick.person_id, pick.item_id))
     band = band_of(record, settings)
     if settings.qf_bands and band is None:
         warnings.append("Tranche de quotient familial inconnue, et pas de tranche par défaut.")
     order = pricing.Order(
-        household=pricing.Household(qf_band=band, resident=resident_of(record, household, settings),
-                                    tags=frozenset(record.tags or ())),
-        students=tuple(students), picks=tuple(picks))
+        household=pricing.Household(
+            qf_band=band, resident=resident_of(record, household, settings), tags=frozenset(record.tags or ())
+        ),
+        students=tuple(students),
+        picks=tuple(picks),
+    )
     return Prepared(order, engine_items, persons, warnings)
 
 
@@ -453,15 +514,23 @@ def add_pick(household, person, item, note=None):
         raise FeeError(f"{person.full_name} ne fait pas partie de ce foyer.")
     pick = FeePick(household=household, person=person, item=item, note=(note or "").strip() or None)
     db.session.add(pick)
-    log("fee.pick", f"« {item.label} » ajouté pour {person.full_name} ({item.season.label})", household=household,
-        person=person)
+    log(
+        "fee.pick",
+        f"« {item.label} » ajouté pour {person.full_name} ({item.season.label})",
+        household=household,
+        person=person,
+    )
     db.session.flush()
     return pick
 
 
 def remove_pick(pick):
-    log("fee.pick", f"« {pick.item.label} » retiré pour {pick.person.full_name} ({pick.item.season.label})",
-        household=pick.household, person=pick.person)
+    log(
+        "fee.pick",
+        f"« {pick.item.label} » retiré pour {pick.person.full_name} ({pick.item.season.label})",
+        household=pick.household,
+        person=pick.person,
+    )
     db.session.delete(pick)
     db.session.flush()
 
@@ -469,6 +538,7 @@ def remove_pick(pick):
 # ---------------------------------------------------------------------------
 # Calcul
 # ---------------------------------------------------------------------------
+
 
 def engine_rules(season, rules=None):
     """Règles actives de la saison, dans l'ordre, telles que le moteur les lit."""
@@ -479,8 +549,9 @@ def engine_rules(season, rules=None):
 def compute(household, season, rules=None):
     """Calcule sans rien enregistrer. Renvoie (Prepared, Result)."""
     prepared = prepare(household, season)
-    result = pricing.compute(prepared.order, prepared.items, engine_rules(season, rules),
-                             season_settings(season).engine)
+    result = pricing.compute(
+        prepared.order, prepared.items, engine_rules(season, rules), season_settings(season).engine
+    )
     return prepared, result
 
 
@@ -495,8 +566,7 @@ def assess(household, season, discard_corrections=False):
         if assessment.status == Assessment.VALIDATED:
             raise FeeError(f"La cotisation du foyer {household.name} est validée : rouvrez-la pour la recalculer.")
         if not discard_corrections and any(line.corrected for line in assessment.lines):
-            raise FeeError(f"La cotisation du foyer {household.name} a des corrections : le recalcul les "
-                           "effacerait.")
+            raise FeeError(f"La cotisation du foyer {household.name} a des corrections : le recalcul les effacerait.")
     prepared, result = compute(household, season)
     if assessment is None:
         assessment = Assessment(household=household, season=season)
@@ -513,17 +583,41 @@ def _lines(prepared, result):
     lines = []
     for line in result.lines:
         person = prepared.persons.get(line.student_id)
-        lines.append(AssessmentLine(
-            position=len(lines), kind=AssessmentLine.ITEM, person_id=line.student_id,
-            person_name=person.full_name if person else None, item_id=line.item.id, label=line.item.label,
-            regie_name=line.item.regie, base=line.base, computed=line.amount, amount=line.amount,
-            steps=[{"rule": s.rule, "before": s.before, "after": s.after, "note": s.note} for s in line.steps]))
+        lines.append(
+            AssessmentLine(
+                position=len(lines),
+                kind=AssessmentLine.ITEM,
+                person_id=line.student_id,
+                person_name=person.full_name if person else None,
+                item_id=line.item.id,
+                label=line.item.label,
+                regie_name=line.item.regie,
+                base=line.base,
+                computed=line.amount,
+                amount=line.amount,
+                steps=[{"rule": s.rule, "before": s.before, "after": s.after, "note": s.note} for s in line.steps],
+            )
+        )
     for step in result.adjustments:
-        lines.append(AssessmentLine(position=len(lines), kind=AssessmentLine.ADJUSTMENT, label=step.rule,
-                                    computed=step.after - step.before, amount=step.after - step.before))
+        lines.append(
+            AssessmentLine(
+                position=len(lines),
+                kind=AssessmentLine.ADJUSTMENT,
+                label=step.rule,
+                computed=step.after - step.before,
+                amount=step.after - step.before,
+            )
+        )
     if result.rounding:
-        lines.append(AssessmentLine(position=len(lines), kind=AssessmentLine.ROUNDING, label="Arrondi",
-                                    computed=result.rounding, amount=result.rounding))
+        lines.append(
+            AssessmentLine(
+                position=len(lines),
+                kind=AssessmentLine.ROUNDING,
+                label="Arrondi",
+                computed=result.rounding,
+                amount=result.rounding,
+            )
+        )
     return lines
 
 
@@ -559,9 +653,14 @@ def correct_line(line, amount, reason, user=None):
     line.correction_reason = reason[:255]
     line.corrected_at = datetime.now()
     line.corrected_by = user
-    log("fee.correct", f"Cotisation {assessment.season.label} du foyer {assessment.household.name} : « {line.label} »"
-                       f" corrigée ({reason[:200]})", changes={"amount": [old, amount]}, user=user,
-        household=assessment.household)
+    log(
+        "fee.correct",
+        f"Cotisation {assessment.season.label} du foyer {assessment.household.name} : « {line.label} »"
+        f" corrigée ({reason[:200]})",
+        changes={"amount": [old, amount]},
+        user=user,
+        household=assessment.household,
+    )
     db.session.flush()
 
 
@@ -570,8 +669,13 @@ def undo_correction(line, user=None):
         raise FeeError("Une cotisation validée ne se corrige pas : rouvrez-la d'abord.")
     if not line.corrected:
         return
-    log("fee.correct", f"Correction de « {line.label} » annulée ({line.assessment.season.label})",
-        changes={"amount": [line.amount, line.computed]}, user=user, household=line.assessment.household)
+    log(
+        "fee.correct",
+        f"Correction de « {line.label} » annulée ({line.assessment.season.label})",
+        changes={"amount": [line.amount, line.computed]},
+        user=user,
+        household=line.assessment.household,
+    )
     line.amount = line.computed
     line.correction_reason = line.corrected_at = line.corrected_by = None
     db.session.flush()
@@ -583,8 +687,13 @@ def validate(assessment, user=None):
     assessment.status = Assessment.VALIDATED
     assessment.validated_at = datetime.now()
     assessment.validated_by = user
-    log("fee.validate", f"Cotisation {assessment.season.label} du foyer {assessment.household.name} validée : "
-                        f"{assessment.total / 100:.2f} €", user=user, household=assessment.household)
+    log(
+        "fee.validate",
+        f"Cotisation {assessment.season.label} du foyer {assessment.household.name} validée : "
+        f"{assessment.total / 100:.2f} €",
+        user=user,
+        household=assessment.household,
+    )
     db.session.flush()
 
 
@@ -596,8 +705,12 @@ def reopen(assessment, reason, user=None):
         raise FeeError("Indiquez pourquoi la cotisation est rouverte.")
     assessment.status = Assessment.PROPOSED
     assessment.validated_at = assessment.validated_by = None
-    log("fee.reopen", f"Cotisation {assessment.season.label} du foyer {assessment.household.name} rouverte "
-                      f"({reason[:200]})", user=user, household=assessment.household)
+    log(
+        "fee.reopen",
+        f"Cotisation {assessment.season.label} du foyer {assessment.household.name} rouverte ({reason[:200]})",
+        user=user,
+        household=assessment.household,
+    )
     db.session.flush()
 
 
@@ -605,8 +718,12 @@ def delete_assessment(assessment, user=None):
     """Supprime une cotisation proposée (foyer en double, calcul lancé par erreur). Une validée reste."""
     if assessment.status == Assessment.VALIDATED:
         raise FeeError("Une cotisation validée ne se supprime pas : rouvrez-la d'abord.")
-    log("fee.assess", f"Cotisation {assessment.season.label} du foyer {assessment.household.name} supprimée",
-        user=user, household=assessment.household)
+    log(
+        "fee.assess",
+        f"Cotisation {assessment.season.label} du foyer {assessment.household.name} supprimée",
+        user=user,
+        household=assessment.household,
+    )
     db.session.delete(assessment)
     db.session.flush()
 
@@ -620,6 +737,7 @@ def drift(assessment):
 # ---------------------------------------------------------------------------
 # Effet d'une règle sur la saison
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Impact:
@@ -663,6 +781,7 @@ def simulate(season, order, include_drafts=()):
 # Copie d'une saison à l'autre
 # ---------------------------------------------------------------------------
 
+
 def copy_season(source, target):
     """Recopie éléments, règles et réglages de `source` sur `target`, qui n'en a pas encore.
 
@@ -675,16 +794,34 @@ def copy_season(source, target):
         raise FeeError(f"La saison {target.label} a déjà des tarifs : la copie ne se fait que sur une saison vide.")
     mapping = {}
     for old in items(source):
-        new = FeeItem(season=target, label=old.label, code=old.code, category=old.category, regie=old.regie,
-                      price=old.price, position=old.position, notes=old.notes)
+        new = FeeItem(
+            season=target,
+            label=old.label,
+            code=old.code,
+            category=old.category,
+            regie=old.regie,
+            price=old.price,
+            position=old.position,
+            notes=old.notes,
+        )
         db.session.add(new)
         db.session.flush()
         mapping[old.id] = new.id
     for old in season_rules(source):
         copied = pricing.remap_items(old.as_dict(), mapping)
-        db.session.add(FeeRule(season=target, position=old.position, name=old.name, active=old.active,
-                               conditions=copied["conditions"], target=copied["target"], effect=copied["effect"],
-                               exclusive_group=old.exclusive_group, notes=old.notes))
+        db.session.add(
+            FeeRule(
+                season=target,
+                position=old.position,
+                name=old.name,
+                active=old.active,
+                conditions=copied["conditions"],
+                target=copied["target"],
+                effect=copied["effect"],
+                exclusive_group=old.exclusive_group,
+                notes=old.notes,
+            )
+        )
     old_settings = season_settings(source)
     settings = season_settings(target)
     settings.engine = dict(old_settings.engine)
@@ -693,11 +830,13 @@ def copy_season(source, target):
     settings.resident_cities = list(old_settings.resident_cities)
     linked = 0
     previous = {}
-    for course in db.session.scalars(db.select(Course).where(Course.season_id == source.id,
-                                                             Course.fee_item_id.is_not(None)).order_by(Course.id)):
+    for course in db.session.scalars(
+        db.select(Course).where(Course.season_id == source.id, Course.fee_item_id.is_not(None)).order_by(Course.id)
+    ):
         previous.setdefault((course.discipline_id, course.level_id, course.group_label), course.fee_item_id)
-    for course in db.session.scalars(db.select(Course).where(Course.season_id == target.id,
-                                                             Course.fee_item_id.is_(None))):
+    for course in db.session.scalars(
+        db.select(Course).where(Course.season_id == target.id, Course.fee_item_id.is_(None))
+    ):
         old_item = previous.get((course.discipline_id, course.level_id, course.group_label))
         if old_item is not None:
             course.fee_item_id = mapping[old_item]
@@ -712,8 +851,10 @@ def set_course_item(course, item):
     if item is not None and item.season_id != course.season_id:
         raise FeeError("L'élément doit être de la même saison que le cours.")
     if course.fee_item_id != (item.id if item else None):
-        log("fee.course", f"Cours « {course.title} » ({course.season.label}) : élément facturé "
-                          f"{item.label if item else 'aucun'}")
+        log(
+            "fee.course",
+            f"Cours « {course.title} » ({course.season.label}) : élément facturé {item.label if item else 'aucun'}",
+        )
         course.fee_item = item
         db.session.flush()
 
@@ -725,6 +866,7 @@ def seasons_with_fees():
 # ---------------------------------------------------------------------------
 # Règles lisibles par un humain
 # ---------------------------------------------------------------------------
+
 
 def euros(cents):
     """12345 → « 123,45 € » ; les centimes nuls sont gardés pour aligner les colonnes."""
@@ -741,6 +883,7 @@ def parse_euros(text):
     text = text.replace(",", ".")
     try:
         from decimal import Decimal, InvalidOperation
+
         value = Decimal(text)
     except InvalidOperation:
         raise FeeError(f"Montant illisible : « {text} ».") from None
@@ -777,12 +920,17 @@ def describe_effect(effect, labels):
 def describe_target(target, labels):
     parts = []
     if target.get("items") or target.get("categories"):
-        parts.append(", ".join([f"« {labels.get(i, '?')} »" for i in target.get("items", [])]
-                               + [f"catégorie {c}" for c in target.get("categories", [])]))
+        parts.append(
+            ", ".join(
+                [f"« {labels.get(i, '?')} »" for i in target.get("items", [])]
+                + [f"catégorie {c}" for c in target.get("categories", [])]
+            )
+        )
     else:
         parts.append("tous les éléments")
-    excluded = [f"« {labels.get(i, '?')} »" for i in target.get("exclude_items", [])] + \
-               [f"catégorie {c}" for c in target.get("exclude_categories", [])]
+    excluded = [f"« {labels.get(i, '?')} »" for i in target.get("exclude_items", [])] + [
+        f"catégorie {c}" for c in target.get("exclude_categories", [])
+    ]
     if excluded:
         parts.append("sauf " + ", ".join(excluded))
     return " ".join(parts)

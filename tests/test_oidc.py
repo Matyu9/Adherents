@@ -1,4 +1,5 @@
 """Serveur OIDC : le parcours complet, puis tout ce qui doit être refusé. Chaque règle du plan a son test."""
+
 import base64
 import hashlib
 import html
@@ -30,8 +31,15 @@ def pkce():
 
 
 def make_client(allowed=(), shared=(), first_party=True, name="Appli", uris=(CB,), active=True):
-    client = OidcClient(client_id=oidc.new_client_id(), name=name, redirect_uris=list(uris), first_party=first_party,
-                        active=active, allowed_groups=list(allowed), shared_groups=list(shared))
+    client = OidcClient(
+        client_id=oidc.new_client_id(),
+        name=name,
+        redirect_uris=list(uris),
+        first_party=first_party,
+        active=active,
+        allowed_groups=list(allowed),
+        shared_groups=list(shared),
+    )
     SECRET_OF[client.client_id] = oidc.set_secret(client)
     db.session.add(client)
     db.session.commit()
@@ -44,9 +52,17 @@ class Flow:
     def __init__(self, client, scope="openid profile email groups", **params):
         self.client = client
         self.verifier, challenge = pkce()
-        self.params = {"response_type": "code", "client_id": client.client_id, "redirect_uri": CB, "scope": scope,
-                       "state": "etat-1", "nonce": secrets.token_urlsafe(8), "code_challenge": challenge,
-                       "code_challenge_method": "S256", **params}
+        self.params = {
+            "response_type": "code",
+            "client_id": client.client_id,
+            "redirect_uri": CB,
+            "scope": scope,
+            "state": "etat-1",
+            "nonce": secrets.token_urlsafe(8),
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            **params,
+        }
         self.params = {key: value for key, value in self.params.items() if value is not None}
 
     @property
@@ -62,8 +78,9 @@ def follow(http, response):
             if urlsplit(location).netloc not in ("", "localhost"):
                 return location
             response = http.get(location)
-        elif response.status_code == 200 and (match := re.search(r'http-equiv="refresh" content="0;url=([^"]+)"',
-                                                                 response.get_data(as_text=True))):
+        elif response.status_code == 200 and (
+            match := re.search(r'http-equiv="refresh" content="0;url=([^"]+)"', response.get_data(as_text=True))
+        ):
             target = html.unescape(match.group(1))
             if urlsplit(target).netloc:
                 return target
@@ -88,8 +105,15 @@ def error_of(location):
 
 
 def exchange(http, flow, code, **overrides):
-    data = {"grant_type": "authorization_code", "code": code, "redirect_uri": CB, "code_verifier": flow.verifier,
-            "client_id": flow.client.client_id, "client_secret": SECRET_OF[flow.client.client_id], **overrides}
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": CB,
+        "code_verifier": flow.verifier,
+        "client_id": flow.client.client_id,
+        "client_secret": SECRET_OF[flow.client.client_id],
+        **overrides,
+    }
     return http.post("/oidc/token", data={key: value for key, value in data.items() if value is not None})
 
 
@@ -100,6 +124,7 @@ def decode(id_token):
 
 def base64_header(raw):
     import json
+
     part = raw.split(".")[0]
     return json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4)))
 
@@ -136,6 +161,7 @@ def signed_in_code(http, flow):
 # Le parcours normal
 # ---------------------------------------------------------------------------
 
+
 def test_discovery_announces_only_what_is_supported(client):
     meta = client.get("/.well-known/openid-configuration").get_json()
     assert meta["issuer"] == "http://localhost:8001"
@@ -170,17 +196,27 @@ def test_full_flow(http, client_app, person):
     assert claims["email"] == "paul@asso.test" and claims["email_verified"] is True and claims["groups"] == ["membres"]
     info = http.get("/oidc/userinfo", headers={"Authorization": f"Bearer {token['access_token']}"})
     assert info.status_code == 200 and info.headers["Cache-Control"] == "no-store"
-    assert info.get_json() == {"sub": person.sub, "name": "Paul Test", "given_name": "Paul", "family_name": "Test",
-                               "updated_at": int(person.updated_at.timestamp()), "email": "paul@asso.test",
-                               "email_verified": True, "groups": ["membres"]}
+    assert info.get_json() == {
+        "sub": person.sub,
+        "name": "Paul Test",
+        "given_name": "Paul",
+        "family_name": "Test",
+        "updated_at": int(person.updated_at.timestamp()),
+        "email": "paul@asso.test",
+        "email_verified": True,
+        "groups": ["membres"],
+    }
 
 
 def test_secret_by_basic_auth_too(http, client_app):
     flow = Flow(client_app)
     code = signed_in_code(http, flow)
     credentials = base64.b64encode(f"{client_app.client_id}:{SECRET_OF[client_app.client_id]}".encode()).decode()
-    response = http.post("/oidc/token", headers={"Authorization": f"Basic {credentials}"}, data={
-        "grant_type": "authorization_code", "code": code, "redirect_uri": CB, "code_verifier": flow.verifier})
+    response = http.post(
+        "/oidc/token",
+        headers={"Authorization": f"Basic {credentials}"},
+        data={"grant_type": "authorization_code", "code": code, "redirect_uri": CB, "code_verifier": flow.verifier},
+    )
     assert response.status_code == 200
 
 
@@ -203,6 +239,7 @@ def test_totp_step_keeps_the_flow(app, client, members):
     response = client.post(client.get(flow.url).location, data={"email": admin.email, "password": "motdepasse"})
     assert response.location.endswith("/connexion/verification")
     from .conftest import totp_code
+
     response = client.post("/connexion/verification", data={"code": totp_code()})
     assert code_of(follow(client, response))
 
@@ -244,6 +281,7 @@ def test_consent_form_is_protected_by_csrf(tmp_path):
 # ---------------------------------------------------------------------------
 # Ce que l'appli reçoit
 # ---------------------------------------------------------------------------
+
 
 def test_scopes_limit_the_claims(http, client_app, person):
     flow = Flow(client_app, scope="openid")
@@ -290,6 +328,7 @@ def test_unverified_email_is_reported_as_such(http, client_app, person):
 # Les codes
 # ---------------------------------------------------------------------------
 
+
 def test_code_is_stored_as_a_digest_and_nothing_in_clear(http, client_app):
     flow = Flow(client_app)
     code = signed_in_code(http, flow)
@@ -313,6 +352,7 @@ def test_two_simultaneous_exchanges_cannot_both_succeed(http, client_app):
     from authlib.oauth2.rfc6749 import InvalidGrantError
 
     from app.services.oidc_server import CodeGrant
+
     flow = Flow(client_app)
     code = signed_in_code(http, flow)
     assert exchange(http, flow, code).status_code == 200
@@ -364,14 +404,21 @@ def test_redirect_uri_must_match_at_token_time(http, members):
 
 @pytest.mark.parametrize("grant_type", ["password", "client_credentials", "refresh_token", "implicit"])
 def test_other_grant_types_are_refused(http, client_app, grant_type):
-    response = http.post("/oidc/token", data={"grant_type": grant_type, "client_id": client_app.client_id,
-                                              "client_secret": SECRET_OF[client_app.client_id]})
+    response = http.post(
+        "/oidc/token",
+        data={
+            "grant_type": grant_type,
+            "client_id": client_app.client_id,
+            "client_secret": SECRET_OF[client_app.client_id],
+        },
+    )
     assert response.status_code == 400 and response.get_json()["error"] == "unsupported_grant_type"
 
 
 # ---------------------------------------------------------------------------
 # PKCE
 # ---------------------------------------------------------------------------
+
 
 def test_pkce_missing_at_authorize(http, client_app):
     location = http.get(Flow(client_app, code_challenge=None, code_challenge_method=None).url).location
@@ -410,8 +457,20 @@ def test_pkce_verifier_of_the_challenge_itself_is_refused(http, client_app):
 # Adresse de retour et demandes invalides
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("uri", ["https://pirate.test/retour", CB + "/", CB + "?x=1", CB.upper(), "https://appli.test",
-                                 CB + "#frag", "https://appli.test/retour/../retour", None])
+
+@pytest.mark.parametrize(
+    "uri",
+    [
+        "https://pirate.test/retour",
+        CB + "/",
+        CB + "?x=1",
+        CB.upper(),
+        "https://appli.test",
+        CB + "#frag",
+        "https://appli.test/retour/../retour",
+        None,
+    ],
+)
 def test_bad_redirect_uri_never_redirects(http, client_app, uri):
     response = http.get(Flow(client_app, redirect_uri=uri).url)
     assert response.status_code == 400 and "Location" not in response.headers
@@ -419,8 +478,10 @@ def test_bad_redirect_uri_never_redirects(http, client_app, uri):
 
 
 def test_unknown_client_never_redirects(http):
-    response = http.get("/oidc/authorize?" + urlencode({"client_id": "inconnu", "redirect_uri": CB,
-                                                        "response_type": "code", "scope": "openid"}))
+    response = http.get(
+        "/oidc/authorize?"
+        + urlencode({"client_id": "inconnu", "redirect_uri": CB, "response_type": "code", "scope": "openid"})
+    )
     assert response.status_code == 400 and "Location" not in response.headers
 
 
@@ -448,11 +509,19 @@ def test_without_openid_scope_is_refused(http, client_app):
 @pytest.mark.parametrize("response_type", ["token", "id_token", "code id_token", "none"])
 def test_other_response_types_are_refused(http, client_app, response_type):
     assert error_of(http.get(Flow(client_app, response_type=response_type).url).location) in (
-        "unsupported_response_type", "unauthorized_client")
+        "unsupported_response_type",
+        "unauthorized_client",
+    )
 
 
-@pytest.mark.parametrize("param,error", [("request", "request_not_supported"), ("request_uri", "request_uri_not_supported"),
-                                         ("registration", "registration_not_supported")])
+@pytest.mark.parametrize(
+    "param,error",
+    [
+        ("request", "request_not_supported"),
+        ("request_uri", "request_uri_not_supported"),
+        ("registration", "registration_not_supported"),
+    ],
+)
 def test_unsupported_parameters(http, client_app, param, error):
     assert error_of(http.get(Flow(client_app, **{param: "x"}).url).location) == error
 
@@ -474,9 +543,20 @@ def test_nonce_replay_is_refused(http, client_app):
     assert error_of(http.get(Flow(client_app, nonce=flow.params["nonce"]).url).location) == "invalid_request"
 
 
-@pytest.mark.parametrize("extra", [{"inconnu": "x"}, {"acr_values": "1 2"}, {"ui_locales": "fr"}, {"login_hint": "a@b.c"},
-                                   {"claims_locales": "fr"}, {"display": "page"}, {"prompt": "select_account"},
-                                   {"scope": "email groups openid"}, {"scope": "openid address phone"}])
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"inconnu": "x"},
+        {"acr_values": "1 2"},
+        {"ui_locales": "fr"},
+        {"login_hint": "a@b.c"},
+        {"claims_locales": "fr"},
+        {"display": "page"},
+        {"prompt": "select_account"},
+        {"scope": "email groups openid"},
+        {"scope": "openid address phone"},
+    ],
+)
 def test_harmless_parameters_are_ignored(http, client_app, extra):
     """Ce que la suite de conformité vérifie : un paramètre inconnu ou facultatif ne fait pas échouer la demande."""
     assert code_of(follow(http, http.get(Flow(client_app, **extra).url)))
@@ -494,6 +574,7 @@ def test_state_is_returned_on_errors(http, client_app):
 # ---------------------------------------------------------------------------
 # Qui peut entrer
 # ---------------------------------------------------------------------------
+
 
 def test_outside_the_allowed_groups(http, person):
     other = AccessGroup(key="autres", name="Autres")
@@ -564,7 +645,9 @@ def test_must_change_password_first_then_returns_to_the_client(http, client_app,
     page = follow(http, http.get(flow.url))
     assert "mot de passe" in page.get_data(as_text=True).lower()
     assert db.session.scalar(db.select(db.func.count(OidcCode.id))) == 0
-    response = http.post("/mot-de-passe", data={"current": "motdepasse", "new": "nouveau-passe-1", "confirm": "nouveau-passe-1"})
+    response = http.post(
+        "/mot-de-passe", data={"current": "motdepasse", "new": "nouveau-passe-1", "confirm": "nouveau-passe-1"}
+    )
     assert code_of(follow(http, response))
 
 
@@ -595,8 +678,9 @@ def test_totp_enrolment_then_returns_to_the_client(app, client, members):
     login(client, account)
     follow(client, client.get(Flow(make_client(allowed=[members])).url))  # arrive sur la configuration
     secret = totp_service.secret_of(db.session.get(type(account), account.id))
-    page = client.post("/mon-compte/double-authentification", data={"password": "motdepasse",
-                                                                    "code": pyotp.TOTP(secret).now()})
+    page = client.post(
+        "/mon-compte/double-authentification", data={"password": "motdepasse", "code": pyotp.TOTP(secret).now()}
+    )
     assert "Je les ai conservés" in page.get_data(as_text=True)
     assert code_of(follow(client, client.get("/mon-compte")))  # le bouton de cet écran
 
@@ -608,7 +692,9 @@ def test_resume_is_dropped_after_a_while(http, client_app, person):
     with http.session_transaction() as cookie:
         cookie["oidc_resume"]["at"] -= oidc.RESUME_LIFETIME + 1
         cookie.modified = True
-    response = http.post("/mot-de-passe", data={"current": "motdepasse", "new": "nouveau-passe-1", "confirm": "nouveau-passe-1"})
+    response = http.post(
+        "/mot-de-passe", data={"current": "motdepasse", "new": "nouveau-passe-1", "confirm": "nouveau-passe-1"}
+    )
     page = follow(http, response)  # la demande trop ancienne est oubliée : on reste sur le serveur
     assert not isinstance(page, str) and page.status_code == 200
 
@@ -625,6 +711,7 @@ def test_logout_forgets_a_pending_flow(http, client_app, person):
 # ---------------------------------------------------------------------------
 # prompt, max_age, id_token_hint
 # ---------------------------------------------------------------------------
+
 
 def test_prompt_none_anonymous(client, client_app):
     assert error_of(client.get(Flow(client_app, prompt="none").url).location) == "login_required"
@@ -655,6 +742,7 @@ def test_prompt_login_consent_asks_both(http, members, person):
 
 def test_max_age_exceeded_asks_again(http, client_app, person):
     from app.models import LoginSession
+
     db.session.execute(db.update(LoginSession).values(created_at=datetime.now() - timedelta(hours=2)))
     db.session.commit()
     flow = Flow(client_app, max_age="3600")
@@ -678,6 +766,7 @@ def test_max_age_not_exceeded_keeps_session(http, client_app):
 
 def test_max_age_exceeded_silent(http, client_app):
     from app.models import LoginSession
+
     db.session.execute(db.update(LoginSession).values(created_at=datetime.now() - timedelta(hours=2)))
     db.session.commit()
     assert error_of(http.get(Flow(client_app, max_age="3600", prompt="none").url).location) == "login_required"
@@ -690,6 +779,7 @@ def test_max_age_invalid(http, client_app, value):
 
 def test_auth_time_is_the_real_login_not_the_request(http, client_app):
     from app.models import LoginSession
+
     old = datetime.now() - timedelta(hours=3)
     db.session.execute(db.update(LoginSession).values(created_at=old))
     db.session.commit()
@@ -709,7 +799,9 @@ def test_id_token_hint_other_person_or_forged(http, client_app, members):
     hint = exchange(http, flow, signed_in_code(http, flow)).get_json()["id_token"]
     head, body, signature = hint.split(".")
     forged = f"{head}.{body}.{signature[::-1]}"
-    foreign = jwt.encode({"alg": "RS256", "kid": "autre"}, {"sub": "x", "iss": "y"}, RSAKey.generate_key(2048), ["RS256"])
+    foreign = jwt.encode(
+        {"alg": "RS256", "kid": "autre"}, {"sub": "x", "iss": "y"}, RSAKey.generate_key(2048), ["RS256"]
+    )
     for bad in (forged, foreign, "n-importe-quoi", "a.b.c"):
         assert error_of(http.get(Flow(client_app, prompt="none", id_token_hint=bad).url).location) == "login_required"
 
@@ -717,6 +809,7 @@ def test_id_token_hint_other_person_or_forged(http, client_app, members):
 # ---------------------------------------------------------------------------
 # Consentement
 # ---------------------------------------------------------------------------
+
 
 def consent_page(http, flow):
     page = http.get(flow.url)
@@ -808,6 +901,7 @@ def test_consent_page_does_not_leak_to_framing_or_cache(http, members):
 # userinfo
 # ---------------------------------------------------------------------------
 
+
 def test_userinfo_refusals(http, client_app):
     assert http.get("/oidc/userinfo").status_code == 401
     bad = http.get("/oidc/userinfo", headers={"Authorization": "Bearer faux"})
@@ -835,6 +929,7 @@ def test_userinfo_session_cookie_is_not_enough(http):
 # Clés
 # ---------------------------------------------------------------------------
 
+
 def test_jwks_has_no_private_part(client):
     keys = client.get("/oidc/jwks").get_json()["keys"]
     assert len(keys) == 1 and keys[0]["kty"] == "RSA" and keys[0]["alg"] == "RS256" and keys[0]["use"] == "sig"
@@ -859,7 +954,10 @@ def test_rotation_old_token_still_verifies_new_key_signs(http, client_app):
     flow = Flow(client_app)
     new_token = exchange(http, flow, signed_in_code(http, flow)).get_json()["id_token"]
     assert base64_header(new_token)["kid"] != old_kid
-    assert {key["kid"] for key in http.get("/oidc/jwks").get_json()["keys"]} == {old_kid, base64_header(new_token)["kid"]}
+    assert {key["kid"] for key in http.get("/oidc/jwks").get_json()["keys"]} == {
+        old_kid,
+        base64_header(new_token)["kid"],
+    }
 
 
 def test_automatic_rotation_and_purge(app):
@@ -910,6 +1008,7 @@ def test_purge_keeps_recent_used_codes(http, client_app):
 # Écran Applications
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def manager(app):
     http = app.test_client()
@@ -937,16 +1036,28 @@ def test_create_shows_the_secret_once(manager, app):
     assert secret not in str([a.message for a in db.session.scalars(db.select(Activity))])
 
 
-@pytest.mark.parametrize("uri", ["http://appli.test/cb", "javascript:alert(1)", "ftp://a.test/", "https://a.test/#x",
-                                 "https://a.test/*", "https://u:p@a.test/", "appli://retour", "//a.test/cb",
-                                 "https://" + "a" * 2000 + ".test/"])
+@pytest.mark.parametrize(
+    "uri",
+    [
+        "http://appli.test/cb",
+        "javascript:alert(1)",
+        "ftp://a.test/",
+        "https://a.test/#x",
+        "https://a.test/*",
+        "https://u:p@a.test/",
+        "appli://retour",
+        "//a.test/cb",
+        "https://" + "a" * 2000 + ".test/",
+    ],
+)
 def test_bad_redirect_uris_are_refused(manager, uri):
     response = manager.post("/applications/nouvelle", data=form_for(redirect_uris=uri))
     assert response.status_code == 200 and db.session.scalar(db.select(OidcClient)) is None
 
 
-@pytest.mark.parametrize("uri", ["https://a.test/cb", "https://a.test:8443/x?y=1", "http://localhost:8002/cb",
-                                 "http://127.0.0.1/cb"])
+@pytest.mark.parametrize(
+    "uri", ["https://a.test/cb", "https://a.test:8443/x?y=1", "http://localhost:8002/cb", "http://127.0.0.1/cb"]
+)
 def test_good_redirect_uris_are_accepted(manager, uri):
     manager.post("/applications/nouvelle", data=form_for(redirect_uris=uri))
     assert db.session.scalar(db.select(OidcClient)).redirect_uris == [uri]
@@ -964,8 +1075,10 @@ def test_edit_keeps_identifier_and_secret(manager, members):
     assert "appli.test" in manager.get(f"/applications/{client_app.id}/modifier").get_data(as_text=True)
     db.session.add(members)
     db.session.commit()
-    manager.post(f"/applications/{client_app.id}/modifier",
-                 data=form_for(name="Renommée", first_party="y", allowed_groups=[members.id], shared_groups=[members.id]))
+    manager.post(
+        f"/applications/{client_app.id}/modifier",
+        data=form_for(name="Renommée", first_party="y", allowed_groups=[members.id], shared_groups=[members.id]),
+    )
     client_app = db.session.get(OidcClient, client_app.id)
     assert (client_app.client_id, client_app.secret_hash) == before and client_app.name == "Renommée"
     assert client_app.first_party and client_app.allowed_groups == [members] and client_app.shared_groups == [members]
@@ -979,7 +1092,9 @@ def test_edit_form_shows_one_address_per_line_and_saves_unchanged(manager):
     page = manager.get(f"/applications/{client_app.id}/modifier").get_data(as_text=True)
     shown = html.unescape(re.search(r"<textarea[^>]*>(.*?)</textarea>", page, re.S).group(1)).strip()
     assert shown.split() == [CB, second] and "[" not in shown
-    response = manager.post(f"/applications/{client_app.id}/modifier", data={"name": client_app.name, "redirect_uris": shown})
+    response = manager.post(
+        f"/applications/{client_app.id}/modifier", data={"name": client_app.name, "redirect_uris": shown}
+    )
     assert response.status_code == 302
     assert db.session.get(OidcClient, client_app.id).redirect_uris == [CB, second]
 
@@ -1005,7 +1120,10 @@ def test_toggle_and_delete(manager, http, client_app):
     flow = Flow(client_app)
     exchange(http, flow, signed_in_code(http, flow))
     response = manager.post(f"/applications/{pk}/supprimer", follow_redirects=True)
-    assert "Fermez d'abord" in html.unescape(response.get_data(as_text=True)) and db.session.get(OidcClient, pk) is not None
+    assert (
+        "Fermez d'abord" in html.unescape(response.get_data(as_text=True))
+        and db.session.get(OidcClient, pk) is not None
+    )
     assert "/supprimer" not in manager.get(f"/applications/{pk}").get_data(as_text=True)
     manager.post(f"/applications/{pk}/activer")
     assert "/supprimer" in manager.get(f"/applications/{pk}").get_data(as_text=True)
@@ -1028,7 +1146,9 @@ def test_group_in_use_cannot_be_deleted(manager, members, field):
     db.session.add(members)
     make_client(**{field: [members]})
     response = manager.post(f"/groupes/{members.id}/supprimer", follow_redirects=True)
-    assert db.session.get(AccessGroup, members.id) is not None and "utilisé par Appli" in response.get_data(as_text=True)
+    assert db.session.get(AccessGroup, members.id) is not None and "utilisé par Appli" in response.get_data(
+        as_text=True
+    )
 
 
 def test_client_manage_requires_totp(app, client):
@@ -1053,6 +1173,7 @@ def test_authorize_is_logged_without_any_secret(http, client_app):
 
 def test_authorize_log_is_purged_like_logins(http, client_app):
     from app.services.activity import purge_expired_logins
+
     signed_in_code(http, Flow(client_app))
     assert purge_expired_logins(datetime.now() + timedelta(days=400)) >= 1
     assert db.session.scalar(db.select(Activity).filter_by(action="oidc.authorize")) is None
@@ -1061,6 +1182,7 @@ def test_authorize_log_is_purged_like_logins(http, client_app):
 # ---------------------------------------------------------------------------
 # Bugs trouvés en revue : chacun a échoué avant sa correction
 # ---------------------------------------------------------------------------
+
 
 def test_prompt_login_does_not_close_the_session_on_a_mere_link(http, client_app):
     """Un simple lien ne doit déconnecter personne : la session ne change qu'après la nouvelle connexion."""
@@ -1073,9 +1195,11 @@ def test_prompt_login_does_not_close_the_session_on_a_mere_link(http, client_app
 
 def test_reauthentication_replaces_the_old_session(http, client_app, person):
     from app.models import LoginSession
+
     before = db.session.scalar(db.select(LoginSession.id))
-    response = http.post(http.get(Flow(client_app, prompt="login").url).location,
-                         data={"email": person.email, "password": "motdepasse"})
+    response = http.post(
+        http.get(Flow(client_app, prompt="login").url).location, data={"email": person.email, "password": "motdepasse"}
+    )
     assert code_of(follow(http, response))
     assert db.session.scalars(db.select(LoginSession.id)).all() != [before]
     assert db.session.scalar(db.select(db.func.count(LoginSession.id))) == 1
@@ -1083,6 +1207,7 @@ def test_reauthentication_replaces_the_old_session(http, client_app, person):
 
 def test_reauthentication_with_totp(app, client, members):
     from .conftest import totp_code
+
     admin = make_account(Role.ADMIN, email="admin@asso.test")
     admin.groups = [members]
     db.session.commit()
@@ -1131,8 +1256,15 @@ def test_withdrawn_consent_cancels_pending_codes(http, members):
     assert exchange(http, flow, code).get_json()["error"] == "invalid_grant"
 
 
-@pytest.mark.parametrize("params", [{"redirect_uri": "https://pirate.test/é"}, {"redirect_uri": 'https://pirate.test/"'},
-                                    {"redirect_uri": "https://pirate.test/\\"}, {"response_type": "é"}])
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"redirect_uri": "https://pirate.test/é"},
+        {"redirect_uri": 'https://pirate.test/"'},
+        {"redirect_uri": "https://pirate.test/\\"},
+        {"response_type": "é"},
+    ],
+)
 def test_odd_characters_get_the_refusal_page_not_a_crash(http, client_app, params):
     response = http.get(Flow(client_app, **params).url)
     assert response.status_code == 400 and "Location" not in response.headers
@@ -1147,16 +1279,19 @@ def test_odd_grant_type_is_a_clean_error(client, data):
 @pytest.mark.parametrize("kid", [{"x": 1}, ["a", "b"], 5, None, True])
 def test_hint_with_a_strange_kid_is_not_a_crash(http, client_app, kid):
     import json
+
     def part(value):
         return base64.urlsafe_b64encode(json.dumps(value).encode()).rstrip(b"=").decode()
-    hint = f'{part({"alg": "RS256", "kid": kid})}.{part({"sub": "x"})}.{part("x")}'
+
+    hint = f"{part({'alg': 'RS256', 'kid': kid})}.{part({'sub': 'x'})}.{part('x')}"
     assert error_of(http.get(Flow(client_app, prompt="none", id_token_hint=hint).url).location) == "login_required"
 
 
 def test_non_utf8_basic_credentials_are_refused_cleanly(client):
     raw = base64.b64encode(b"\xff:\xfe").decode()
-    response = client.post("/oidc/token", headers={"Authorization": f"Basic {raw}"},
-                           data={"grant_type": "authorization_code"})
+    response = client.post(
+        "/oidc/token", headers={"Authorization": f"Basic {raw}"}, data={"grant_type": "authorization_code"}
+    )
     assert response.status_code == 401 and response.get_json()["error"] == "invalid_client"
 
 
@@ -1170,6 +1305,7 @@ def test_plain_http_is_explained_not_reported_as_unknown_app(http, client_app, b
 
 def test_issuer_https_without_proxy_warns():
     from app.config import startup_warnings
+
     assert startup_warnings({"OIDC_ISSUER": "https://compte.asso.test", "BASE_URL": "http://x", "TRUST_PROXY": False})
 
 
@@ -1177,6 +1313,7 @@ def test_blank_issuer_falls_back_to_base_url(monkeypatch):
     import importlib
 
     import app.config as config
+
     monkeypatch.setenv("OIDC_ISSUER", "")
     try:
         assert importlib.reload(config).Config.OIDC_ISSUER == config.Config.BASE_URL != ""
@@ -1188,7 +1325,12 @@ def test_blank_issuer_falls_back_to_base_url(monkeypatch):
 def test_authorize_takes_the_write_lock_from_the_start(app, client_app):
     """Sous SQLite, passer de la lecture à l'écriture échoue si quelqu'un d'autre a écrit entre-temps."""
     from app.extensions import _is_write_request
-    for path, expected in (("/oidc/authorize", True), ("/oidc/jwks", True), ("/.well-known/openid-configuration", False)):
+
+    for path, expected in (
+        ("/oidc/authorize", True),
+        ("/oidc/jwks", True),
+        ("/.well-known/openid-configuration", False),
+    ):
         with app.test_request_context(path):
             assert _is_write_request() is expected
 
@@ -1198,6 +1340,7 @@ def test_pending_flow_does_not_pass_to_the_next_person_after_remote_revocation(a
     db.session.commit()
     http.get(Flow(client_app).url)
     from app.services import sessions
+
     sessions.revoke(person)
     person.must_change_password = False
     db.session.commit()
@@ -1228,6 +1371,7 @@ def test_session_lost_on_the_consent_page_comes_back_to_the_flow(http, members, 
 
 def test_replay_entries_are_purged_like_logins(http, client_app):
     from app.services.activity import purge_expired_logins
+
     flow = Flow(client_app)
     code = signed_in_code(http, flow)
     exchange(http, flow, code)
@@ -1268,4 +1412,5 @@ def test_repeated_prompt_is_refused(http, client_app):
 
 def test_joserfc_is_pinned():
     from pathlib import Path
+
     assert "joserfc==" in (Path(__file__).parent.parent / "requirements.txt").read_text()

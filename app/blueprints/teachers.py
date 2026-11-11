@@ -3,6 +3,7 @@
 Un professeur reste une personne de l'annuaire (une seule fiche s'il est aussi parent ou élève), mais on ne devient
 professeur que depuis cet écran, et son contrat ne se voit qu'avec le droit teacher.manage.
 """
+
 from datetime import date
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
@@ -24,8 +25,13 @@ CONTRACT_FIELDS = ("status", "started_on", "left_on", "work_email", "notes")
 
 
 class ContractForm(FlaskForm):
-    status = SelectField("Contrat", default="", coerce=_text, validate_choice=False,
-                         choices=[("", "—"), *((s, s) for s in Teacher.STATUSES)])
+    status = SelectField(
+        "Contrat",
+        default="",
+        coerce=_text,
+        validate_choice=False,
+        choices=[("", "—"), *((s, s) for s in Teacher.STATUSES)],
+    )
     started_on = DateField("Arrivée", validators=[Optional()])
     left_on = DateField("Départ", validators=[Optional()])
     work_email = EmailField("Email professionnel", validators=[Optional(), Length(max=255), EMAIL], filters=[_strip])
@@ -36,15 +42,25 @@ class ContractForm(FlaskForm):
             raise ValidationError("Le départ ne peut pas précéder l'arrivée.")
 
     def values(self):
-        return {"status": self.status.data if self.status.data in Teacher.STATUSES else None,
-                "started_on": self.started_on.data, "left_on": self.left_on.data,
-                "work_email": _blank(self.work_email.data), "notes": _blank(self.notes.data)}
+        return {
+            "status": self.status.data if self.status.data in Teacher.STATUSES else None,
+            "started_on": self.started_on.data,
+            "left_on": self.left_on.data,
+            "work_email": _blank(self.work_email.data),
+            "notes": _blank(self.notes.data),
+        }
 
 
 class NewTeacherForm(ContractForm):
     """Nouveau professeur qui n'est pas encore dans l'annuaire : sa fiche et son contrat en une fois."""
-    civility = SelectField("Civilité", default="", coerce=_text, validate_choice=False,
-                           choices=[("", "—"), *((c, c) for c in Person.CIVILITIES)])
+
+    civility = SelectField(
+        "Civilité",
+        default="",
+        coerce=_text,
+        validate_choice=False,
+        choices=[("", "—"), *((c, c) for c in Person.CIVILITIES)],
+    )
     first_name = StringField("Prénom", validators=[DataRequired(), Length(max=80)])
     last_name = StringField("Nom", validators=[DataRequired(), Length(max=80)])
     email = EmailField("Email personnel", validators=[Optional(), Length(max=255), EMAIL], filters=[_strip])
@@ -118,23 +134,31 @@ def create():
     q = (request.args.get("q") or "").strip()
     found = []
     if existing is None and q:
-        query = directory.search(db.select(Person), q).where(~Person.teacher.has(), Person.archived_at.is_(None),
-                                                              db.or_(Person.birth_date.is_(None),
-                                                                     Person.birth_date <= _adult_born_before()))
+        query = directory.search(db.select(Person), q).where(
+            ~Person.teacher.has(),
+            Person.archived_at.is_(None),
+            db.or_(Person.birth_date.is_(None), Person.birth_date <= _adult_born_before()),
+        )
         found = db.session.scalars(query.order_by(Person.last_name, Person.first_name).limit(20)).all()
     if form.validate_on_submit():
         person = existing
         if person is None:
-            person = Person(civility=form.civility.data if form.civility.data in Person.CIVILITIES else None,
-                            first_name=form.first_name.data.strip(), last_name=form.last_name.data.strip(),
-                            email=_blank(form.email.data))
+            person = Person(
+                civility=form.civility.data if form.civility.data in Person.CIVILITIES else None,
+                first_name=form.first_name.data.strip(),
+                last_name=form.last_name.data.strip(),
+                email=_blank(form.email.data),
+            )
             db.session.add(person)
             if form.phone.data:
                 directory.add_phone(person, form.phone.data, "portable")
         person.teacher = Teacher(**form.values())
         db.session.flush()
-        log("teacher.create", f"Professeur ajouté : {person.full_name}" + (" (déjà dans l'annuaire)" if existing else ""),
-            person=person)
+        log(
+            "teacher.create",
+            f"Professeur ajouté : {person.full_name}" + (" (déjà dans l'annuaire)" if existing else ""),
+            person=person,
+        )
         db.session.commit()
         flash(f"{person.full_name} est enregistré(e) comme professeur.", "success")
         return redirect(url_for(".detail", person_id=person.id))
@@ -148,8 +172,9 @@ def detail(person_id):
     season = directory.current_season()
     courses = catalog.sorted_courses(c for c in person.teacher.courses if season and c.season_id == season.id)
     taught = catalog.disciplines_of(person.teacher, season) if season else []
-    return render_template("teachers/detail.html", person=person, teacher=person.teacher, season=season,
-                           courses=courses, taught=taught)
+    return render_template(
+        "teachers/detail.html", person=person, teacher=person.teacher, season=season, courses=courses, taught=taught
+    )
 
 
 @bp.route("/<int:person_id>/modifier", methods=["GET", "POST"])
@@ -176,6 +201,9 @@ def remove(person_id):
     person.teacher = None
     log("teacher.delete", f"{person.full_name} n'est plus enregistré(e) comme professeur", person=person)
     db.session.commit()
-    flash("Ce n'est plus un professeur. Sa fiche de l'annuaire est conservée."
-          + (f" {freed} cours sont maintenant sans professeur." if freed else ""), "success")
+    flash(
+        "Ce n'est plus un professeur. Sa fiche de l'annuaire est conservée."
+        + (f" {freed} cours sont maintenant sans professeur." if freed else ""),
+        "success",
+    )
     return redirect(url_for(".index"))

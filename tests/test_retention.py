@@ -1,4 +1,5 @@
 """Conservation des données : rien tant que la durée n'est pas choisie, puis anonymisation décidée à l'écran."""
+
 from datetime import date, datetime
 
 import pytest
@@ -36,8 +37,9 @@ def history(app):
     account = BankAccount(household_id=old_home.id, holder_name="Paul Ancien")
     bank.set_iban(account, IBAN)
     db.session.add(account)
-    db.session.add(Consent(person=lea, season=seasons[2019], label="Image", text="x", granted=True,
-                           given_at=datetime(2019, 9, 1)))
+    db.session.add(
+        Consent(person=lea, season=seasons[2019], label="Image", text="x", granted=True, given_at=datetime(2019, 9, 1))
+    )
     log("person.update", "Fiche de Léa Ancien modifiée", person=lea)
     recent_home = home("Famille Récent")
     marie, tom = person("Marie", "Récent"), person("Tom", "Récent")
@@ -62,6 +64,7 @@ def test_candidates(history):
     assert retention.candidates(count=6) == []  # 2019 fait encore partie des 6 dernières saisons
     assert retention.candidates(count=10) == []  # pas encore 10 saisons
     from .conftest import make_account
+
     history["paul"].account = make_account(email="paul@ancien.test")
     db.session.commit()
     assert {p.full_name for p in retention.candidates()} == {"Léa Ancien"}  # un compte : on garde
@@ -72,7 +75,12 @@ def test_anonymize(history):
     retention.anonymize(lea)
     db.session.commit()
     assert (lea.first_name, lea.last_name, lea.birth_date, lea.external_refs, lea.consents) == (
-        "Anonyme", f"n° {lea.id}", date(2008, 1, 1), [], [])
+        "Anonyme",
+        f"n° {lea.id}",
+        date(2008, 1, 1),
+        [],
+        [],
+    )
     assert lea.anonymized_at and lea.archived_at
     assert [m.season.label for m in lea.memberships] == ["2019-2020"]  # l'historique reste, sans nom
     assert db.session.scalar(sa.select(Activity.message).filter_by(person_id=lea.id)).startswith("(effacé")
@@ -89,10 +97,12 @@ def test_anonymize(history):
 
 def test_old_dossiers_are_purged(history):
     seasons = history["seasons"]
-    campaign = Campaign(season=seasons[2019], title="Inscriptions 2019", opens_at=datetime(2019, 6, 1),
-                        closes_at=datetime(2019, 7, 1))
-    recent = Campaign(season=seasons[2024], title="Inscriptions 2024", opens_at=datetime(2024, 6, 1),
-                      closes_at=datetime(2024, 7, 1))
+    campaign = Campaign(
+        season=seasons[2019], title="Inscriptions 2019", opens_at=datetime(2019, 6, 1), closes_at=datetime(2019, 7, 1)
+    )
+    recent = Campaign(
+        season=seasons[2024], title="Inscriptions 2024", opens_at=datetime(2024, 6, 1), closes_at=datetime(2024, 7, 1)
+    )
     db.session.add_all([campaign, recent])
     db.session.flush()
     old = registration.dossier_for(campaign, history["old_home"], None)
@@ -115,8 +125,10 @@ def test_retention_screen(client, admin, history):
     client.post("/annuaire/conservation/anonymiser", data={"personne": [history["lea"].id, history["tom"].id]})
     assert history["lea"].anonymized_at is not None
     assert history["tom"].anonymized_at is None  # pas candidat : ignoré
-    assert db.session.scalar(sa.select(Activity).filter_by(action="retention.anonymize")).message == \
-        "1 fiche(s) anonymisée(s)"
+    assert (
+        db.session.scalar(sa.select(Activity).filter_by(action="retention.anonymize")).message
+        == "1 fiche(s) anonymisée(s)"
+    )
     client.post("/annuaire/conservation", data={"seasons": ""})
     assert retention.seasons_kept() is None
 
@@ -125,5 +137,6 @@ def test_managers_cannot_anonymize(client, accounts, history):
     from app.models import Role
 
     from .conftest import login
+
     login(client, accounts[Role.GESTIONNAIRE])
     assert client.get("/annuaire/conservation").status_code == 403

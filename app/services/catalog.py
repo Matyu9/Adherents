@@ -1,4 +1,5 @@
 """Catalogue : disciplines, niveaux, lieux et cours de chaque saison. Les services ne font pas de commit."""
+
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -13,6 +14,7 @@ class CatalogError(ValueError):
 # ---------------------------------------------------------------------------
 # Listes de référence : disciplines, niveaux, sites, salles
 # ---------------------------------------------------------------------------
+
 
 def disciplines(include_archived=False):
     query = db.select(Discipline)
@@ -50,8 +52,9 @@ def room_open(room):
 def usage(item):
     """Nombre d'utilisations d'une valeur de référence : on ne supprime que ce qui n'a jamais servi."""
     if isinstance(item, Discipline):
-        return (_count(Course.id, Course.discipline_id == item.id)
-                + _count(TeacherDiscipline.season_id, TeacherDiscipline.discipline_id == item.id))
+        return _count(Course.id, Course.discipline_id == item.id) + _count(
+            TeacherDiscipline.season_id, TeacherDiscipline.discipline_id == item.id
+        )
     if isinstance(item, Level):
         return _count(Course.id, Course.level_id == item.id)
     if isinstance(item, Room):
@@ -77,11 +80,15 @@ def restore(item):
 # Professeurs d'une saison
 # ---------------------------------------------------------------------------
 
+
 def teachers_for(season, keep=None):
     """Professeurs présents pendant la saison, par nom. `keep` : celui déjà choisi, gardé même s'il est parti, pour
     qu'enregistrer un cours ne le retire pas sans qu'on l'ait décidé."""
-    items = [t for t in db.session.scalars(db.select(Teacher).join(Person).where(Person.archived_at.is_(None)))
-             if t.teaches_during(season)]
+    items = [
+        t
+        for t in db.session.scalars(db.select(Teacher).join(Person).where(Person.archived_at.is_(None)))
+        if t.teaches_during(season)
+    ]
     if keep is not None and keep not in items:
         items.append(keep)
     return sorted(items, key=lambda t: (fold(t.person.last_name), fold(t.person.first_name)))
@@ -99,8 +106,10 @@ def set_disciplines(teacher, season, wanted):
     current = {td.discipline.id: td for td in teacher.taught if td.season == season}
     in_use = {c.discipline.id for c in teacher.courses if c.season == season}
     if blocked := sorted(current[d].discipline.name for d in set(current) - set(wanted) if d in in_use):
-        raise CatalogError("Ce professeur a des cours de " + ", ".join(blocked) + " cette saison : changez d'abord "
-                           "le professeur de ces cours.")
+        raise CatalogError(
+            "Ce professeur a des cours de " + ", ".join(blocked) + " cette saison : changez d'abord "
+            "le professeur de ces cours."
+        )
     added = [wanted[d] for d in wanted if d not in current]
     removed = [current[d].discipline for d in current if d not in wanted]
     for discipline_id in set(current) - set(wanted):
@@ -127,8 +136,9 @@ def move_teaching(drop, keep):
     for td in list(drop.taught):
         if (td.season, td.discipline) not in held:
             keep.taught.append(TeacherDiscipline(season=td.season, discipline=td.discipline))
-    moved = db.session.execute(db.update(Course).where(Course.teacher_id == drop.person_id)
-                               .values(teacher_id=keep.person_id)).rowcount
+    moved = db.session.execute(
+        db.update(Course).where(Course.teacher_id == drop.person_id).values(teacher_id=keep.person_id)
+    ).rowcount
     db.session.expire(drop, ["courses"])  # sinon, en supprimant `drop`, l'ORM viderait le professeur de ces cours
     return moved
 
@@ -136,6 +146,7 @@ def move_teaching(drop, keep):
 # ---------------------------------------------------------------------------
 # Cours
 # ---------------------------------------------------------------------------
+
 
 def course_query(season, discipline_id=None, teacher_id=None, weekday=None, site_id=None):
     query = db.select(Course).where(Course.season_id == season.id)
@@ -154,9 +165,18 @@ def course_query(season, discipline_id=None, teacher_id=None, weekday=None, site
 
 def sorted_courses(courses):
     """Par discipline, niveau, jour et heure : l'ordre dans lequel on cherche un cours."""
+
     def key(c):
-        return (fold(c.discipline.name), c.level.position if c.level else 1_000_000, fold(c.level.name) if c.level else "",
-                fold(c.group_label or ""), 7 if c.weekday is None else c.weekday, c.starts_at or datetime.min.time(), c.id or 0)
+        return (
+            fold(c.discipline.name),
+            c.level.position if c.level else 1_000_000,
+            fold(c.level.name) if c.level else "",
+            fold(c.group_label or ""),
+            7 if c.weekday is None else c.weekday,
+            c.starts_at or datetime.min.time(),
+            c.id or 0,
+        )
+
     return sorted(courses, key=key)
 
 
@@ -202,6 +222,7 @@ def describe(course):
 # Copie d'une saison sur une autre
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CopyLine:
     course: Course  # cours de la saison d'origine
@@ -227,8 +248,10 @@ class CopyPlan:
 
 
 def target_has_catalog(season):
-    return (_count(Course.id, Course.season_id == season.id)
-            + _count(TeacherDiscipline.season_id, TeacherDiscipline.season_id == season.id)) > 0
+    return (
+        _count(Course.id, Course.season_id == season.id)
+        + _count(TeacherDiscipline.season_id, TeacherDiscipline.season_id == season.id)
+    ) > 0
 
 
 def copy_plan(source, target):
@@ -239,8 +262,10 @@ def copy_plan(source, target):
     elif source.id == target.id:
         problems.append("La saison d'origine et la saison à remplir doivent être différentes.")
     elif target_has_catalog(target):
-        problems.append(f"La saison {target.label} a déjà des cours ou des disciplines de professeurs : la copie "
-                        "ne sert qu'à remplir une saison vide.")
+        problems.append(
+            f"La saison {target.label} a déjà des cours ou des disciplines de professeurs : la copie "
+            "ne sert qu'à remplir une saison vide."
+        )
     if problems:
         return CopyPlan(source, target, [], [], problems)
 
@@ -279,12 +304,22 @@ def copy_season(source, target):
     for line in plan.copied:
         old = line.course
         teacher = old.teacher if old.teacher is not None and _teaches(old.teacher, target) else None
-        db.session.add(Course(
-            season=target, discipline=old.discipline,
-            level=old.level if old.level is not None and not old.level.archived else None,
-            room=old.room if room_open(old.room) else None,
-            teacher=teacher, group_label=old.group_label, weekday=old.weekday, starts_at=old.starts_at,
-            ends_at=old.ends_at, capacity=old.capacity, marked_full=False, notes=old.notes))
+        db.session.add(
+            Course(
+                season=target,
+                discipline=old.discipline,
+                level=old.level if old.level is not None and not old.level.archived else None,
+                room=old.room if room_open(old.room) else None,
+                teacher=teacher,
+                group_label=old.group_label,
+                weekday=old.weekday,
+                starts_at=old.starts_at,
+                ends_at=old.ends_at,
+                capacity=old.capacity,
+                marked_full=False,
+                notes=old.notes,
+            )
+        )
     for teacher, discipline in plan.disciplines:
         teacher.taught.append(TeacherDiscipline(season=target, discipline=discipline))
     db.session.flush()

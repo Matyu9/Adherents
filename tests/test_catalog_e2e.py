@@ -2,6 +2,7 @@
 
 SCREENSHOT_DIR=… garde une capture de chaque page, en clair et en sombre, pour vérifier la mise en page.
 """
+
 from datetime import date
 
 import pytest
@@ -20,10 +21,13 @@ pytestmark = pytest.mark.e2e
 def _seasons_and_teacher():
     with _app["app"].app_context():
         from app.services import directory
+
         if db.session.scalar(db.select(Season).filter_by(label="2030-2031")) is None:
             old = Season(label="2030-2031", starts_on=date(2030, 9, 1), ends_on=date(2031, 8, 31))
             new = Season(label="2031-2032", starts_on=date(2031, 9, 1), ends_on=date(2032, 8, 31))
-            db.session.add_all([old, new, Person(first_name="Élodie", last_name="Flûtiste", teacher=Teacher(status="CDI"))])
+            db.session.add_all(
+                [old, new, Person(first_name="Élodie", last_name="Flûtiste", teacher=Teacher(status="CDI"))]
+            )
             db.session.flush()
             directory.set_current_season(old)
             db.session.commit()
@@ -94,8 +98,14 @@ def test_catalogue_pages_have_no_violation(session, scheme):
     seasons = _seasons_and_teacher()
     browser_page = session(color_scheme=scheme, viewport={"width": 390, "height": 844} if scheme == "dark" else None)
     page = browser_page.login()
-    for path in ("/catalogue", "/catalogue/professeurs", "/catalogue/referentiels", "/catalogue/copier",
-                 f"/catalogue/cours/nouveau?saison={seasons['2030-2031']}", "/catalogue/salles/nouveau"):
+    for path in (
+        "/catalogue",
+        "/catalogue/professeurs",
+        "/catalogue/referentiels",
+        "/catalogue/copier",
+        f"/catalogue/cours/nouveau?saison={seasons['2030-2031']}",
+        "/catalogue/salles/nouveau",
+    ):
         page.goto(path)
         assert page.evaluate("window.htmx !== undefined"), path
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"), path

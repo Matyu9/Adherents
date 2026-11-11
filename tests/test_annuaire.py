@@ -1,4 +1,5 @@
 """Annuaire : personnes, foyers, téléphones, saisons, adhésions, professeurs, fusion, rattachement des comptes."""
+
 import re
 from datetime import date, timedelta
 
@@ -78,6 +79,7 @@ def manager(accounts, client):
 # Modèle et contraintes
 # ---------------------------------------------------------------------------
 
+
 def test_a_parent_can_belong_to_two_households(app):
     anne, first, second = person(), home(), home("Famille Durand")
     directory.add_member(first, anne, G)
@@ -89,8 +91,12 @@ def test_a_parent_can_belong_to_two_households(app):
 
 def test_only_one_guardian_per_rank(app):
     household, a, b = home(), person(), person("Bob")
-    db.session.add_all([HouseholdMember(household=household, person=a, role=G, guardian_rank=1),
-                        HouseholdMember(household=household, person=b, role=G, guardian_rank=1)])
+    db.session.add_all(
+        [
+            HouseholdMember(household=household, person=a, role=G, guardian_rank=1),
+            HouseholdMember(household=household, person=b, role=G, guardian_rank=1),
+        ]
+    )
     with pytest.raises(IntegrityError):
         db.session.flush()
 
@@ -105,15 +111,22 @@ def test_role_and_rank_must_agree(app, role, rank):
 @pytest.mark.parametrize("owners", ["both", "none"])
 def test_a_phone_belongs_to_exactly_one_record(app, owners):
     p, h = person(), home()
-    db.session.add(Phone(number="+33612345678", person_id=p.id if owners == "both" else None,
-                         household_id=h.id if owners == "both" else None))
+    db.session.add(
+        Phone(
+            number="+33612345678",
+            person_id=p.id if owners == "both" else None,
+            household_id=h.id if owners == "both" else None,
+        )
+    )
     with pytest.raises(IntegrityError):
         db.session.flush()
 
 
 def test_external_number_is_unique_per_kind(app):
     a, b = person(), person("Bob")
-    db.session.add_all([ExternalRef(kind="student", value="42", person=a), ExternalRef(kind="teacher", value="42", person=a)])
+    db.session.add_all(
+        [ExternalRef(kind="student", value="42", person=a), ExternalRef(kind="teacher", value="42", person=a)]
+    )
     db.session.flush()  # même numéro, autre type : c'est permis (élève et professeur)
     db.session.add(ExternalRef(kind="student", value="42", person=b))
     with pytest.raises(IntegrityError):
@@ -159,10 +172,18 @@ def test_age_and_minority(app):
 # Téléphones
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("text, expected", [
-    ("06 12 34 56 78", "+33612345678"), ("06.12.34.56.78", "+33612345678"), ("+33 6 12 34 56 78", "+33612345678"),
-    ("+33 (0)6 12 34 56 78", "+33612345678"), ("0033612345678", "+33612345678"), ("+41 79 123 45 67", "+41791234567"),
-])
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("06 12 34 56 78", "+33612345678"),
+        ("06.12.34.56.78", "+33612345678"),
+        ("+33 6 12 34 56 78", "+33612345678"),
+        ("+33 (0)6 12 34 56 78", "+33612345678"),
+        ("0033612345678", "+33612345678"),
+        ("+41 79 123 45 67", "+41791234567"),
+    ],
+)
 def test_phone_numbers_are_normalized(text, expected):
     assert directory.normalize_phone(text) == expected
 
@@ -193,6 +214,7 @@ def test_phone_is_added_once(client, admin, family):
 # Foyers et membres
 # ---------------------------------------------------------------------------
 
+
 def test_a_third_guardian_is_refused(family):
     with pytest.raises(DirectoryError, match="deux responsables"):
         directory.add_member(family["home"], person("Paul"), G)
@@ -214,13 +236,16 @@ def test_a_child_cannot_carry_a_parent_email(family):
 
 def test_person_form_refuses_a_parent_email_on_a_child(client, admin, family):
     url = f"/annuaire/personnes/{family['zoe'].id}/modifier"
-    response = client.post(url, data={"first_name": "Zoé", "last_name": "Martin", "email": "anne@asso.test",
-                                      "country": "FR"})
+    response = client.post(
+        url, data={"first_name": "Zoé", "last_name": "Martin", "email": "anne@asso.test", "country": "FR"}
+    )
     assert "jamais recopiée" in response.get_data(as_text=True)
     assert db.session.get(Person, family["zoe"].id).email is None
     # Le parent lui-même garde son adresse, et deux adultes peuvent partager la leur.
-    response = client.post(f"/annuaire/personnes/{family['marc'].id}/modifier",
-                           data={"first_name": "Marc", "last_name": "Martin", "email": "anne@asso.test", "country": "FR"})
+    response = client.post(
+        f"/annuaire/personnes/{family['marc'].id}/modifier",
+        data={"first_name": "Marc", "last_name": "Martin", "email": "anne@asso.test", "country": "FR"},
+    )
     assert response.status_code == 302
 
 
@@ -239,8 +264,10 @@ def test_member_roles_and_swap(client, admin, family):
     client.post(f"/annuaire/foyers/{household.id}/responsables/echanger")
     ranks = {m.person.first_name: m.guardian_rank for m in db.session.get(Household, household.id).guardians}
     assert ranks == {"Anne": 2, "Marc": 1}
-    client.post(f"/annuaire/foyers/{household.id}/membres/{family['marc'].id}/modifier",
-                data={"role": D, "relationship": "beau-père"})
+    client.post(
+        f"/annuaire/foyers/{household.id}/membres/{family['marc'].id}/modifier",
+        data={"role": D, "relationship": "beau-père"},
+    )
     marc = next(m for m in db.session.get(Household, household.id).members if m.person_id == family["marc"].id)
     assert marc.role == D and marc.guardian_rank is None and marc.relationship == "beau-père"
     client.post(f"/annuaire/foyers/{household.id}/responsables/echanger")
@@ -264,8 +291,9 @@ def test_adding_an_existing_person_from_the_household_page(client, admin, family
     assert "MARTIN Léo" in page and "MARTIN Zoé" not in page  # déjà membre : pas proposée
     client.post(f"/annuaire/foyers/{family['home'].id}/membres", data={"person_id": leo.id, "role": D})
     assert any(m.person_id == leo.id for m in db.session.get(Household, family["home"].id).dependents)
-    response = client.post(f"/annuaire/foyers/{family['home'].id}/membres", data={"person_id": leo.id, "role": G},
-                           follow_redirects=True)
+    response = client.post(
+        f"/annuaire/foyers/{family['home'].id}/membres", data={"person_id": leo.id, "role": G}, follow_redirects=True
+    )
     assert "fait déjà partie" in response.get_data(as_text=True)
 
 
@@ -275,8 +303,9 @@ def test_creating_a_child_from_the_household(client, admin, family):
     client.post(url, data={"first_name": "Léa", "last_name": "Martin", "country": "FR"})
     lea = db.session.scalar(db.select(Person).filter_by(first_name="Léa"))
     assert lea.household_links[0].role == D
-    response = client.post(url, data={"first_name": "Tom", "last_name": "Martin", "email": "anne@asso.test",
-                                      "country": "FR"})
+    response = client.post(
+        url, data={"first_name": "Tom", "last_name": "Martin", "email": "anne@asso.test", "country": "FR"}
+    )
     assert "jamais recopiée" in response.get_data(as_text=True)
     assert db.session.scalar(db.select(Person).filter_by(first_name="Tom")) is None
 
@@ -284,6 +313,7 @@ def test_creating_a_child_from_the_household(client, admin, family):
 # ---------------------------------------------------------------------------
 # Liste, recherche, filtres
 # ---------------------------------------------------------------------------
+
 
 def test_search_ignores_accents_and_case(client, admin, family):
     page = client.get("/annuaire?q=zoe").get_data(as_text=True)
@@ -296,8 +326,13 @@ def test_search_ignores_accents_and_case(client, admin, family):
 
 def test_status_filters(client, admin, family):
     old, current = season("2025-2026"), season("2026-2027", current=True)
-    db.session.add_all([Membership(person=family["zoe"], season=current), Membership(person=family["anne"], season=old),
-                        Membership(person=family["marc"], season=current, status=Membership.WITHDRAWN)])
+    db.session.add_all(
+        [
+            Membership(person=family["zoe"], season=current),
+            Membership(person=family["anne"], season=old),
+            Membership(person=family["marc"], season=current, status=Membership.WITHDRAWN),
+        ]
+    )
     prof = person("Paul", "Prof", teacher=Teacher())  # professeur seulement : dans l'écran Professeurs
     person("Parti", "Prof", teacher=Teacher(left_on=date(2020, 1, 1)))
     gone = person("Ancienne", "Fiche", archived_at=date(2026, 1, 1))
@@ -328,16 +363,23 @@ def test_households_list_and_search(client, admin, family):
 # Fiches : création, modification, droits
 # ---------------------------------------------------------------------------
 
+
 def test_create_and_edit_a_person_is_logged(client, admin, app):
-    client.post("/annuaire/personnes/nouvelle", data={"first_name": " Jeanne ", "last_name": "Dupré", "sex": "F",
-                                                      "birth_date": "2010-04-05", "country": "fr"})
+    client.post(
+        "/annuaire/personnes/nouvelle",
+        data={"first_name": " Jeanne ", "last_name": "Dupré", "sex": "F", "birth_date": "2010-04-05", "country": "fr"},
+    )
     jeanne = db.session.scalar(db.select(Person).filter_by(last_name="Dupré"))
     assert jeanne.first_name == "Jeanne" and jeanne.birth_date == date(2010, 4, 5) and jeanne.country == "FR"
     assert jeanne.email is None and jeanne.civility is None and len(jeanne.uuid) == 36
-    client.post(f"/annuaire/personnes/{jeanne.id}/modifier",
-                data={"first_name": "Jeanne", "last_name": "Dupré", "birth_place": "Caen", "country": "FR"})
+    client.post(
+        f"/annuaire/personnes/{jeanne.id}/modifier",
+        data={"first_name": "Jeanne", "last_name": "Dupré", "birth_place": "Caen", "country": "FR"},
+    )
     entry = db.session.scalar(db.select(Activity).filter_by(action="person.update"))
-    assert entry.person_id == jeanne.id and entry.changes == {"birth_place": ["(masqué)", "(masqué)"]}  # jamais la valeur au journal
+    assert entry.person_id == jeanne.id and entry.changes == {
+        "birth_place": ["(masqué)", "(masqué)"]
+    }  # jamais la valeur au journal
     assert "Fiche modifiée" in client.get(f"/annuaire/personnes/{jeanne.id}").get_data(as_text=True)
 
 
@@ -359,8 +401,12 @@ def test_manager_sees_birth_place(client, manager, family):
 
 
 def test_member_has_no_access(client, member, family):
-    for url in ("/annuaire", "/annuaire/foyers", f"/annuaire/personnes/{family['anne'].id}",
-                f"/annuaire/foyers/{family['home'].id}"):
+    for url in (
+        "/annuaire",
+        "/annuaire/foyers",
+        f"/annuaire/personnes/{family['anne'].id}",
+        f"/annuaire/foyers/{family['home'].id}",
+    ):
         assert client.get(url).status_code == 403
 
 
@@ -385,17 +431,22 @@ def test_archive_and_restore(client, admin, family):
 # Saisons, adhésions, professeurs
 # ---------------------------------------------------------------------------
 
+
 def test_seasons(client, admin, family):
-    client.post("/annuaire/saisons/nouvelle", data={"label": "2026-2027", "starts_on": "2026-09-01",
-                                                    "ends_on": "2027-08-31"})
+    client.post(
+        "/annuaire/saisons/nouvelle", data={"label": "2026-2027", "starts_on": "2026-09-01", "ends_on": "2027-08-31"}
+    )
     first = db.session.scalar(db.select(Season))
     assert directory.current_season() is first  # la première saison devient celle en cours
-    assert "La fin doit suivre" in client.post("/annuaire/saisons/nouvelle", data={
-        "label": "2027-2028", "starts_on": "2027-09-01", "ends_on": "2027-08-01"}).get_data(as_text=True)
-    assert "existe déjà" in client.post("/annuaire/saisons/nouvelle", data={
-        "label": "2026-2027", "starts_on": "2026-09-01", "ends_on": "2027-08-31"}).get_data(as_text=True)
-    client.post("/annuaire/saisons/nouvelle", data={"label": "2027-2028", "starts_on": "2027-09-01",
-                                                    "ends_on": "2028-08-31"})
+    assert "La fin doit suivre" in client.post(
+        "/annuaire/saisons/nouvelle", data={"label": "2027-2028", "starts_on": "2027-09-01", "ends_on": "2027-08-01"}
+    ).get_data(as_text=True)
+    assert "existe déjà" in client.post(
+        "/annuaire/saisons/nouvelle", data={"label": "2026-2027", "starts_on": "2026-09-01", "ends_on": "2027-08-31"}
+    ).get_data(as_text=True)
+    client.post(
+        "/annuaire/saisons/nouvelle", data={"label": "2027-2028", "starts_on": "2027-09-01", "ends_on": "2028-08-31"}
+    )
     second = db.session.scalar(db.select(Season).filter_by(label="2027-2028"))
     assert directory.current_season() is first
     client.post(f"/annuaire/saisons/{second.id}/en-cours")
@@ -423,24 +474,36 @@ def test_membership_form(client, admin, family):
     assert re.search(rf'<option selected value="{s.id}">', page)
     assert 'data-show-when="status" data-show-value="withdrawn"' in page  # date d'abandon masquée si active
     # Une date restée dans le champ masqué n'est pas gardée pour une adhésion active.
-    client.post(f"/annuaire/personnes/{zoe.id}/adhesions/nouvelle",
-                data={"season_id": s.id, "status": "active", "withdrawn_on": "2026-10-01", "category": "Scolaire",
-                      "school_class": "6e"})
+    client.post(
+        f"/annuaire/personnes/{zoe.id}/adhesions/nouvelle",
+        data={
+            "season_id": s.id,
+            "status": "active",
+            "withdrawn_on": "2026-10-01",
+            "category": "Scolaire",
+            "school_class": "6e",
+        },
+    )
     (m,) = db.session.get(Person, zoe.id).memberships
     assert m.category == "Scolaire" and m.school_class == "6e" and m.school_level is None and m.withdrawn_on is None
     # Plus de saison libre : le formulaire renvoie vers la fiche.
     assert client.get(f"/annuaire/personnes/{zoe.id}/adhesions/nouvelle").status_code == 302
-    client.post(f"/annuaire/adhesions/{m.id}/modifier", data={"season_id": s.id, "status": "withdrawn",
-                                                              "withdrawn_on": "2027-01-10"})
+    client.post(
+        f"/annuaire/adhesions/{m.id}/modifier",
+        data={"season_id": s.id, "status": "withdrawn", "withdrawn_on": "2027-01-10"},
+    )
     m = db.session.get(Membership, m.id)
     assert m.status == "withdrawn" and m.withdrawn_on == date(2027, 1, 10)
     assert db.session.scalar(db.select(Activity).filter_by(action="membership.update")).changes["status"] == [
-        "active", "withdrawn"]
+        "active",
+        "withdrawn",
+    ]
 
 
 # ---------------------------------------------------------------------------
 # Fusion
 # ---------------------------------------------------------------------------
+
 
 def test_merging_two_persons(client, manager, family):
     old, current = season("2025-2026"), season("2026-2027", current=True)
@@ -449,13 +512,21 @@ def test_merging_two_persons(client, manager, family):
     other_home = home("Famille Martin-Bis")
     directory.add_member(other_home, copy, D)
     directory.add_member(family["home"], copy, D)  # déjà dans le même foyer que l'original
-    db.session.add_all([Phone(number="+33612345678", person=zoe), Phone(number="+33612345678", person=copy),
-                        Phone(number="+33699999999", person=copy), ExternalRef(kind="student", value="7", person=copy),
-                        Membership(person=zoe, season=current, category="original"),
-                        Membership(person=copy, season=current, category="doublon"),
-                        Membership(person=copy, season=old), Teacher(person=copy, status="Bénévole")])
+    db.session.add_all(
+        [
+            Phone(number="+33612345678", person=zoe),
+            Phone(number="+33612345678", person=copy),
+            Phone(number="+33699999999", person=copy),
+            ExternalRef(kind="student", value="7", person=copy),
+            Membership(person=zoe, season=current, category="original"),
+            Membership(person=copy, season=current, category="doublon"),
+            Membership(person=copy, season=old),
+            Teacher(person=copy, status="Bénévole"),
+        ]
+    )
     db.session.flush()
     from app.services.activity import log
+
     log("person.update", "trace du doublon", person=copy)
     db.session.commit()
     copy_id = copy.id
@@ -549,6 +620,7 @@ def test_merge_requires_its_right(client, app, family):
 # Comptes : rattachement et invitation
 # ---------------------------------------------------------------------------
 
+
 def test_suggestions_show_why_and_never_decide(family):
     homonym = make_account(email="autre@asso.test", first_name="Zoe")
     homonym.last_name = "Martin"
@@ -570,8 +642,9 @@ def test_linking_screen(client, admin, family):
     entry = db.session.scalar(db.select(Activity).filter_by(action="account.link"))
     assert entry.target_account_id == anne_account.id and entry.person_id == family["anne"].id
     other = make_account(email="x@asso.test", first_name="X")
-    response = client.post(f"/annuaire/rattachement/{other.id}", data={"person_id": family["anne"].id},
-                           follow_redirects=True)
+    response = client.post(
+        f"/annuaire/rattachement/{other.id}", data={"person_id": family["anne"].id}, follow_redirects=True
+    )
     assert "a déjà un compte" in response.get_data(as_text=True)
     assert "anne@asso.test" not in client.get("/annuaire/rattachement").get_data(as_text=True)
     client.post(f"/annuaire/personnes/{family['anne'].id}/compte/detacher")
@@ -594,8 +667,15 @@ def test_inviting_an_adult_from_their_record(client, admin, family):
     assert db.session.scalar(db.select(AccountToken).filter_by(account_id=account.id, purpose="invite")) is not None
 
 
-@pytest.mark.parametrize("case, message", [("minor", "avant 16 ans"), ("no_email", "pas d'adresse"),
-                                           ("taken", "déjà celle d'un autre compte"), ("archived", "archivée")])
+@pytest.mark.parametrize(
+    "case, message",
+    [
+        ("minor", "avant 16 ans"),
+        ("no_email", "pas d'adresse"),
+        ("taken", "déjà celle d'un autre compte"),
+        ("archived", "archivée"),
+    ],
+)
 def test_no_account_when_it_would_be_wrong(family, case, message):
     target = family["anne"]
     if case == "minor":
@@ -650,8 +730,15 @@ def test_an_adult_needs_no_consent(family):
 def test_merge_mixes_both_records_and_asks_only_on_conflicts(client, manager, family):
     anne = family["anne"]
     anne.birth_name = "Durand"
-    copy = person("Anne", "Martin", email="anne.martin@autre.test", birth_date=date(1980, 1, 2),
-                  emergency_contact="Sœur : 06 00 00 00 00", city="Rouen", postal_code="76000")
+    copy = person(
+        "Anne",
+        "Martin",
+        email="anne.martin@autre.test",
+        birth_date=date(1980, 1, 2),
+        emergency_contact="Sœur : 06 00 00 00 00",
+        city="Rouen",
+        postal_code="76000",
+    )
     db.session.commit()
     page = client.get(f"/annuaire/personnes/{anne.id}/fusionner?avec={copy.id}").get_data(as_text=True)
     # Email différent des deux côtés : on choisit. Le reste est repris ou gardé sans question.
@@ -659,17 +746,19 @@ def test_merge_mixes_both_records_and_asks_only_on_conflicts(client, manager, fa
     assert 'name="prendre_emergency_contact"' not in page and "repris" in page
     client.post(f"/annuaire/personnes/{anne.id}/fusionner", data={"avec": copy.id, "prendre_email": "autre"})
     anne = db.session.get(Person, anne.id)
-    assert anne.email == "anne.martin@autre.test"            # conflit : la valeur choisie
-    assert anne.birth_name == "Durand"                        # rempli d'un seul côté (la fiche gardée)
+    assert anne.email == "anne.martin@autre.test"  # conflit : la valeur choisie
+    assert anne.birth_name == "Durand"  # rempli d'un seul côté (la fiche gardée)
     assert anne.emergency_contact == "Sœur : 06 00 00 00 00"  # rempli d'un seul côté (l'autre)
-    assert anne.city == "Rouen"                               # adresse reprise en bloc
+    assert anne.city == "Rouen"  # adresse reprise en bloc
 
 
 def test_accents_and_case_are_not_a_conflict(family):
     copy = person("LEA", "martin", city="ROUEN")
     family["zoe"].city = "Rouen"
-    plan = {field: conflict for field, _, _, conflict in directory.merge_plan(
-        family["zoe"], copy, directory.PERSON_MERGE_FIELDS)}
+    plan = {
+        field: conflict
+        for field, _, _, conflict in directory.merge_plan(family["zoe"], copy, directory.PERSON_MERGE_FIELDS)
+    }
     assert not plan["last_name"] and not plan["adresse"]
     directory.merge_persons(family["zoe"], copy)
     assert family["zoe"].last_name == "Martin"
@@ -706,15 +795,23 @@ def test_same_iban_stays_visible_on_the_household(client, admin, family):
 
 
 def test_messages_can_be_dismissed_and_stay_in_view(client, admin, family):
-    response = client.post(f"/annuaire/foyers/{family['home'].id}/telephones", data={"number": "06 12"},
-                           follow_redirects=True)
+    response = client.post(
+        f"/annuaire/foyers/{family['home'].id}/telephones", data={"number": "06 12"}, follow_redirects=True
+    )
     page = response.get_data(as_text=True)
     assert '<div class="flashes">' in page and "data-dismiss" in page and "Numéro invalide" in page
 
 
-@pytest.mark.parametrize("url", ["/annuaire/personnes/99999999999999999999", "/annuaire/foyers/99999999999999999999",
-                                 "/annuaire?saison=99999999999999999999", "/professeurs/99999999999999999999",
-                                 "/annuaire/personnes/nouvelle?foyer=99999999999999999999"])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "/annuaire/personnes/99999999999999999999",
+        "/annuaire/foyers/99999999999999999999",
+        "/annuaire?saison=99999999999999999999",
+        "/professeurs/99999999999999999999",
+        "/annuaire/personnes/nouvelle?foyer=99999999999999999999",
+    ],
+)
 def test_numbers_too_large_are_a_clean_404(client, admin, url):
     """PostgreSQL refuse un entier hors limites : l'appli répond « introuvable », jamais une erreur 500."""
     assert client.get(url).status_code == 404

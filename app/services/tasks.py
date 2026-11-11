@@ -1,4 +1,5 @@
 """Tâches périodiques, lancées par `flask run-tasks` (service scheduler)."""
+
 from datetime import datetime
 
 from ..extensions import db
@@ -18,9 +19,11 @@ def run(now=None):
     db.session.commit()
     sent, failed, dropped = logout.deliver_pending(now)
     emails = mailer.deliver_pending()
-    return (f"{logins} connexion(s), {attempts} tentative(s) et {links} lien(s) expiré(s) effacé(s), "
-            f"{old_sessions} session(s) trop ancienne(s) fermée(s), {expired} élément(s) OIDC expiré(s) effacé(s), "
-            f"{orphans} session(s) d'appli rattrapée(s), avis de déconnexion : {sent} reçu(s), {failed} à réessayer, "
-            f"{dropped} abandonné(s), {emails} email(s) envoyé(s), {mandates} mandat(s) SEPA et "
-            f"{bank_accounts} compte(s) bancaire(s) arrivés au bout de leur conservation supprimés, "
-            f"{reminded} foyer(s) relancé(s) pour leur inscription.")
+    return (
+        f"{logins} connexion(s), {attempts} tentative(s) et {links} lien(s) expiré(s) effacé(s), "
+        f"{old_sessions} session(s) trop ancienne(s) fermée(s), {expired} élément(s) OIDC expiré(s) effacé(s), "
+        f"{orphans} session(s) d'appli rattrapée(s), avis de déconnexion : {sent} reçu(s), {failed} à réessayer, "
+        f"{dropped} abandonné(s), {emails} email(s) envoyé(s), {mandates} mandat(s) SEPA et "
+        f"{bank_accounts} compte(s) bancaire(s) arrivés au bout de leur conservation supprimés, "
+        f"{reminded} foyer(s) relancé(s) pour leur inscription."
+    )

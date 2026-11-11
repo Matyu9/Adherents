@@ -7,6 +7,7 @@ est ignoré si l'Inventaire n'est pas là.
 Parcours : export des comptes depuis Adhérents, rattachement dans l'Inventaire par un administrateur (accès de secours,
 car OIDC_ONLY=1), connexion par Adhérents, refus d'une adresse partagée, puis les trois façons d'être déconnecté.
 """
+
 import json
 import os
 import socket
@@ -77,25 +78,43 @@ def world(tmp_path_factory, module_database):
     tmp = tmp_path_factory.mktemp("inventaire-e2e")
     idp_port, inv_port = free_port(), free_port()
     issuer, inventaire = f"http://127.0.0.1:{idp_port}", f"http://127.0.0.1:{inv_port}"
-    idp = create_app(config_for(tmp, SQLALCHEMY_DATABASE_URI=module_database, WTF_CSRF_ENABLED=True,
-                                TESTING=False, PROPAGATE_EXCEPTIONS=False, SECRET_KEY="cle-de-test-e2e-" * 4,
-                                OIDC_ISSUER=issuer, BASE_URL=issuer, BACKCHANNEL_IN_BACKGROUND=True))
+    idp = create_app(
+        config_for(
+            tmp,
+            SQLALCHEMY_DATABASE_URI=module_database,
+            WTF_CSRF_ENABLED=True,
+            TESTING=False,
+            PROPAGATE_EXCEPTIONS=False,
+            SECRET_KEY="cle-de-test-e2e-" * 4,
+            OIDC_ISSUER=issuer,
+            BASE_URL=issuer,
+            BACKCHANNEL_IN_BACKGROUND=True,
+        )
+    )
     httpd = make_server("127.0.0.1", idp_port, idp, threaded=True)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     with idp.app_context():
         db.create_all()
         stamp_head()
         group = AccessGroup(key="membres", name="Membres")
-        accounts = [Account(first_name="Élise", last_name="Test", email="elise@e2e.test"),
-                    Account(first_name="Sophie", last_name="Durand", email="famille@e2e.test")]
+        accounts = [
+            Account(first_name="Élise", last_name="Test", email="elise@e2e.test"),
+            Account(first_name="Sophie", last_name="Durand", email="famille@e2e.test"),
+        ]
         for account in accounts:
             account.role, account.active, account.email_verified, account.groups = Role.ADHERENT, True, True, [group]
             account.set_password(PASSWORD)
-        client = OidcClient(client_id=oidc.new_client_id(), name="Inventaire", first_party=True,
-                            redirect_uris=[f"{inventaire}/connexion/oidc/retour"],
-                            post_logout_redirect_uris=[f"{inventaire}/connexion"],
-                            backchannel_logout_uri=f"{inventaire}/connexion/oidc/deconnexion",
-                            allowed_groups=[group], shared_groups=[group], directory_access=True)
+        client = OidcClient(
+            client_id=oidc.new_client_id(),
+            name="Inventaire",
+            first_party=True,
+            redirect_uris=[f"{inventaire}/connexion/oidc/retour"],
+            post_logout_redirect_uris=[f"{inventaire}/connexion"],
+            backchannel_logout_uri=f"{inventaire}/connexion/oidc/deconnexion",
+            allowed_groups=[group],
+            shared_groups=[group],
+            directory_access=True,
+        )
         secret = oidc.set_secret(client)
         db.session.add_all([*accounts, client])
         db.session.commit()
@@ -104,22 +123,46 @@ def world(tmp_path_factory, module_database):
     data = tmp / "inventaire"
     data.mkdir()
     env = {key: value for key, value in os.environ.items() if not key.startswith(("FLASK_", "OIDC_", "SMTP_"))}
-    env.update(FLASK_APP="app:create_app()", FLASK_SKIP_DOTENV="1", SECRET_KEY="inventaire-e2e-" * 4,
-               DATA_DIR=str(data), BASE_URL=inventaire, ASSO_NAME="Harmonie e2e",
-               OIDC_DISCOVERY_URL=f"{issuer}/.well-known/openid-configuration", OIDC_CLIENT_ID=client_id,
-               OIDC_CLIENT_SECRET=secret, OIDC_PROVIDER_NAME="Adhérents", OIDC_SCOPES="openid email profile groups",
-               OIDC_ONLY="1", OIDC_LINK_BY_EMAIL="0", PYTHONDONTWRITEBYTECODE="1",
-               OIDC_ACCOUNTS_URL=f"{issuer}/oidc/comptes")
+    env.update(
+        FLASK_APP="app:create_app()",
+        FLASK_SKIP_DOTENV="1",
+        SECRET_KEY="inventaire-e2e-" * 4,
+        DATA_DIR=str(data),
+        BASE_URL=inventaire,
+        ASSO_NAME="Harmonie e2e",
+        OIDC_DISCOVERY_URL=f"{issuer}/.well-known/openid-configuration",
+        OIDC_CLIENT_ID=client_id,
+        OIDC_CLIENT_SECRET=secret,
+        OIDC_PROVIDER_NAME="Adhérents",
+        OIDC_SCOPES="openid email profile groups",
+        OIDC_ONLY="1",
+        OIDC_LINK_BY_EMAIL="0",
+        PYTHONDONTWRITEBYTECODE="1",
+        OIDC_ACCOUNTS_URL=f"{issuer}/oidc/comptes",
+    )
     for command in ([str(FLASK), "db", "upgrade"], [str(PYTHON), "-c", SEED]):
         result = subprocess.run(command, cwd=INVENTAIRE, env=env, capture_output=True, text=True, timeout=120)
         assert result.returncode == 0, result.stdout + result.stderr
-    server = subprocess.Popen([str(FLASK), "run", "--host", "127.0.0.1", "--port", str(inv_port), "--no-reload",
-                               "--no-debugger"], cwd=INVENTAIRE, env=env, stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT, text=True)
+    server = subprocess.Popen(
+        [str(FLASK), "run", "--host", "127.0.0.1", "--port", str(inv_port), "--no-reload", "--no-debugger"],
+        cwd=INVENTAIRE,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
     try:
         wait_for_port(inv_port, server)
-        yield {"idp": idp, "issuer": issuer, "inventaire": inventaire, "db": data / "inventaire.db",
-               "group_id": group_id, "elise_sub": elise_sub, "tmp": tmp, "env": env}
+        yield {
+            "idp": idp,
+            "issuer": issuer,
+            "inventaire": inventaire,
+            "db": data / "inventaire.db",
+            "group_id": group_id,
+            "elise_sub": elise_sub,
+            "tmp": tmp,
+            "env": env,
+        }
     finally:
         server.terminate()
         output, _ = server.communicate(timeout=10)
@@ -168,8 +211,13 @@ def enter_inventaire(page, world, email="elise@e2e.test"):
     page.goto(world["inventaire"] + "/connexion")
     page.click("text=Se connecter avec Adhérents")
     # Page intermédiaire de l'Inventaire, puis Adhérents : son formulaire, ou directement le retour si déjà connecté.
-    page.wait_for_url(lambda url: url.startswith(world["issuer"] + "/connexion")
-                      or url.startswith(world["inventaire"]) and "/connexion" not in url)
+    page.wait_for_url(
+        lambda url: (
+            url.startswith(world["issuer"] + "/connexion")
+            or url.startswith(world["inventaire"])
+            and "/connexion" not in url
+        )
+    )
     if page.url.startswith(world["issuer"]):
         sign_in_at_adherents(page, email)
     try:
@@ -186,8 +234,11 @@ def inventaire_logged_in(page, world):
 
 def test_1_fetch_then_link_by_an_admin(page, world):
     export = world["tmp"] / "comptes.json"
-    result = world["idp"].test_cli_runner().invoke(args=["oidc-export-accounts", "--application", "Inventaire",
-                                                        "--output", str(export)])
+    result = (
+        world["idp"]
+        .test_cli_runner()
+        .invoke(args=["oidc-export-accounts", "--application", "Inventaire", "--output", str(export)])
+    )
     assert result.exit_code == 0, result.output
     assert {a["email"] for a in json.loads(export.read_text())["accounts"]} == {"elise@e2e.test", "famille@e2e.test"}
 
@@ -213,8 +264,11 @@ def test_1_fetch_then_link_by_an_admin(page, world):
 def test_2_login_through_adherents_finds_the_linked_fiche(page, world):
     enter_inventaire(page, world)
     assert "Élise" in page.content()
-    rows = inventaire_rows(world, "SELECT s.oidc_sid, s.oidc_id_token IS NOT NULL FROM login_session s "
-                                  "JOIN user u ON u.id = s.user_id WHERE u.email = 'elise@e2e.test'")
+    rows = inventaire_rows(
+        world,
+        "SELECT s.oidc_sid, s.oidc_id_token IS NOT NULL FROM login_session s "
+        "JOIN user u ON u.id = s.user_id WHERE u.email = 'elise@e2e.test'",
+    )
     assert rows and rows[-1][0] and rows[-1][1] == 1
     assert inventaire_rows(world, "SELECT count(*) FROM user WHERE email = 'elise@e2e.test'") == [(1,)]
 
@@ -270,8 +324,12 @@ def test_6_leaving_the_group_closes_the_inventaire_session(page, world):
 def test_7_inventaire_refuses_a_forged_notice(world):
     import urllib.error
     import urllib.request
-    request = urllib.request.Request(world["inventaire"] + "/connexion/oidc/deconnexion",
-                                     data=b"logout_token=eyJhbGciOiJub25lIn0.e30.", method="POST")
+
+    request = urllib.request.Request(
+        world["inventaire"] + "/connexion/oidc/deconnexion",
+        data=b"logout_token=eyJhbGciOiJub25lIn0.e30.",
+        method="POST",
+    )
     with pytest.raises(urllib.error.HTTPError) as error:
         urllib.request.urlopen(request, timeout=5)
     assert error.value.code == 400
@@ -299,6 +357,7 @@ def test_8_member_area_shows_the_instruments_from_the_real_inventaire(page, worl
     """Phase 7 : fiches rattachées à l'annuaire dans l'Inventaire, compte de service, puis l'espace adhérent."""
     from app.models import Household, Person
     from app.services import directory
+
     with world["idp"].app_context():
         sophie_account = db.session.scalar(db.select(Account).filter_by(email="famille@e2e.test"))
         household = Household(name="Famille Durand")
@@ -330,8 +389,18 @@ def test_8_member_area_shows_the_instruments_from_the_real_inventaire(page, worl
         result = subprocess.run(command, cwd=INVENTAIRE, env=world["env"], capture_output=True, text=True, timeout=60)
         assert result.returncode == 0, result.stdout + result.stderr
     # Un nouveau jeton annule le précédent : c'est lui qu'on recopie dans Adhérents.
-    token = subprocess.run([str(FLASK), "jeton-espace-adherent"], cwd=INVENTAIRE, env=world["env"],
-                           capture_output=True, text=True, timeout=60).stdout.strip().splitlines()[-1]
+    token = (
+        subprocess.run(
+            [str(FLASK), "jeton-espace-adherent"],
+            cwd=INVENTAIRE,
+            env=world["env"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        .stdout.strip()
+        .splitlines()[-1]
+    )
     assert token.startswith("ohn_")
     world["idp"].config.update(INVENTAIRE_API_URL=world["inventaire"] + "/api/v1", INVENTAIRE_API_TOKEN=token)
 

@@ -8,6 +8,7 @@ Ce qui reste après l'anonymisation : les adhésions et les inscriptions (sans n
 passées, et l'année de naissance. Tout le reste est effacé : nom, coordonnées, téléphones, numéros externes,
 consentements, observations, et le texte du journal qui la concernait.
 """
+
 from datetime import datetime
 
 from ..extensions import db
@@ -40,8 +41,12 @@ def oldest_kept_season(count=None):
     count = count or seasons_kept()
     if not count:
         return None
-    seasons = db.session.scalars(db.select(Season).where(Season.starts_on <= datetime.now().date())
-                                 .order_by(Season.starts_on.desc()).limit(count)).all()
+    seasons = db.session.scalars(
+        db.select(Season)
+        .where(Season.starts_on <= datetime.now().date())
+        .order_by(Season.starts_on.desc())
+        .limit(count)
+    ).all()
     return seasons[-1] if len(seasons) == count else None
 
 
@@ -55,13 +60,17 @@ def candidates(count=None):
     limit = oldest_kept_season(count)
     if limit is None:
         return []
-    recent_households = db.select(HouseholdMember.household_id).join(Person).where(
-        Person.memberships.any(_recent(limit)))
+    recent_households = (
+        db.select(HouseholdMember.household_id).join(Person).where(Person.memberships.any(_recent(limit)))
+    )
     query = db.select(Person).where(
-        Person.anonymized_at.is_(None), Person.account_id.is_(None), ~Person.teacher.has(),
+        Person.anonymized_at.is_(None),
+        Person.account_id.is_(None),
+        ~Person.teacher.has(),
         ~Person.memberships.any(_recent(limit)),
         Person.created_at < datetime.combine(limit.starts_on, datetime.min.time()),
-        ~Person.household_links.any(HouseholdMember.household_id.in_(recent_households)))
+        ~Person.household_links.any(HouseholdMember.household_id.in_(recent_households)),
+    )
     return db.session.scalars(query.order_by(Person.last_name, Person.first_name)).all()
 
 
@@ -69,8 +78,18 @@ def anonymize(person, now=None):
     """Efface ce qui identifie la personne. Ses adhésions et inscriptions restent, sans nom."""
     now = now or datetime.now()
     birth_year = person.birth_date.year if person.birth_date else None
-    for field in ("civility", "birth_name", "birth_place", "email", "emergency_contact", "notes", "address_recipient",
-                  "address_street", "postal_code", "city"):
+    for field in (
+        "civility",
+        "birth_name",
+        "birth_place",
+        "email",
+        "emergency_contact",
+        "notes",
+        "address_recipient",
+        "address_street",
+        "postal_code",
+        "city",
+    ):
         setattr(person, field, None)
     person.first_name, person.last_name = ANONYMOUS, f"n° {person.id}"
     person.birth_date = datetime(birth_year, 1, 1).date() if birth_year else None  # l'année seule, au 1er janvier
@@ -79,8 +98,11 @@ def anonymize(person, now=None):
     person.phones.clear()
     person.external_refs.clear()
     person.consents.clear()
-    db.session.execute(db.update(Activity).where(Activity.person_id == person.id)
-                       .values(message="(effacé à l'anonymisation de la fiche)", changes=None))
+    db.session.execute(
+        db.update(Activity)
+        .where(Activity.person_id == person.id)
+        .values(message="(effacé à l'anonymisation de la fiche)", changes=None)
+    )
     for link in list(person.household_links):
         household = link.household
         if all(m.person is person or m.person.anonymized_at for m in household.members):
@@ -97,8 +119,11 @@ def anonymize_household(household, now=None):
     household.external_refs.clear()
     household.bank_accounts.clear()  # IBAN et mandats
     household.consents.clear()
-    db.session.execute(db.update(Activity).where(Activity.household_id == household.id)
-                       .values(message="(effacé à l'anonymisation du foyer)", changes=None))
+    db.session.execute(
+        db.update(Activity)
+        .where(Activity.household_id == household.id)
+        .values(message="(effacé à l'anonymisation du foyer)", changes=None)
+    )
     for dossier in db.session.scalars(db.select(Dossier).filter_by(household_id=household.id)):
         db.session.delete(dossier)
 
@@ -109,8 +134,12 @@ def old_dossiers(count=None):
     limit = oldest_kept_season(count)
     if limit is None:
         return []
-    return db.session.scalars(db.select(Dossier).join(Campaign).join(Season).where(
-        Season.starts_on < limit.starts_on, Campaign.closes_at < datetime.now())).all()
+    return db.session.scalars(
+        db.select(Dossier)
+        .join(Campaign)
+        .join(Season)
+        .where(Season.starts_on < limit.starts_on, Campaign.closes_at < datetime.now())
+    ).all()
 
 
 def purge_dossiers(count=None):

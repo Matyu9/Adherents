@@ -58,8 +58,12 @@ def test_digest_depends_on_secret_key(app):
 
 def test_purge_keeps_recent_events(app):
     now = datetime.now()
-    db.session.add_all([ThrottleEvent(key_hash="vieux", created_at=now - throttle.MAX_WINDOW - timedelta(minutes=1)),
-                        ThrottleEvent(key_hash="recent", created_at=now - timedelta(minutes=1))])
+    db.session.add_all(
+        [
+            ThrottleEvent(key_hash="vieux", created_at=now - throttle.MAX_WINDOW - timedelta(minutes=1)),
+            ThrottleEvent(key_hash="recent", created_at=now - timedelta(minutes=1)),
+        ]
+    )
     assert throttle.purge(now) == 1
     assert db.session.scalars(db.select(ThrottleEvent.key_hash)).all() == ["recent"]
 

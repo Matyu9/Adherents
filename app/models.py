@@ -1,4 +1,5 @@
 """Modèle de données."""
+
 import hashlib
 import hmac
 import uuid
@@ -14,13 +15,15 @@ from .extensions import db, login_manager
 
 class TimestampMixin:
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now, server_default=func.now())
-    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.now, server_default=func.now(),
-                           onupdate=datetime.now)
+    updated_at = db.Column(
+        db.DateTime, nullable=False, default=datetime.now, server_default=func.now(), onupdate=datetime.now
+    )
 
 
 # ---------------------------------------------------------------------------
 # Comptes
 # ---------------------------------------------------------------------------
+
 
 class Role(db.Model):
     """Rôle attribuable aux comptes, avec ses droits (cochés dans l'écran « Rôles »).
@@ -28,6 +31,7 @@ class Role(db.Model):
     Les trois rôles de base existent toujours (non supprimables) ; l'administrateur a tous les droits
     quelle que soit sa liste, pour qu'on ne puisse pas se retirer l'accès à l'appli.
     """
+
     ADMIN = "admin"
     GESTIONNAIRE = "gestionnaire"
     ADHERENT = "adherent"
@@ -68,6 +72,7 @@ class AccessGroup(db.Model):
 
     `key` est la valeur transmise aux applis : elle ne change jamais, même si le groupe est renommé.
     """
+
     id = db.Column(db.Integer, primary_key=True)
     key = db.Column(db.String(40), nullable=False, unique=True)
     name = db.Column(db.String(80), nullable=False, unique=True)
@@ -78,6 +83,7 @@ class AccessGroup(db.Model):
 
 class Account(UserMixin, TimestampMixin, db.Model):
     """Compte de connexion : ce qui permet d'entrer dans l'appli, et plus tard dans les applis clientes (OIDC)."""
+
     id = db.Column(db.Integer, primary_key=True)
     # Identifiant public, stable et opaque (claim OIDC « sub ») : jamais l'email ni `id`.
     sub = db.Column(db.String(36), nullable=False, unique=True, default=lambda: str(uuid.uuid4()))
@@ -99,8 +105,9 @@ class Account(UserMixin, TimestampMixin, db.Model):
     theme = db.Column(db.String(10))  # "light", "dark" ou None (celui du système)
     text_size = db.Column(db.String(10))  # "large", "xlarge" ou None (normale)
 
-    groups = db.relationship("AccessGroup", secondary=account_access_group, back_populates="members",
-                             order_by="AccessGroup.name")
+    groups = db.relationship(
+        "AccessGroup", secondary=account_access_group, back_populates="members", order_by="AccessGroup.name"
+    )
 
     @property
     def full_name(self):
@@ -156,6 +163,7 @@ class Account(UserMixin, TimestampMixin, db.Model):
 
 class LoginSession(db.Model):
     """Connexion ouverte sur un appareil. La supprimer invalide ses cookies, même copiés ailleurs."""
+
     id = db.Column(db.String(64), primary_key=True)  # jeton secret
     # Identifiant public de la session (claim OIDC « sid »), qui peut circuler sans rien donner : jamais `id`.
     sid = db.Column(db.String(36), nullable=False, unique=True, default=lambda: str(uuid.uuid4()))
@@ -173,6 +181,7 @@ class AccountToken(db.Model):
 
     Seule l'empreinte du jeton est stockée : une fuite de la base ne donne aucun lien valable.
     """
+
     INVITE = "invite"
     RESET = "reset"
     EMAIL = "email"
@@ -191,6 +200,7 @@ class AccountToken(db.Model):
 
 class RecoveryCode(db.Model):
     """Code de secours à usage unique, pour un téléphone perdu. Seule son empreinte est stockée."""
+
     id = db.Column(db.String(64), primary_key=True)  # empreinte du code
     account_id = db.Column(db.ForeignKey("account.id", ondelete="CASCADE"), nullable=False, index=True)
 
@@ -203,6 +213,7 @@ def load_user(user_id):
         return None
     login.account.session_token = token
     from .services.sessions import touch
+
     if not touch(login):  # fermée pour inactivité
         return None
     return login.account
@@ -213,6 +224,7 @@ class ThrottleEvent(db.Model):
 
     `key_hash` est une empreinte : le texte d'origine (email saisi, IP) n'est jamais conservé.
     """
+
     id = db.Column(db.Integer, primary_key=True)
     key_hash = db.Column(db.String(64), nullable=False, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now, index=True)
@@ -236,6 +248,7 @@ oidc_client_shared_group = db.Table(
 
 class OidcClient(TimestampMixin, ClientMixin, db.Model):
     """Appli qui délègue sa connexion à ce serveur. Les méthodes `check_*` et `get_*` sont celles qu'appelle Authlib."""
+
     SCOPES = ("openid", "profile", "email", "groups")
     AUTH_METHODS = ("client_secret_basic", "client_secret_post")
 
@@ -285,6 +298,7 @@ class OidcClient(TimestampMixin, ClientMixin, db.Model):
 
 class OidcCode(db.Model):
     """Code d'autorisation : stocké en empreinte, à usage unique. `used_at` permet de reconnaître un code rejoué."""
+
     id = db.Column(db.String(64), primary_key=True)  # empreinte du code
     client_id = db.Column(db.ForeignKey("oidc_client.id", ondelete="CASCADE"), nullable=False, index=True)
     account_id = db.Column(db.ForeignKey("account.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -322,6 +336,7 @@ class OidcCode(db.Model):
 
 class OidcToken(db.Model):
     """Jeton d'accès opaque, stocké en empreinte : il ne sert qu'à /userinfo, qui revérifie les droits à chaque appel."""
+
     id = db.Column(db.String(64), primary_key=True)  # empreinte du jeton
     client_id = db.Column(db.ForeignKey("oidc_client.id", ondelete="CASCADE"), nullable=False, index=True)
     account_id = db.Column(db.ForeignKey("account.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -335,6 +350,7 @@ class OidcToken(db.Model):
 
 class OidcConsent(db.Model):
     """Ce qu'une personne a accepté de transmettre à une appli. Elle peut le retirer depuis « Mon compte »."""
+
     account_id = db.Column(db.ForeignKey("account.id", ondelete="CASCADE"), primary_key=True)
     client_id = db.Column(db.ForeignKey("oidc_client.id", ondelete="CASCADE"), primary_key=True, index=True)
     scope = db.Column(db.String(255), nullable=False)
@@ -348,6 +364,7 @@ class OidcSession(db.Model):
 
     Pas de clé étrangère vers LoginSession : la ligne doit survivre à la session, le temps de prévenir l'appli.
     """
+
     __table_args__ = (db.UniqueConstraint("sid", "client_id"),)
 
     id = db.Column(db.Integer, primary_key=True)
@@ -367,6 +384,7 @@ class OidcLogout(db.Model):
 
     `sub` et `sid` sont recopiés : l'avis doit pouvoir partir même si la session ou le compte n'existent plus.
     """
+
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.ForeignKey("oidc_client.id", ondelete="CASCADE"), nullable=False, index=True)
     sub = db.Column(db.String(36), nullable=False)
@@ -381,6 +399,7 @@ class OidcLogout(db.Model):
 
 class OidcKey(db.Model):
     """Clé de signature des jetons d'identité. Retirée, elle reste publiée sans sa partie privée, le temps que ses jetons expirent."""
+
     kid = db.Column(db.String(64), primary_key=True)
     public_jwk = db.Column(db.JSON, nullable=False)
     private_key = db.Column(db.Text)  # chiffrée avec une clé dérivée de SECRET_KEY, effacée au retrait
@@ -392,12 +411,14 @@ class OidcKey(db.Model):
 # Annuaire : personnes, foyers, saisons (voir docs/annuaire.md)
 # ---------------------------------------------------------------------------
 
+
 def _uuid():
     return str(uuid.uuid4())
 
 
 class AddressMixin:
     """Adresse postale. Celle d'une personne reste vide en général : on prend celle de son foyer."""
+
     address_recipient = db.Column(db.String(120))  # destinataire, s'il diffère du nom
     address_street = db.Column(db.Text)
     postal_code = db.Column(db.String(10))
@@ -411,6 +432,7 @@ class AddressMixin:
 
 class Person(AddressMixin, TimestampMixin, db.Model):
     """Une personne, quel que soit le nombre de ses rôles : élève, responsable, professeur."""
+
     CIVILITIES = ("M.", "Mme")
     SEXES = {"F": "Féminin", "M": "Masculin"}
 
@@ -434,12 +456,14 @@ class Person(AddressMixin, TimestampMixin, db.Model):
     account_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"), unique=True)
 
     account = db.relationship("Account", backref=db.backref("person", uselist=False))
-    phones = db.relationship("Phone", back_populates="person", cascade="all, delete-orphan",
-                             order_by="(Phone.position, Phone.id)")
+    phones = db.relationship(
+        "Phone", back_populates="person", cascade="all, delete-orphan", order_by="(Phone.position, Phone.id)"
+    )
     external_refs = db.relationship("ExternalRef", back_populates="person", cascade="all, delete-orphan")
     household_links = db.relationship("HouseholdMember", back_populates="person", cascade="all, delete-orphan")
-    memberships = db.relationship("Membership", back_populates="person", cascade="all, delete-orphan",
-                                  order_by="Membership.season_id.desc()")
+    memberships = db.relationship(
+        "Membership", back_populates="person", cascade="all, delete-orphan", order_by="Membership.season_id.desc()"
+    )
     teacher = db.relationship("Teacher", back_populates="person", uselist=False, cascade="all, delete-orphan")
 
     @property
@@ -467,19 +491,26 @@ class Person(AddressMixin, TimestampMixin, db.Model):
 
 class Household(AddressMixin, TimestampMixin, db.Model):
     """Un foyer : le payeur. Les cotisations, l'adresse postale et les IBAN s'y rattachent."""
+
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(36), nullable=False, unique=True, default=_uuid)
     name = db.Column(db.String(120), nullable=False, index=True)
     notes = db.Column(db.Text)
     archived_at = db.Column(db.DateTime)
 
-    members = db.relationship("HouseholdMember", back_populates="household", cascade="all, delete-orphan",
-                              order_by="(HouseholdMember.role.desc(), HouseholdMember.guardian_rank)")
-    phones = db.relationship("Phone", back_populates="household", cascade="all, delete-orphan",
-                             order_by="(Phone.position, Phone.id)")
+    members = db.relationship(
+        "HouseholdMember",
+        back_populates="household",
+        cascade="all, delete-orphan",
+        order_by="(HouseholdMember.role.desc(), HouseholdMember.guardian_rank)",
+    )
+    phones = db.relationship(
+        "Phone", back_populates="household", cascade="all, delete-orphan", order_by="(Phone.position, Phone.id)"
+    )
     external_refs = db.relationship("ExternalRef", back_populates="household", cascade="all, delete-orphan")
-    bank_accounts = db.relationship("BankAccount", back_populates="household", cascade="all, delete-orphan",
-                                    order_by="BankAccount.id")
+    bank_accounts = db.relationship(
+        "BankAccount", back_populates="household", cascade="all, delete-orphan", order_by="BankAccount.id"
+    )
 
     @property
     def guardians(self):
@@ -495,13 +526,17 @@ class Household(AddressMixin, TimestampMixin, db.Model):
 
 class HouseholdMember(db.Model):
     """Appartenance d'une personne à un foyer : responsable 1 ou 2, ou à charge."""
+
     GUARDIAN = "guardian"
     DEPENDENT = "dependent"
     ROLES = {GUARDIAN: "Responsable", DEPENDENT: "À charge"}
     __table_args__ = (
         db.UniqueConstraint("household_id", "guardian_rank"),  # un seul responsable 1, un seul responsable 2
-        db.CheckConstraint("(role = 'guardian' AND guardian_rank IS NOT NULL AND guardian_rank IN (1, 2)) OR "
-                           "(role = 'dependent' AND guardian_rank IS NULL)", name="ck_household_member_role"),
+        db.CheckConstraint(
+            "(role = 'guardian' AND guardian_rank IS NOT NULL AND guardian_rank IN (1, 2)) OR "
+            "(role = 'dependent' AND guardian_rank IS NULL)",
+            name="ck_household_member_role",
+        ),
     )
 
     household_id = db.Column(db.ForeignKey("household.id", ondelete="CASCADE"), primary_key=True)
@@ -520,9 +555,8 @@ class HouseholdMember(db.Model):
 
 class Phone(db.Model):
     """Téléphone d'une personne ou d'un foyer, jamais des deux."""
-    __table_args__ = (
-        db.CheckConstraint("(person_id IS NULL) <> (household_id IS NULL)", name="ck_phone_owner"),
-    )
+
+    __table_args__ = (db.CheckConstraint("(person_id IS NULL) <> (household_id IS NULL)", name="ck_phone_owner"),)
 
     id = db.Column(db.Integer, primary_key=True)
     person_id = db.Column(db.ForeignKey("person.id", ondelete="CASCADE"), index=True)
@@ -537,6 +571,7 @@ class Phone(db.Model):
 
 class ExternalRef(db.Model):
     """Numéro d'une fiche dans le logiciel de gestion : ce qui rend l'import rejouable sans doublons."""
+
     KINDS = {"student": "N° élève", "household": "N° famille", "teacher": "N° professeur"}
     __table_args__ = (
         db.UniqueConstraint("kind", "value"),
@@ -556,6 +591,7 @@ class ExternalRef(db.Model):
 
 class Season(db.Model):
     """Saison (« 2026-2027 »). La saison en cours se choisit dans l'annuaire, elle n'est pas déduite de la date."""
+
     __table_args__ = (db.CheckConstraint("ends_on > starts_on", name="ck_season_dates"),)
 
     id = db.Column(db.Integer, primary_key=True)
@@ -569,6 +605,7 @@ class Season(db.Model):
 
 class Membership(TimestampMixin, db.Model):
     """Adhésion d'une personne, comme élève, pour une saison. Jamais supprimée : c'est l'historique."""
+
     ACTIVE = "active"
     WITHDRAWN = "withdrawn"
     STATUSES = {ACTIVE: "Active", WITHDRAWN: "Abandon"}
@@ -595,6 +632,7 @@ class Membership(TimestampMixin, db.Model):
 
 class Teacher(db.Model):
     """Profil de professeur. Les droits dans l'appli passent par le compte, pas par cette table."""
+
     STATUSES = ("CDI", "CDD", "Vacataire", "Bénévole", "Autre")
 
     person_id = db.Column(db.ForeignKey("person.id", ondelete="CASCADE"), primary_key=True)
@@ -612,8 +650,9 @@ class Teacher(db.Model):
 
     def teaches_during(self, season):
         """Arrivé avant la fin de la saison et pas parti avant son début : on peut lui confier un cours."""
-        return ((self.started_on is None or self.started_on <= season.ends_on)
-                and (self.left_on is None or self.left_on > season.starts_on))
+        return (self.started_on is None or self.started_on <= season.ends_on) and (
+            self.left_on is None or self.left_on > season.starts_on
+        )
 
     def leaves_during(self, season):
         """Parti avant la fin de la saison : ses cours de cette saison sont à reprendre."""
@@ -624,8 +663,10 @@ class Teacher(db.Model):
 # Catalogue : disciplines, niveaux, lieux, cours (voir docs/catalogue.md)
 # ---------------------------------------------------------------------------
 
+
 class ArchivableMixin:
     """Une valeur du catalogue qui a servi ne se supprime pas : on l'archive, et elle n'est plus proposée."""
+
     archived_at = db.Column(db.DateTime)
 
     @property
@@ -635,6 +676,7 @@ class ArchivableMixin:
 
 class Discipline(ArchivableMixin, db.Model):
     """Discipline enseignée (« Flûte traversière », « Formation musicale »…), commune à toutes les saisons."""
+
     CATEGORIES = ("Instrument", "Formation musicale", "Pratique collective", "Éveil", "Autre")
 
     id = db.Column(db.Integer, primary_key=True)
@@ -647,6 +689,7 @@ class Discipline(ArchivableMixin, db.Model):
 
 class Level(ArchivableMixin, db.Model):
     """Niveau (« Cycle 1 - 2e année », « Débutant »…), commun à toutes les disciplines et saisons."""
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(60), nullable=False, unique=True)
     position = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # ordre dans les listes
@@ -657,6 +700,7 @@ class Level(ArchivableMixin, db.Model):
 
 class Site(ArchivableMixin, db.Model):
     """Lieu d'enseignement : l'école, une salle municipale, un collège…"""
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False, unique=True)
     address = db.Column(db.String(255))
@@ -690,6 +734,7 @@ class Course(TimestampMixin, db.Model):
 
     Un cours individuel regroupe plusieurs élèves à des heures de passage différentes : l'horaire est celui du créneau.
     """
+
     WEEKDAYS = ("Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche")
     __table_args__ = (
         db.CheckConstraint("weekday BETWEEN 0 AND 6", name="ck_course_weekday"),
@@ -743,9 +788,14 @@ class Course(TimestampMixin, db.Model):
 
     def overlaps(self, other):
         """Même jour, horaires qui se chevauchent (un cours qui finit à 18 h et un qui commence à 18 h ne se gênent pas)."""
-        return (self.weekday is not None and self.weekday == other.weekday
-                and self.starts_at is not None and other.starts_at is not None
-                and self.starts_at < other.ends_at and other.starts_at < self.ends_at)
+        return (
+            self.weekday is not None
+            and self.weekday == other.weekday
+            and self.starts_at is not None
+            and other.starts_at is not None
+            and self.starts_at < other.ends_at
+            and other.starts_at < self.ends_at
+        )
 
     def __repr__(self):
         return f"<Course {self.id}>"
@@ -753,12 +803,15 @@ class Course(TimestampMixin, db.Model):
 
 class TeacherDiscipline(db.Model):
     """Discipline enseignée par un professeur pendant une saison."""
+
     season_id = db.Column(db.ForeignKey("season.id", ondelete="RESTRICT"), primary_key=True)
     teacher_id = db.Column(db.ForeignKey("teacher.person_id", ondelete="CASCADE"), primary_key=True, index=True)
     discipline_id = db.Column(db.ForeignKey("discipline.id", ondelete="RESTRICT"), primary_key=True, index=True)
 
     season = db.relationship("Season")
-    teacher = db.relationship("Teacher", backref=db.backref("taught", cascade="all, delete-orphan", passive_deletes=True))
+    teacher = db.relationship(
+        "Teacher", backref=db.backref("taught", cascade="all, delete-orphan", passive_deletes=True)
+    )
     discipline = db.relationship("Discipline")
 
 
@@ -766,8 +819,10 @@ class TeacherDiscipline(db.Model):
 # Inscriptions : campagnes, dossiers, inscriptions aux cours, consentements (voir docs/inscriptions.md)
 # ---------------------------------------------------------------------------
 
+
 class Campaign(TimestampMixin, db.Model):
     """Campagne d'inscription d'une saison : les familles déposent leur dossier entre ces deux dates."""
+
     __table_args__ = (db.CheckConstraint("closes_at > opens_at", name="ck_campaign_dates"),)
 
     id = db.Column(db.Integer, primary_key=True)
@@ -780,8 +835,12 @@ class Campaign(TimestampMixin, db.Model):
     instructions = db.Column(db.Text)  # affichées en tête du dossier
 
     season = db.relationship("Season")
-    consents = db.relationship("CampaignConsent", back_populates="campaign", cascade="all, delete-orphan",
-                               order_by="(CampaignConsent.position, CampaignConsent.id)")
+    consents = db.relationship(
+        "CampaignConsent",
+        back_populates="campaign",
+        cascade="all, delete-orphan",
+        order_by="(CampaignConsent.position, CampaignConsent.id)",
+    )
 
     def is_open(self, now=None):
         now = now or datetime.now()
@@ -794,6 +853,7 @@ class Campaign(TimestampMixin, db.Model):
 class CampaignConsent(db.Model):
     """Consentement demandé dans une campagne : droit à l'image, règlement intérieur… Son texte est recopié dans
     chaque réponse, pour garder la preuve de ce qui a été accepté même s'il change ensuite."""
+
     STUDENT = "student"
     HOUSEHOLD = "household"
     SCOPES = {STUDENT: "Pour chaque élève", HOUSEHOLD: "Pour le foyer"}
@@ -816,18 +876,25 @@ class Dossier(TimestampMixin, db.Model):
     Ce que la famille saisit reste dans `data` (JSON) : l'annuaire ne change qu'à la validation, par un gestionnaire.
     Une nouvelle famille (formulaire public) n'a pas encore de foyer : `household_id` est vide jusque-là.
     """
+
     DRAFT = "draft"
     SUBMITTED = "submitted"
     TO_FIX = "to_fix"
     VALIDATED = "validated"
     TRANSFERRED = "transferred"
-    STATUSES = {DRAFT: "Brouillon", SUBMITTED: "Soumis", TO_FIX: "À corriger", VALIDATED: "Validé",
-                TRANSFERRED: "Reporté dans le logiciel de gestion"}
+    STATUSES = {
+        DRAFT: "Brouillon",
+        SUBMITTED: "Soumis",
+        TO_FIX: "À corriger",
+        VALIDATED: "Validé",
+        TRANSFERRED: "Reporté dans le logiciel de gestion",
+    }
     EDITABLE = (DRAFT, TO_FIX)  # la famille peut encore le modifier
     __table_args__ = (
         db.UniqueConstraint("campaign_id", "household_id"),  # plusieurs NULL permis : les nouvelles familles
-        db.CheckConstraint("status IN ('draft', 'submitted', 'to_fix', 'validated', 'transferred')",
-                           name="ck_dossier_status"),
+        db.CheckConstraint(
+            "status IN ('draft', 'submitted', 'to_fix', 'validated', 'transferred')", name="ck_dossier_status"
+        ),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -873,6 +940,7 @@ class Dossier(TimestampMixin, db.Model):
 
 class Enrollment(TimestampMixin, db.Model):
     """Inscription d'un élève à un cours, rattachée à son adhésion de la saison."""
+
     ACTIVE = "active"
     WITHDRAWN = "withdrawn"
     STATUSES = {ACTIVE: "Inscrit", WITHDRAWN: "Abandon"}
@@ -889,17 +957,17 @@ class Enrollment(TimestampMixin, db.Model):
     withdrawn_on = db.Column(db.Date)
     dossier_id = db.Column(db.ForeignKey("dossier.id", ondelete="SET NULL"), index=True)
 
-    membership = db.relationship("Membership", backref=db.backref("enrollments", cascade="all, delete-orphan",
-                                                                  passive_deletes=True))
+    membership = db.relationship(
+        "Membership", backref=db.backref("enrollments", cascade="all, delete-orphan", passive_deletes=True)
+    )
     course = db.relationship("Course", backref=db.backref("enrollments", passive_deletes=True))
     dossier = db.relationship("Dossier")
 
 
 class Consent(db.Model):
     """Consentement donné (ou refusé) pour une saison, daté, avec le texte tel qu'il était affiché."""
-    __table_args__ = (
-        db.CheckConstraint("(person_id IS NULL) <> (household_id IS NULL)", name="ck_consent_owner"),
-    )
+
+    __table_args__ = (db.CheckConstraint("(person_id IS NULL) <> (household_id IS NULL)", name="ck_consent_owner"),)
 
     id = db.Column(db.Integer, primary_key=True)
     person_id = db.Column(db.ForeignKey("person.id", ondelete="CASCADE"), index=True)
@@ -913,10 +981,15 @@ class Consent(db.Model):
     given_by_name = db.Column(db.String(160))  # nom de la personne qui a répondu, gardé si son compte disparaît
     dossier_id = db.Column(db.ForeignKey("dossier.id", ondelete="SET NULL"), index=True)
 
-    person = db.relationship("Person", backref=db.backref("consents", cascade="all, delete-orphan",
-                                                          passive_deletes=True, order_by="Consent.given_at.desc()"))
-    household = db.relationship("Household", backref=db.backref("consents", cascade="all, delete-orphan",
-                                                                passive_deletes=True))
+    person = db.relationship(
+        "Person",
+        backref=db.backref(
+            "consents", cascade="all, delete-orphan", passive_deletes=True, order_by="Consent.given_at.desc()"
+        ),
+    )
+    household = db.relationship(
+        "Household", backref=db.backref("consents", cascade="all, delete-orphan", passive_deletes=True)
+    )
     season = db.relationship("Season")
     dossier = db.relationship("Dossier")
 
@@ -924,6 +997,7 @@ class Consent(db.Model):
 class BankAccount(TimestampMixin, db.Model):
     """Coordonnées bancaires d'un foyer. L'IBAN est chiffré (services/bank.py) : seuls ses 4 derniers caractères
     sont en clair, et son empreinte sert à repérer un même IBAN sans rien déchiffrer."""
+
     id = db.Column(db.Integer, primary_key=True)
     household_id = db.Column(db.ForeignKey("household.id", ondelete="CASCADE"), nullable=False, index=True)
     holder_person_id = db.Column(db.ForeignKey("person.id", ondelete="SET NULL"), index=True)
@@ -936,8 +1010,9 @@ class BankAccount(TimestampMixin, db.Model):
 
     household = db.relationship("Household", back_populates="bank_accounts")
     holder = db.relationship("Person")
-    mandates = db.relationship("SepaMandate", back_populates="bank_account", cascade="all, delete-orphan",
-                               order_by="SepaMandate.id")
+    mandates = db.relationship(
+        "SepaMandate", back_populates="bank_account", cascade="all, delete-orphan", order_by="SepaMandate.id"
+    )
 
     @property
     def masked_iban(self):
@@ -946,6 +1021,7 @@ class BankAccount(TimestampMixin, db.Model):
 
 class SepaMandate(db.Model):
     """Mandat de prélèvement SEPA. Le document signé n'est pas conservé ici."""
+
     id = db.Column(db.Integer, primary_key=True)
     bank_account_id = db.Column(db.ForeignKey("bank_account.id", ondelete="CASCADE"), nullable=False, index=True)
     rum = db.Column(db.String(35), nullable=False, unique=True)  # référence unique du mandat
@@ -965,8 +1041,10 @@ class SepaMandate(db.Model):
 # Tarifs et cotisations (voir docs/tarifs.md)
 # ---------------------------------------------------------------------------
 
+
 class Regie(ArchivableMixin, db.Model):
     """Régie qui encaisse : EMHN, OHN… Chaque élément de cotisation relève de l'une d'elles."""
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(60), nullable=False, unique=True)
 
@@ -976,6 +1054,7 @@ class Regie(ArchivableMixin, db.Model):
 
 class FeeSeason(db.Model):
     """Réglages des tarifs d'une saison : classement des élèves, arrondi, tranches de QF, communes résidentes."""
+
     season_id = db.Column(db.ForeignKey("season.id", ondelete="CASCADE"), primary_key=True)
     # Réglages du moteur (services/pricing.py : DEFAULT_SETTINGS), vérifiés par validate_settings.
     engine = db.Column(db.JSON, nullable=False, default=dict)
@@ -984,8 +1063,9 @@ class FeeSeason(db.Model):
     default_band = db.Column(db.String(10))  # tranche d'un foyer qui ne donne pas son quotient
     resident_cities = db.Column(db.JSON, nullable=False, default=list)  # communes « résidentes »
 
-    season = db.relationship("Season", backref=db.backref("fee_season", uselist=False, cascade="all, delete-orphan",
-                                                          passive_deletes=True))
+    season = db.relationship(
+        "Season", backref=db.backref("fee_season", uselist=False, cascade="all, delete-orphan", passive_deletes=True)
+    )
 
 
 class FeeItem(TimestampMixin, db.Model):
@@ -993,6 +1073,7 @@ class FeeItem(TimestampMixin, db.Model):
 
     Le code repris du logiciel de gestion n'est qu'une information : les codes changent d'une saison à l'autre.
     """
+
     __table_args__ = (
         db.UniqueConstraint("season_id", "label"),
         db.CheckConstraint("price >= 0", name="ck_fee_item_price"),
@@ -1019,6 +1100,7 @@ class FeeItem(TimestampMixin, db.Model):
 class FeeRule(TimestampMixin, db.Model):
     """Règle de tarif d'une saison. Les règles s'appliquent dans l'ordre de `position`, de la plus petite à la plus
     grande. Conditions, cible et effet sont vérifiés par services/pricing.py avant tout enregistrement."""
+
     __table_args__ = (db.CheckConstraint("position >= 0", name="ck_fee_rule_position"),)
 
     id = db.Column(db.Integer, primary_key=True)
@@ -1036,8 +1118,13 @@ class FeeRule(TimestampMixin, db.Model):
 
     def as_dict(self):
         """La règle telle que le moteur la lit."""
-        return {"name": self.name, "conditions": self.conditions, "target": self.target, "effect": self.effect,
-                "group": self.exclusive_group}
+        return {
+            "name": self.name,
+            "conditions": self.conditions,
+            "target": self.target,
+            "effect": self.effect,
+            "group": self.exclusive_group,
+        }
 
     def __repr__(self):
         return f"<FeeRule {self.position} {self.name}>"
@@ -1045,6 +1132,7 @@ class FeeRule(TimestampMixin, db.Model):
 
 class HouseholdSeason(db.Model):
     """Situation d'un foyer pour une saison : ce qui fixe ses tarifs. Réservée au trésorier et à la direction."""
+
     household_id = db.Column(db.ForeignKey("household.id", ondelete="CASCADE"), primary_key=True)
     season_id = db.Column(db.ForeignKey("season.id", ondelete="RESTRICT"), primary_key=True, index=True)
     qf_band = db.Column(db.String(10))  # tranche saisie ; vide : déduite du quotient, sinon tranche par défaut
@@ -1054,13 +1142,15 @@ class HouseholdSeason(db.Model):
     tags = db.Column(db.JSON, nullable=False, default=list)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
 
-    household = db.relationship("Household", backref=db.backref("seasons", cascade="all, delete-orphan",
-                                                                passive_deletes=True))
+    household = db.relationship(
+        "Household", backref=db.backref("seasons", cascade="all, delete-orphan", passive_deletes=True)
+    )
     season = db.relationship("Season")
 
 
 class FeePick(db.Model):
     """Élément pris en dehors des cours : location d'instrument, frais particuliers… ajouté par un gestionnaire."""
+
     id = db.Column(db.Integer, primary_key=True)
     household_id = db.Column(db.ForeignKey("household.id", ondelete="CASCADE"), nullable=False, index=True)
     person_id = db.Column(db.ForeignKey("person.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -1079,6 +1169,7 @@ class Assessment(TimestampMixin, db.Model):
     Les lignes gardent libellés, régies et montants tels qu'ils étaient : supprimer un élément ou une fiche ne change
     pas une cotisation validée.
     """
+
     PROPOSED = "proposed"
     VALIDATED = "validated"
     STATUSES = {PROPOSED: "Proposée", VALIDATED: "Validée"}
@@ -1101,8 +1192,9 @@ class Assessment(TimestampMixin, db.Model):
     household = db.relationship("Household")
     season = db.relationship("Season")
     validated_by = db.relationship("Account")
-    lines = db.relationship("AssessmentLine", back_populates="assessment", cascade="all, delete-orphan",
-                            order_by="AssessmentLine.position")
+    lines = db.relationship(
+        "AssessmentLine", back_populates="assessment", cascade="all, delete-orphan", order_by="AssessmentLine.position"
+    )
 
     @property
     def total(self):
@@ -1118,13 +1210,15 @@ class Assessment(TimestampMixin, db.Model):
 
 class AssessmentLine(db.Model):
     """Ligne d'une cotisation : un élément pour un élève, une règle sur le total du foyer, ou l'arrondi."""
+
     ITEM = "item"
     ADJUSTMENT = "adjustment"
     ROUNDING = "rounding"
     __table_args__ = (
         db.CheckConstraint("kind IN ('item', 'adjustment', 'rounding')", name="ck_assessment_line_kind"),
-        db.CheckConstraint("(corrected_at IS NULL) = (correction_reason IS NULL)",
-                           name="ck_assessment_line_correction"),
+        db.CheckConstraint(
+            "(corrected_at IS NULL) = (correction_reason IS NULL)", name="ck_assessment_line_correction"
+        ),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -1157,6 +1251,7 @@ class AssessmentLine(db.Model):
 # ---------------------------------------------------------------------------
 # Journal, notifications, réglages
 # ---------------------------------------------------------------------------
+
 
 class Activity(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1191,5 +1286,6 @@ class Notification(db.Model):
 
 class AppSetting(db.Model):
     """Réglage de l'appli modifiable depuis l'interface (nom, logo, couleur…), stocké en clé / valeur."""
+
     key = db.Column(db.String(50), primary_key=True)
     value = db.Column(db.Text, nullable=False)

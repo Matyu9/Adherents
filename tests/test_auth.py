@@ -1,4 +1,5 @@
 """Connexion, déconnexion, mot de passe, limitation des tentatives."""
+
 from datetime import datetime, timedelta
 
 import pytest
@@ -60,7 +61,9 @@ def test_account_without_password_cannot_log_in(client):
     account = make_account()
     account.password_hash = None
     db.session.commit()
-    assert "incorrect" in client.post("/connexion", data={"email": account.email, "password": "x"}).get_data(as_text=True)
+    assert "incorrect" in client.post("/connexion", data={"email": account.email, "password": "x"}).get_data(
+        as_text=True
+    )
 
 
 def test_deactivating_an_account_ends_its_access_at_once(client, account):
@@ -87,25 +90,29 @@ def test_failed_login_on_known_account_targets_it(client, account):
 
 # --- Limitation des tentatives ------------------------------------------------------------------------------
 
+
 def fail(client, email, times=1, ip="10.0.0.1"):
     for _ in range(times):
-        response = client.post("/connexion", data={"email": email, "password": "mauvais"},
-                               environ_overrides={"REMOTE_ADDR": ip})
+        response = client.post(
+            "/connexion", data={"email": email, "password": "mauvais"}, environ_overrides={"REMOTE_ADDR": ip}
+        )
     return response
 
 
 def test_throttle_blocks_even_the_right_password(client, account):
     assert fail(client, account.email, MAX_FAILURES).status_code == 200
-    response = client.post("/connexion", data={"email": account.email, "password": PASSWORD},
-                           environ_overrides={"REMOTE_ADDR": "10.0.0.2"})
+    response = client.post(
+        "/connexion", data={"email": account.email, "password": PASSWORD}, environ_overrides={"REMOTE_ADDR": "10.0.0.2"}
+    )
     assert response.status_code == 429 and "Trop de tentatives" in response.get_data(as_text=True)
 
 
 def test_throttle_also_counts_per_address(client, account):
     for n in range(MAX_FAILURES):
         fail(client, f"inconnu{n}@asso.test")
-    response = client.post("/connexion", data={"email": account.email, "password": PASSWORD},
-                           environ_overrides={"REMOTE_ADDR": "10.0.0.1"})
+    response = client.post(
+        "/connexion", data={"email": account.email, "password": PASSWORD}, environ_overrides={"REMOTE_ADDR": "10.0.0.1"}
+    )
     assert response.status_code == 429
 
 
@@ -124,8 +131,14 @@ def test_throttle_never_stores_the_typed_text(client, account):
 
 def test_success_resets_the_counter(client, account):
     fail(client, account.email, MAX_FAILURES - 1)
-    assert client.post("/connexion", data={"email": account.email, "password": PASSWORD},
-                       environ_overrides={"REMOTE_ADDR": "10.0.0.1"}).status_code == 302
+    assert (
+        client.post(
+            "/connexion",
+            data={"email": account.email, "password": PASSWORD},
+            environ_overrides={"REMOTE_ADDR": "10.0.0.1"},
+        ).status_code
+        == 302
+    )
     client.post("/deconnexion")
     assert fail(client, account.email, MAX_FAILURES - 1).status_code == 200
 
@@ -138,6 +151,7 @@ def test_old_failures_stop_counting(client, account):
 
 
 # --- Déconnexion et sessions --------------------------------------------------------------------------------
+
 
 def test_logout_needs_post(client, account):
     login(client, account)
@@ -173,11 +187,21 @@ def test_cookies_have_their_own_names(client, account):
     assert client.get_cookie("adherents_session") and not client.get_cookie("session")
 
 
-@pytest.mark.parametrize("target, expected", [
-    ("/journal", "/journal"), ("/journal?page=2", "/journal?page=2"),
-    ("//evil.test", "/"), ("///evil.test", "/"), ("/\\evil.test", "/"), ("https://evil.test", "/"), ("javascript:alert(1)", "/"),
-    ("evil.test", "/"), ("", "/"), (None, "/"),
-])
+@pytest.mark.parametrize(
+    "target, expected",
+    [
+        ("/journal", "/journal"),
+        ("/journal?page=2", "/journal?page=2"),
+        ("//evil.test", "/"),
+        ("///evil.test", "/"),
+        ("/\\evil.test", "/"),
+        ("https://evil.test", "/"),
+        ("javascript:alert(1)", "/"),
+        ("evil.test", "/"),
+        ("", "/"),
+        (None, "/"),
+    ],
+)
 def test_safe_next(app, target, expected):
     with app.test_request_context():
         assert safe_next(target) == expected
@@ -198,6 +222,7 @@ def test_logged_in_user_is_sent_away_from_login_page(client, account):
 
 # --- Mot de passe -------------------------------------------------------------------------------------------
 
+
 def change(client, current=PASSWORD, new="nouveau-mot-de-passe", confirm=None):
     return client.post("/mot-de-passe", data={"current": current, "new": new, "confirm": confirm or new})
 
@@ -209,10 +234,15 @@ def test_change_password(client, account):
     assert "account.password" in actions()
 
 
-@pytest.mark.parametrize("kwargs, message", [
-    ({"current": "faux"}, "actuel incorrect"), ({"new": PASSWORD}, "différent"), ({"new": "court"}, "8"),
-    ({"confirm": "autre-chose"}, "ne correspondent pas"),
-])
+@pytest.mark.parametrize(
+    "kwargs, message",
+    [
+        ({"current": "faux"}, "actuel incorrect"),
+        ({"new": PASSWORD}, "différent"),
+        ({"new": "court"}, "8"),
+        ({"confirm": "autre-chose"}, "ne correspondent pas"),
+    ],
+)
 def test_change_password_errors(client, account, kwargs, message):
     login(client, account)
     response = change(client, **kwargs)

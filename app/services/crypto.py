@@ -2,6 +2,7 @@
 
 Changer SECRET_KEY les rend donc illisibles (voir docs/configuration.md).
 """
+
 import base64
 
 from cryptography.fernet import Fernet
@@ -13,5 +14,6 @@ from flask import current_app
 def fernet(purpose):
     """Une clé distincte par usage (`purpose`, en octets)."""
     key = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=purpose).derive(
-        current_app.config["SECRET_KEY"].encode())
+        current_app.config["SECRET_KEY"].encode()
+    )
     return Fernet(base64.urlsafe_b64encode(key))

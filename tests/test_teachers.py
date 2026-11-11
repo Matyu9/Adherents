@@ -1,4 +1,5 @@
 """Professeurs : un écran à part, avec son droit. On ne devient professeur que d'ici, jamais depuis une fiche."""
+
 from datetime import date
 
 import pytest
@@ -12,9 +13,19 @@ from .test_annuaire import family, person, season  # noqa: F401
 
 
 def test_a_new_teacher_gets_a_record_and_a_contract(client, admin):
-    client.post("/professeurs/nouveau", data={
-        "civility": "Mme", "first_name": " Élodie ", "last_name": "Martin", "email": "elodie@perso.test",
-        "phone": "06 12 34 56 78", "status": "CDI", "started_on": "2018-09-01", "work_email": "e.martin@ecole.test"})
+    client.post(
+        "/professeurs/nouveau",
+        data={
+            "civility": "Mme",
+            "first_name": " Élodie ",
+            "last_name": "Martin",
+            "email": "elodie@perso.test",
+            "phone": "06 12 34 56 78",
+            "status": "CDI",
+            "started_on": "2018-09-01",
+            "work_email": "e.martin@ecole.test",
+        },
+    )
     elodie = db.session.scalar(db.select(Person).filter_by(last_name="Martin"))
     assert elodie.first_name == "Élodie" and elodie.civility == "Mme" and elodie.email == "elodie@perso.test"
     assert [p.number for p in elodie.phones] == ["+33612345678"]
@@ -25,8 +36,10 @@ def test_a_new_teacher_gets_a_record_and_a_contract(client, admin):
 
 
 def test_invalid_contract_or_phone_is_refused(client, admin):
-    response = client.post("/professeurs/nouveau", data={"first_name": "A", "last_name": "B", "phone": "12",
-                                                         "started_on": "2020-09-01", "left_on": "2019-01-01"})
+    response = client.post(
+        "/professeurs/nouveau",
+        data={"first_name": "A", "last_name": "B", "phone": "12", "started_on": "2020-09-01", "left_on": "2019-01-01"},
+    )
     page = response.get_data(as_text=True)
     assert "ne peut pas précéder" in page and "Numéro invalide" in page
     assert db.session.scalar(db.select(db.func.count(Teacher.person_id))) == 0
@@ -47,7 +60,7 @@ def test_a_parent_becomes_a_teacher_without_a_second_record(client, admin, famil
 
 def test_a_member_record_offers_no_contract(client, admin, family):
     page = client.get(f"/annuaire/personnes/{family['zoe'].id}").get_data(as_text=True)
-    content = page[page.index('<main class="content">'):page.index("</main>")]  # sans le menu
+    content = page[page.index('<main class="content">') : page.index("</main>")]  # sans le menu
     assert "professeur" not in content.lower()
 
 
@@ -92,7 +105,8 @@ def test_departure_and_list_of_former_teachers(client, admin, app):
     client.post(f"/professeurs/{paul.id}/modifier", data={"status": "CDD", "left_on": "2024-06-30"})
     assert db.session.get(Teacher, paul.id).left_on == date(2024, 6, 30)
     assert db.session.scalar(db.select(Activity).filter_by(action="teacher.update")).changes == {
-        "left_on": ["(masqué)", "(masqué)"]}  # le journal dit ce qui a changé dans le contrat, jamais les valeurs
+        "left_on": ["(masqué)", "(masqué)"]
+    }  # le journal dit ce qui a changé dans le contrat, jamais les valeurs
     assert "PROF Paul" not in client.get("/professeurs").get_data(as_text=True)
     assert "PROF Paul" in client.get("/professeurs?partis=1").get_data(as_text=True)
 

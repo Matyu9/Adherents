@@ -42,8 +42,12 @@ def register_cli(app):
 
     @app.cli.command("oidc-export-accounts")
     @click.option("--application", "name", required=True, help="Nom de l'application, comme dans « Applications ».")
-    @click.option("--output", type=click.File("w", encoding="utf-8"), default="-",
-                  help="Fichier où écrire l'export (par défaut, la sortie standard).")
+    @click.option(
+        "--output",
+        type=click.File("w", encoding="utf-8"),
+        default="-",
+        help="Fichier où écrire l'export (par défaut, la sortie standard).",
+    )
     def oidc_export_accounts(name, output):
         """Exporte en JSON les comptes qui ont accès à une application, pour les rattacher à ses propres fiches.
 
@@ -67,8 +71,11 @@ def register_cli(app):
         except bank.BankKeyError:
             version = 1
         click.echo(f"{version}:{bank.new_key()}")
-        click.echo("Ajoutez-la en tête de BANK_DATA_KEYS (séparée par une virgule), redémarrez, puis lancez "
-                   "flask bank-rotate-key. Sauvegardez-la à part de la base.", err=True)
+        click.echo(
+            "Ajoutez-la en tête de BANK_DATA_KEYS (séparée par une virgule), redémarrez, puis lancez "
+            "flask bank-rotate-key. Sauvegardez-la à part de la base.",
+            err=True,
+        )
 
     @app.cli.command("bank-rotate-key")
     def bank_rotate_key():
@@ -80,8 +87,10 @@ def register_cli(app):
             raise click.ClickException(str(exc)) from None
         log("bank.rotate", f"IBAN rechiffrés avec la clé n° {version} ({count}) en ligne de commande")
         db.session.commit()
-        click.echo(f"{count} IBAN rechiffré(s) avec la clé n° {version}. Les autres clés peuvent être retirées "
-                   "de BANK_DATA_KEYS.")
+        click.echo(
+            f"{count} IBAN rechiffré(s) avec la clé n° {version}. Les autres clés peuvent être retirées "
+            "de BANK_DATA_KEYS."
+        )
 
     @app.cli.command("run-tasks")
     def run_tasks():

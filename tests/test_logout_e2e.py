@@ -4,6 +4,7 @@ L'appli cliente garde ses sessions côté serveur, indexées par `sid`. Son poin
 signature avec le JWKS du serveur, puis `iss`, `aud`, `iat`, `events`, l'absence de `nonce` et le `typ`. Tous les
 serveurs tournent sur 127.0.0.1 uniquement, et les avis partent en tâche de fond comme en production.
 """
+
 import secrets
 import threading
 import time
@@ -59,8 +60,13 @@ class RelyingParty:
         web.config.update(SESSION_COOKIE_NAME=f"rp_{port}")
         oauth = OAuth(web)
         discovery = f"{issuer}/.well-known/openid-configuration"
-        remote = oauth.register("idp", server_metadata_url=discovery, client_id=client_id, client_secret=secret,
-                                client_kwargs={"scope": "openid profile email groups", "code_challenge_method": "S256"})
+        remote = oauth.register(
+            "idp",
+            server_metadata_url=discovery,
+            client_id=client_id,
+            client_secret=secret,
+            client_kwargs={"scope": "openid profile email groups", "code_challenge_method": "S256"},
+        )
         rp = self
 
         @web.route("/entrer")
@@ -71,8 +77,11 @@ class RelyingParty:
         def back():
             token = remote.authorize_access_token()
             local = secrets.token_urlsafe(16)
-            rp.sessions[local] = {"sub": token["userinfo"]["sub"], "sid": token["userinfo"].get("sid"),
-                                  "id_token": token["id_token"]}
+            rp.sessions[local] = {
+                "sub": token["userinfo"]["sub"],
+                "sid": token["userinfo"].get("sid"),
+                "id_token": token["id_token"],
+            }
             session["local"] = local
             return redirect("/moi")
 
@@ -84,8 +93,11 @@ class RelyingParty:
         @web.route("/sortir")
         def leave():
             current = rp.sessions.pop(session.pop("local", None), None)
-            params = {"post_logout_redirect_uri": f"{rp.base}/au-revoir", "state": "etat-sortie",
-                      "client_id": client_id}
+            params = {
+                "post_logout_redirect_uri": f"{rp.base}/au-revoir",
+                "state": "etat-sortie",
+                "client_id": client_id,
+            }
             if current and request.args.get("sans_jeton") is None:
                 params["id_token_hint"] = current["id_token"]
             return redirect(remote.load_server_metadata()["end_session_endpoint"] + "?" + urlencode(params))
@@ -131,26 +143,48 @@ def world(tmp_path_factory, module_database):
     tmp = tmp_path_factory.mktemp("logout-e2e")
     port = free_port()
     issuer = f"http://127.0.0.1:{port}"
-    idp = create_app(config_for(tmp, SQLALCHEMY_DATABASE_URI=module_database, WTF_CSRF_ENABLED=True,
-                                TESTING=False, PROPAGATE_EXCEPTIONS=False, SECRET_KEY="cle-de-test-e2e-" * 4,
-                                OIDC_ISSUER=issuer, BASE_URL=issuer, BACKCHANNEL_IN_BACKGROUND=True))
+    idp = create_app(
+        config_for(
+            tmp,
+            SQLALCHEMY_DATABASE_URI=module_database,
+            WTF_CSRF_ENABLED=True,
+            TESTING=False,
+            PROPAGATE_EXCEPTIONS=False,
+            SECRET_KEY="cle-de-test-e2e-" * 4,
+            OIDC_ISSUER=issuer,
+            BASE_URL=issuer,
+            BACKCHANNEL_IN_BACKGROUND=True,
+        )
+    )
     httpd = serve(idp, port)
     rps = {}
     with idp.app_context():
         db.create_all()
         stamp_head()
         group = AccessGroup(key="membres", name="Membres")
-        person = Account(first_name="Élise", last_name="Test", email="elise@e2e.test", role=Role.ADHERENT, active=True,
-                         email_verified=True, groups=[group])
+        person = Account(
+            first_name="Élise",
+            last_name="Test",
+            email="elise@e2e.test",
+            role=Role.ADHERENT,
+            active=True,
+            email_verified=True,
+            groups=[group],
+        )
         person.set_password(PASSWORD)
         db.session.add(person)
         for name in ("Inventaire", "Autre appli"):
             rp_port = free_port()
-            client = OidcClient(client_id=oidc.new_client_id(), name=name, first_party=True,
-                                redirect_uris=[f"http://127.0.0.1:{rp_port}/retour"],
-                                post_logout_redirect_uris=[f"http://127.0.0.1:{rp_port}/au-revoir"],
-                                backchannel_logout_uri=f"http://127.0.0.1:{rp_port}/backchannel",
-                                allowed_groups=[group], shared_groups=[group])
+            client = OidcClient(
+                client_id=oidc.new_client_id(),
+                name=name,
+                first_party=True,
+                redirect_uris=[f"http://127.0.0.1:{rp_port}/retour"],
+                post_logout_redirect_uris=[f"http://127.0.0.1:{rp_port}/au-revoir"],
+                backchannel_logout_uri=f"http://127.0.0.1:{rp_port}/backchannel",
+                allowed_groups=[group],
+                shared_groups=[group],
+            )
             secret = oidc.set_secret(client)
             db.session.add(client)
             db.session.commit()
@@ -189,6 +223,7 @@ def page(browser, world):
 
 def json_of(page):
     import json
+
     page.wait_for_load_state("load")
     return json.loads(page.inner_text("body"))
 
@@ -299,10 +334,12 @@ def test_cut_account_closes_the_app_session(page, world):
     idp = world["idp"]
     with idp.app_context():
         from app.services import sessions
+
         account = db.session.scalar(db.select(Account).filter_by(email="elise@e2e.test"))
         with idp.test_request_context():
             sessions.revoke(account)  # ce que fait « Couper » : ses sessions sont fermées
             db.session.commit()
         from app.services import logout
+
         logout.deliver_pending()
     assert inventaire.wait_for(1) and not connected(page, inventaire)

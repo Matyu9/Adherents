@@ -1,4 +1,5 @@
 """Rôles et droits (administrateurs uniquement)."""
+
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
@@ -44,13 +45,23 @@ def _apply(form, role):
     if role.key != Role.ADMIN:  # l'administrateur a toujours tous les droits
         role.permissions = [p for p in PERMISSIONS if p in request.form.getlist("permissions")]
     ids = request.form.getlist("groups", type=int)
-    role.groups = db.session.scalars(db.select(AccessGroup).where(AccessGroup.id.in_(ids))
-                                     .order_by(AccessGroup.name)).all() if ids else []
+    role.groups = (
+        db.session.scalars(db.select(AccessGroup).where(AccessGroup.id.in_(ids)).order_by(AccessGroup.name)).all()
+        if ids
+        else []
+    )
 
 
 def _render(form, role, checked, checked_groups):
-    return render_template("roles/form.html", form=form, role=role, groups=PERMISSION_GROUPS, checked=checked,
-                           all_groups=groups_service.all_groups(), checked_groups=checked_groups)
+    return render_template(
+        "roles/form.html",
+        form=form,
+        role=role,
+        groups=PERMISSION_GROUPS,
+        checked=checked,
+        all_groups=groups_service.all_groups(),
+        checked_groups=checked_groups,
+    )
 
 
 def _form_groups(default):
@@ -61,8 +72,9 @@ def _form_groups(default):
 
 @bp.route("/roles")
 def index():
-    return render_template("roles/index.html", roles=roles.all_roles(), counts=roles.member_counts(),
-                           total=len(PERMISSIONS))
+    return render_template(
+        "roles/index.html", roles=roles.all_roles(), counts=roles.member_counts(), total=len(PERMISSIONS)
+    )
 
 
 @bp.route("/roles/nouveau", methods=["GET", "POST"])
@@ -73,15 +85,21 @@ def create():
         role = Role(key=roles.new_key(form.name.data))
         _apply(form, role)
         db.session.add(role)
-        log("role.create", f"Rôle créé : {role.name} ({len(role.permissions)} droit(s))",
-            changes={"groupes": [[], [g.key for g in role.groups]]} if role.groups else None)
+        log(
+            "role.create",
+            f"Rôle créé : {role.name} ({len(role.permissions)} droit(s))",
+            changes={"groupes": [[], [g.key for g in role.groups]]} if role.groups else None,
+        )
         db.session.commit()
         flash(f"Rôle « {role.name} » créé.", "success")
         return redirect(url_for(".index"))
     if request.method == "GET" and source is not None:
         form.description.data = source.description
-    checked = request.form.getlist("permissions") if request.method == "POST" else (
-        source.permissions if source is not None and source.key != Role.ADMIN else [])
+    checked = (
+        request.form.getlist("permissions")
+        if request.method == "POST"
+        else (source.permissions if source is not None and source.key != Role.ADMIN else [])
+    )
     return _render(form, None, set(checked), _form_groups(source.groups if source is not None else []))
 
 
@@ -93,8 +111,11 @@ def edit(key):
         before = [g.key for g in role.groups]
         _apply(form, role)
         after = [g.key for g in role.groups]
-        log("role.update", f"Rôle modifié : {role.name}",
-            changes={"groupes": [before, after]} if before != after else None)
+        log(
+            "role.update",
+            f"Rôle modifié : {role.name}",
+            changes={"groupes": [before, after]} if before != after else None,
+        )
         if before != after:  # chacun de ses comptes gagne ou perd ces groupes : les applis concernées sont prévenues
             logout.review_access(accounts=db.session.scalars(db.select(Account).filter_by(role=role.key)).all())
         db.session.commit()

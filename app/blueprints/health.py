@@ -1,4 +1,5 @@
 """État de l'installation, réservé à qui gère les paramètres (404 pour les autres : la route ne se dévoile pas)."""
+
 from functools import wraps
 
 from flask import Blueprint, abort, jsonify, render_template

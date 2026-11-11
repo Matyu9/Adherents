@@ -6,8 +6,19 @@ from .conftest import login, make_account
 
 
 def create_admin(app, email="Chef@Asso.Test", password="un-mot-de-passe"):
-    return app.test_cli_runner().invoke(args=["create-admin", "--email", email, "--first-name", "Élise", "--last-name",
-                                              "Lefèvre", "--password", password])
+    return app.test_cli_runner().invoke(
+        args=[
+            "create-admin",
+            "--email",
+            email,
+            "--first-name",
+            "Élise",
+            "--last-name",
+            "Lefèvre",
+            "--password",
+            password,
+        ]
+    )
 
 
 def test_create_admin(app):
@@ -42,12 +53,20 @@ def test_run_tasks_records_its_passage(app):
 # Export des comptes pour le rattachement (phase 5)
 # ---------------------------------------------------------------------------
 
+
 def make_app_with_members(name="Inventaire"):
     from app.models import AccessGroup, OidcClient
     from app.services import oidc
+
     members, others = AccessGroup(key="membres", name="Membres"), AccessGroup(key="autres", name="Autres")
-    client = OidcClient(client_id=oidc.new_client_id(), name=name, redirect_uris=["https://i.test/retour"],
-                        allowed_groups=[members], shared_groups=[members], first_party=True)
+    client = OidcClient(
+        client_id=oidc.new_client_id(),
+        name=name,
+        redirect_uris=["https://i.test/retour"],
+        allowed_groups=[members],
+        shared_groups=[members],
+        first_party=True,
+    )
     oidc.set_secret(client)
     db.session.add(client)
     db.session.commit()
@@ -56,6 +75,7 @@ def make_app_with_members(name="Inventaire"):
 
 def test_export_lists_only_the_accounts_that_may_enter(app):
     import json
+
     _client, members, others = make_app_with_members()
     elise = make_account(email="elise@asso.test", first_name="Élise", email_verified=True)
     elise.groups = [members]
@@ -68,22 +88,36 @@ def test_export_lists_only_the_accounts_that_may_enter(app):
     assert result.exit_code == 0, result.output
     data = json.loads(result.stdout)
     assert data["application"] == "Inventaire" and data["issuer"] == "http://localhost:8001"
-    assert data["accounts"] == [{"sub": elise.sub, "email": "elise@asso.test", "email_verified": True,
-                                 "first_name": "Élise", "last_name": "Test", "groups": ["membres"]}]
+    assert data["accounts"] == [
+        {
+            "sub": elise.sub,
+            "email": "elise@asso.test",
+            "email_verified": True,
+            "first_name": "Élise",
+            "last_name": "Test",
+            "groups": ["membres"],
+        }
+    ]
     assert "1 compte(s) exporté(s)" in result.stderr
     from app.models import Activity
+
     assert db.session.scalar(db.select(Activity).filter_by(action="oidc.export")) is not None
 
 
 def test_export_to_a_file_keeps_accents(app, tmp_path):
     import json
+
     _client, members, _ = make_app_with_members()
     account = make_account(email="e@asso.test", first_name="Éloïse")
     account.groups = [members]
     db.session.commit()
     path = tmp_path / "comptes.json"
-    assert app.test_cli_runner().invoke(args=["oidc-export-accounts", "--application", "Inventaire",
-                                              "--output", str(path)]).exit_code == 0
+    assert (
+        app.test_cli_runner()
+        .invoke(args=["oidc-export-accounts", "--application", "Inventaire", "--output", str(path)])
+        .exit_code
+        == 0
+    )
     text = path.read_text(encoding="utf-8")
     assert "Éloïse" in text and json.loads(text)["accounts"][0]["first_name"] == "Éloïse"
 
@@ -104,6 +138,7 @@ def test_export_never_contains_secrets(app):
 
 def test_create_admin_notifies_the_apps_of_closed_sessions(app, client, monkeypatch):
     from app.services import logout
+
     calls = []
     monkeypatch.setattr(logout, "deliver_pending", lambda now=None: calls.append(now) or (0, 0, 0))
     make_account(Role.ADHERENT, email="chef@asso.test")

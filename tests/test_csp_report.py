@@ -1,4 +1,5 @@
 """Collecte des rapports CSP : publique, sans CSRF, limitée en débit et en taille, journalisée sans rien stocker."""
+
 import json
 
 import pytest
@@ -7,9 +8,17 @@ from app.blueprints import csp
 from app.extensions import db
 from app.models import Activity, ThrottleEvent
 
-VIOLATION = {"csp-report": {"document-uri": "https://adherents.test/mon-compte", "violated-directive": "script-src-attr",
-                            "effective-directive": "script-src-attr", "blocked-uri": "inline",
-                            "source-file": "https://adherents.test/mon-compte", "line-number": 12, "disposition": "enforce"}}
+VIOLATION = {
+    "csp-report": {
+        "document-uri": "https://adherents.test/mon-compte",
+        "violated-directive": "script-src-attr",
+        "effective-directive": "script-src-attr",
+        "blocked-uri": "inline",
+        "source-file": "https://adherents.test/mon-compte",
+        "line-number": 12,
+        "disposition": "enforce",
+    }
+}
 
 
 def post(client, payload, mimetype="application/csp-report", **kwargs):
@@ -28,8 +37,10 @@ def test_report_uri_is_logged(client, caplog):
 
 
 def test_report_to_is_logged(client, caplog):
-    batch = [{"type": "csp-violation", "body": {"effectiveDirective": "style-src", "blockedURL": "inline"}},
-             {"type": "autre", "body": {}}]
+    batch = [
+        {"type": "csp-violation", "body": {"effectiveDirective": "style-src", "blockedURL": "inline"}},
+        {"type": "autre", "body": {}},
+    ]
     with caplog.at_level("WARNING"):
         assert post(client, batch, "application/reports+json").status_code == 204
     assert len(logs(caplog)) == 1 and "directive=style-src" in logs(caplog)[0]
@@ -44,6 +55,7 @@ def test_works_without_csrf_token(tmp_path):
     from app import create_app
 
     from .conftest import config_for, release, reset_database
+
     app = create_app(config_for(tmp_path, WTF_CSRF_ENABLED=True))
     with app.app_context():
         reset_database()
@@ -59,12 +71,18 @@ def test_log_injection_is_neutralised(client, caplog):
     assert "\n" not in line and "\r" not in line and len(line) < csp.MAX_FIELD * 2 + 100
 
 
-@pytest.mark.parametrize("payload, mimetype, code", [
-    ("pas du json", "application/csp-report", 400), (VIOLATION, "text/plain", 415),
-    ([1, 2], "application/csp-report", 204), ({"csp-report": "texte"}, "application/csp-report", 204),
-    ({"autre": {}}, "application/json", 204), ("[{}]", "application/reports+json", 204),
-    ('{"a": 1}', "application/reports+json", 204),
-])
+@pytest.mark.parametrize(
+    "payload, mimetype, code",
+    [
+        ("pas du json", "application/csp-report", 400),
+        (VIOLATION, "text/plain", 415),
+        ([1, 2], "application/csp-report", 204),
+        ({"csp-report": "texte"}, "application/csp-report", 204),
+        ({"autre": {}}, "application/json", 204),
+        ("[{}]", "application/reports+json", 204),
+        ('{"a": 1}', "application/reports+json", 204),
+    ],
+)
 def test_odd_bodies(client, payload, mimetype, code):
     assert post(client, payload, mimetype).status_code == code
 

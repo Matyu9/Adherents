@@ -57,10 +57,15 @@ def test_filter_by_person_includes_author_and_target(journal, accounts):
 
 
 def test_pagination(journal, accounts):
-    db.session.add_all(Activity(account_id=accounts[Role.ADMIN].id, action="role.update", message=f"Ligne {n:04}")
-                       for n in range(PER_PAGE + 5))
+    db.session.add_all(
+        Activity(account_id=accounts[Role.ADMIN].id, action="role.update", message=f"Ligne {n:04}")
+        for n in range(PER_PAGE + 5)
+    )
     db.session.commit()
-    first, second = journal.get("/journal").get_data(as_text=True), journal.get("/journal?page=2").get_data(as_text=True)
+    first, second = (
+        journal.get("/journal").get_data(as_text=True),
+        journal.get("/journal?page=2").get_data(as_text=True),
+    )
     assert "Page 1 / 2" in first and "Plus ancien" in first and "Page 2 / 2" in second and "Plus récent" in second
 
 
@@ -106,10 +111,14 @@ def test_log_does_not_commit(accounts):
 
 def test_expired_logins_are_purged_but_not_other_actions(accounts):
     old = datetime.now() - timedelta(days=activity.LOGIN_RETENTION_DAYS + 1)
-    db.session.add_all([Activity(action="auth.login", message="vieille connexion", created_at=old),
-                        Activity(action="auth.failed", message="vieil échec", created_at=old),
-                        Activity(action="role.update", message="vieux rôle", created_at=old),
-                        Activity(action="auth.login", message="connexion récente")])
+    db.session.add_all(
+        [
+            Activity(action="auth.login", message="vieille connexion", created_at=old),
+            Activity(action="auth.failed", message="vieil échec", created_at=old),
+            Activity(action="role.update", message="vieux rôle", created_at=old),
+            Activity(action="auth.login", message="connexion récente"),
+        ]
+    )
     db.session.commit()
     assert "2 connexion(s)" in tasks.run()
     db.session.rollback()

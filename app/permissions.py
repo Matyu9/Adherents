@@ -4,6 +4,7 @@ Toute vérification de droits passe par `can(user, action)`, utilisée à la foi
 des routes et par les templates (pour masquer les boutons).
 Les droits de chaque rôle se cochent dans l'écran « Rôles » (table `role`) ; l'administrateur les a tous.
 """
+
 from functools import wraps
 
 from flask import abort, has_app_context
@@ -16,45 +17,74 @@ A, G, H = Role.ADMIN, Role.GESTIONNAIRE, Role.ADHERENT
 
 # Catalogue des droits, regroupés comme dans l'écran « Rôles ».
 PERMISSION_GROUPS = [
-    ("Annuaire", [
-        ("directory.view", "Consulter l'annuaire : personnes, foyers, adhésions"),
-        ("directory.edit", "Modifier l'annuaire et les saisons, voir le lieu de naissance"),
-        ("directory.merge", "Fusionner deux fiches en double"),
-        ("teacher.manage", "Gérer les professeurs et voir leurs contrats"),
-        ("bank.view", "Voir et modifier les coordonnées bancaires (IBAN), après une nouvelle saisie du code TOTP"),
-        ("directory.anonymize", "Fixer la durée de conservation et anonymiser les anciens adhérents"),
-    ]),
-    ("Catalogue", [
-        ("catalog.view", "Consulter le catalogue : disciplines, niveaux, lieux et cours des saisons"),
-        ("catalog.edit", "Modifier le catalogue, les disciplines des professeurs et copier une saison"),
-    ]),
-    ("Inscriptions", [
-        ("registration.view", "Consulter les campagnes et les dossiers d'inscription"),
-        ("registration.manage", "Ouvrir les campagnes, valider ou renvoyer les dossiers, préparer le report"),
-    ]),
-    ("Tarifs", [
-        ("fee.view", "Consulter les tarifs et les cotisations des foyers"),
-        ("fee.edit", "Modifier les éléments, les règles et les réglages des tarifs, copier une saison"),
-        ("fee.assess", "Calculer, corriger et valider les cotisations des foyers"),
-        ("fee.situation", "Voir et modifier la situation des foyers : quotient familial, tranche, étiquettes"),
-    ]),
-    ("Comptes", [
-        ("account.manage", "Gérer les comptes : créer, inviter, couper, fermer les sessions"),
-        ("group.manage", "Gérer les groupes, qui donnent accès aux applis de l'association"),
-        ("client.manage", "Gérer les applications connectées et les clés de signature"),
-    ]),
-    ("Administration", [
-        ("settings.manage", "Paramètres de l'appli"),
-        ("activity.view", "Voir le journal de toutes les actions (connexions comprises)"),
-    ]),
+    (
+        "Annuaire",
+        [
+            ("directory.view", "Consulter l'annuaire : personnes, foyers, adhésions"),
+            ("directory.edit", "Modifier l'annuaire et les saisons, voir le lieu de naissance"),
+            ("directory.merge", "Fusionner deux fiches en double"),
+            ("teacher.manage", "Gérer les professeurs et voir leurs contrats"),
+            ("bank.view", "Voir et modifier les coordonnées bancaires (IBAN), après une nouvelle saisie du code TOTP"),
+            ("directory.anonymize", "Fixer la durée de conservation et anonymiser les anciens adhérents"),
+        ],
+    ),
+    (
+        "Catalogue",
+        [
+            ("catalog.view", "Consulter le catalogue : disciplines, niveaux, lieux et cours des saisons"),
+            ("catalog.edit", "Modifier le catalogue, les disciplines des professeurs et copier une saison"),
+        ],
+    ),
+    (
+        "Inscriptions",
+        [
+            ("registration.view", "Consulter les campagnes et les dossiers d'inscription"),
+            ("registration.manage", "Ouvrir les campagnes, valider ou renvoyer les dossiers, préparer le report"),
+        ],
+    ),
+    (
+        "Tarifs",
+        [
+            ("fee.view", "Consulter les tarifs et les cotisations des foyers"),
+            ("fee.edit", "Modifier les éléments, les règles et les réglages des tarifs, copier une saison"),
+            ("fee.assess", "Calculer, corriger et valider les cotisations des foyers"),
+            ("fee.situation", "Voir et modifier la situation des foyers : quotient familial, tranche, étiquettes"),
+        ],
+    ),
+    (
+        "Comptes",
+        [
+            ("account.manage", "Gérer les comptes : créer, inviter, couper, fermer les sessions"),
+            ("group.manage", "Gérer les groupes, qui donnent accès aux applis de l'association"),
+            ("client.manage", "Gérer les applications connectées et les clés de signature"),
+        ],
+    ),
+    (
+        "Administration",
+        [
+            ("settings.manage", "Paramètres de l'appli"),
+            ("activity.view", "Voir le journal de toutes les actions (connexions comprises)"),
+        ],
+    ),
 ]
 PERMISSIONS = {key: label for _, perms in PERMISSION_GROUPS for key, label in perms}
 
 # Droits des rôles de base tant qu'ils n'ont pas été modifiés (et à la création de la base).
 DEFAULT_PERMISSIONS = {
     A: set(PERMISSIONS),
-    G: {"activity.view", "directory.view", "directory.edit", "directory.merge", "catalog.view", "catalog.edit",
-        "registration.view", "registration.manage", "fee.view", "fee.edit", "fee.assess"},
+    G: {
+        "activity.view",
+        "directory.view",
+        "directory.edit",
+        "directory.merge",
+        "catalog.view",
+        "catalog.edit",
+        "registration.view",
+        "registration.manage",
+        "fee.view",
+        "fee.edit",
+        "fee.assess",
+    },
     H: set(),
 }
 

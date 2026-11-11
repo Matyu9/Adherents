@@ -1,4 +1,5 @@
 """En-têtes, CSP bloquante, CSRF, secret de production, feuilles de style."""
+
 import re
 from pathlib import Path
 
@@ -26,8 +27,15 @@ def test_default_configuration_is_blocking():
 
 def test_csp_allows_nothing_inline_or_external():
     assert "unsafe" not in CSP and "http" not in CSP and "*" not in CSP
-    for directive in ("default-src 'self'", "script-src 'self'", "style-src 'self'", "object-src 'none'",
-                      "base-uri 'none'", "frame-ancestors 'none'", "form-action 'self'"):
+    for directive in (
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self'",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+    ):
         assert directive in CSP
 
 
@@ -97,6 +105,7 @@ def test_every_light_token_has_its_dark_value():
 
 # --- CSRF ---------------------------------------------------------------------------------------------------
 
+
 @pytest.fixture
 def csrf_app(tmp_path):
     app = create_app(config_for(tmp_path, WTF_CSRF_ENABLED=True))
@@ -130,25 +139,44 @@ def test_csrf_token_does_not_expire_during_a_long_form():
 
 # --- Configuration ------------------------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("secret", ["", "dev-secret-change-me", "change-moi"])
 def test_production_refuses_a_known_secret(tmp_path, monkeypatch, secret):
     monkeypatch.delenv("FLASK_DEBUG", raising=False)
-    config = type("Prod", (Config,), {"SECRET_KEY": secret, "DATA_DIR": tmp_path, "UPLOAD_DIR": tmp_path / "u",
-                                      "SQLALCHEMY_DATABASE_URI": TEST_DATABASE_URL})
+    config = type(
+        "Prod",
+        (Config,),
+        {
+            "SECRET_KEY": secret,
+            "DATA_DIR": tmp_path,
+            "UPLOAD_DIR": tmp_path / "u",
+            "SQLALCHEMY_DATABASE_URI": TEST_DATABASE_URL,
+        },
+    )
     with pytest.raises(RuntimeError, match="SECRET_KEY"):
         create_app(config)
 
 
 def test_production_starts_with_a_real_secret(tmp_path, monkeypatch):
     monkeypatch.delenv("FLASK_DEBUG", raising=False)
-    config = type("Prod", (Config,), {"SECRET_KEY": "x" * 64, "DATA_DIR": tmp_path, "UPLOAD_DIR": tmp_path / "u",
-                                      "SQLALCHEMY_DATABASE_URI": TEST_DATABASE_URL})
+    config = type(
+        "Prod",
+        (Config,),
+        {
+            "SECRET_KEY": "x" * 64,
+            "DATA_DIR": tmp_path,
+            "UPLOAD_DIR": tmp_path / "u",
+            "SQLALCHEMY_DATABASE_URI": TEST_DATABASE_URL,
+        },
+    )
     assert create_app(config).config["SECRET_KEY"] == "x" * 64
 
 
 def test_warning_when_issuer_is_not_https():
     assert startup_warnings({"OIDC_ISSUER": "http://compte.asso.test", "TRUST_PROXY": True})
-    assert not startup_warnings({"OIDC_ISSUER": "https://compte.asso.test", "BASE_URL": "http://x", "TRUST_PROXY": True})
+    assert not startup_warnings(
+        {"OIDC_ISSUER": "https://compte.asso.test", "BASE_URL": "http://x", "TRUST_PROXY": True}
+    )
     assert not startup_warnings({"OIDC_ISSUER": "http://localhost:8001", "BASE_URL": "http://x"})
 
 
@@ -161,6 +189,7 @@ def test_warning_when_https_without_proxy():
 def test_proxy_headers_are_ignored_by_default(client):
     client.post("/connexion", data={"email": "x@y.z", "password": "x"}, headers={"X-Forwarded-For": "1.2.3.4"})
     from app.models import Activity
+
     assert "1.2.3.4" not in db.session.scalar(db.select(Activity.message))
 
 
@@ -168,9 +197,11 @@ def test_proxy_headers_are_used_when_trusted(tmp_path):
     app = create_app(config_for(tmp_path, TRUST_PROXY=True))
     with app.app_context():
         reset_database()
-        app.test_client().post("/connexion", data={"email": "x@y.z", "password": "x"},
-                               headers={"X-Forwarded-For": "1.2.3.4"})
+        app.test_client().post(
+            "/connexion", data={"email": "x@y.z", "password": "x"}, headers={"X-Forwarded-For": "1.2.3.4"}
+        )
         from app.models import Activity
+
         assert "1.2.3.4" in db.session.scalar(db.select(Activity.message))
         release()
 

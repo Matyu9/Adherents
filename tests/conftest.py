@@ -55,6 +55,7 @@ def stamp_head():
     """create_all produit le schéma le plus récent : la base est donc « à jour » pour la page de santé."""
     if not _HEADS:
         from app.services.health import migration_heads
+
         _HEADS.extend(migration_heads()[1])
     db.session.execute(text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) PRIMARY KEY)"))
     db.session.execute(text("DELETE FROM alembic_version"))
@@ -169,8 +170,14 @@ def totp_code(secret=TOTP_SECRET):
 
 
 def make_account(role=Role.ADHERENT, email=None, active=True, password=PASSWORD, first_name=None, **fields):
-    account = Account(first_name=first_name or role.capitalize(), last_name="Test",
-                      email=email or f"{role}@asso.test", role=role, active=active, **fields)
+    account = Account(
+        first_name=first_name or role.capitalize(),
+        last_name="Test",
+        email=email or f"{role}@asso.test",
+        role=role,
+        active=active,
+        **fields,
+    )
     account.set_password(password)
     db.session.add(account)
     db.session.commit()

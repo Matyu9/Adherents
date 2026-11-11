@@ -16,9 +16,14 @@ def test_only_my_notifications_are_shown(app, accounts):
 
 
 def test_badge_counts_my_unread_only(client, member, accounts):
-    db.session.add_all([Notification(account_id=member.id, message="1"), Notification(account_id=member.id, message="2"),
-                        Notification(account_id=member.id, message="lue", read=True),
-                        Notification(account_id=accounts[Role.ADMIN].id, message="autre")])
+    db.session.add_all(
+        [
+            Notification(account_id=member.id, message="1"),
+            Notification(account_id=member.id, message="2"),
+            Notification(account_id=member.id, message="lue", read=True),
+            Notification(account_id=accounts[Role.ADMIN].id, message="autre"),
+        ]
+    )
     db.session.commit()
     assert '<span class="bell-count">2</span>' in client.get("/").get_data(as_text=True)
 

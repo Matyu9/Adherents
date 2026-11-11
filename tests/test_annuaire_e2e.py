@@ -2,6 +2,7 @@
 
 SCREENSHOT_DIR=… garde une capture de chaque page, en clair et en sombre, pour vérifier la mise en page.
 """
+
 import os
 from pathlib import Path
 
@@ -71,9 +72,11 @@ def test_a_household_from_start_to_iban(session):
     page.wait_for_url("**/annuaire/mode-securise?**")
     with _app["app"].app_context():
         from app.models import Account, Role
+
         db.session.scalar(db.select(Account).filter_by(role=Role.ADMIN)).totp_last_counter = None
         db.session.commit()
     from .conftest import TOTP_SECRET, totp_code
+
     page.fill("#code", totp_code(TOTP_SECRET))
     page.click("main form[method=post] button[type=submit]")
     page.wait_for_url("**/banque/nouveau")
@@ -120,8 +123,15 @@ def test_a_household_from_start_to_iban(session):
 def test_directory_pages_have_no_violation(session, scheme):
     browser_page = session(color_scheme=scheme, viewport={"width": 390, "height": 844} if scheme == "dark" else None)
     page = browser_page.login()
-    for path in ("/annuaire", "/annuaire/foyers", "/annuaire/saisons", "/annuaire/rattachement",
-                 "/annuaire/personnes/nouvelle", "/annuaire/foyers/nouveau", "/annuaire/saisons/nouvelle"):
+    for path in (
+        "/annuaire",
+        "/annuaire/foyers",
+        "/annuaire/saisons",
+        "/annuaire/rattachement",
+        "/annuaire/personnes/nouvelle",
+        "/annuaire/foyers/nouveau",
+        "/annuaire/saisons/nouvelle",
+    ):
         page.goto(path)
         assert page.evaluate("window.htmx !== undefined"), path
         shot(page, f"{scheme}{path.replace('/', '-')}")

@@ -8,6 +8,7 @@
 - **Inactivité** : une session qui peut lire des données personnelles se ferme après IDLE_TIMEOUT_HOURS sans activité,
   même avec « rester connecté ».
 """
+
 from datetime import datetime, timedelta
 
 from flask import abort, current_app, session
@@ -26,6 +27,7 @@ SENSITIVE_RIGHTS = ("directory.view", "bank.view", "teacher.manage")
 # ---------------------------------------------------------------------------
 # Mode sécurisé
 # ---------------------------------------------------------------------------
+
 
 def _sid():
     login = db.session.get(LoginSession, current_user.session_token) if current_user.is_authenticated else None
@@ -64,6 +66,7 @@ def remaining():
 # Limite de lecture
 # ---------------------------------------------------------------------------
 
+
 def _reads():
     return throttle.Limiter("directory-read", current_app.config.get("DIRECTORY_READ_LIMIT", 300), READ_WINDOW)
 
@@ -74,13 +77,21 @@ def count_read():
     limiter = _reads()
     if limiter.blocked(keys):
         hour = datetime.now().strftime("%Y%m%d%H")
-        created = notify.notify(notify.admins(), f"Lecture massive de l'annuaire par {current_user.full_name} : "
-                                f"compte arrêté {READ_WINDOW // 60} minutes. Vérifiez qu'il s'agit bien de cette "
-                                "personne, sinon coupez son compte.", link=f"/comptes/{current_user.id}",
-                                dedup_key=f"directory-read:{current_user.id}:{hour}")
+        created = notify.notify(
+            notify.admins(),
+            f"Lecture massive de l'annuaire par {current_user.full_name} : "
+            f"compte arrêté {READ_WINDOW // 60} minutes. Vérifiez qu'il s'agit bien de cette "
+            "personne, sinon coupez son compte.",
+            link=f"/comptes/{current_user.id}",
+            dedup_key=f"directory-read:{current_user.id}:{hour}",
+        )
         if created:  # une seule entrée au journal par heure et par compte
-            log("directory.throttle", f"Lecture de l'annuaire bloquée pour {current_user.full_name} "
-                f"(plus de {limiter.limit} pages en {READ_WINDOW // 60} minutes)", target=current_user)
+            log(
+                "directory.throttle",
+                f"Lecture de l'annuaire bloquée pour {current_user.full_name} "
+                f"(plus de {limiter.limit} pages en {READ_WINDOW // 60} minutes)",
+                target=current_user,
+            )
         db.session.commit()
         abort(429)
     limiter.hit(keys)
@@ -91,8 +102,10 @@ def count_read():
 # Inactivité
 # ---------------------------------------------------------------------------
 
+
 def handles_personal_data(account):
     from ..permissions import can
+
     return any(can(account, right) for right in SENSITIVE_RIGHTS)
 
 
@@ -100,5 +113,6 @@ def idle_expired(login, now=None):
     """Vrai si cette session doit se fermer : compte qui voit des données personnelles, inactif trop longtemps."""
     hours = current_app.config.get("IDLE_TIMEOUT_HOURS", 2)
     last = login.last_seen_at or login.created_at
-    return bool(hours) and last < (now or datetime.now()) - timedelta(hours=hours) and \
-        handles_personal_data(login.account)
+    return (
+        bool(hours) and last < (now or datetime.now()) - timedelta(hours=hours) and handles_personal_data(login.account)
+    )

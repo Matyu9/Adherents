@@ -8,10 +8,14 @@ from datetime import datetime, timedelta
 from authlib.integrations.flask_oauth2 import AuthorizationServer
 from authlib.oauth2.rfc6749 import InvalidGrantError, InvalidRequestError, InvalidScopeError, grants
 from authlib.oauth2.rfc7636 import CodeChallenge
-from authlib.oidc.core.errors import (RegistrationNotSupportedError, RequestNotSupportedError,
-                                      RequestURINotSupportedError)
+from authlib.oidc.core.errors import (
+    RegistrationNotSupportedError,
+    RequestNotSupportedError,
+    RequestURINotSupportedError,
+)
 from authlib.oidc.core.grants import OpenIDCode
-from flask import g, request as flask_request
+from flask import g
+from flask import request as flask_request
 from joserfc.jwk import RSAKey
 
 from ..extensions import db

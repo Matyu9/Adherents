@@ -4,8 +4,20 @@ from datetime import date
 import pytest
 
 from app.extensions import db
-from app.models import (Activity, Assessment, AssessmentLine, Course, Discipline, Enrollment, FeePick, FeeRule,
-                        HouseholdMember, HouseholdSeason, Level, Membership)
+from app.models import (
+    Activity,
+    Assessment,
+    AssessmentLine,
+    Course,
+    Discipline,
+    Enrollment,
+    FeePick,
+    FeeRule,
+    HouseholdMember,
+    HouseholdSeason,
+    Level,
+    Membership,
+)
 from app.services import directory, fees, pricing
 from app.services.fees import FeeError
 
@@ -634,7 +646,7 @@ def test_copie_de_saison(priced):
     assert fees.season_settings(target).qf_bands == fees.season_settings(s).qf_bands
     assert fees.season_settings(target).resident_cities == ["Hérouville-Saint-Clair"]
     # la saison copiée calcule comme l'ancienne
-    assert all(pricing.referenced_items(r.as_dict()) <= set(i.id for i in new_items.values())
+    assert all(pricing.referenced_items(r.as_dict()) <= {i.id for i in new_items.values()}
                for r in fees.season_rules(target))
 
 

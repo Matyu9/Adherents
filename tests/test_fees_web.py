@@ -4,7 +4,7 @@ import re
 import pytest
 
 from app.extensions import db
-from app.models import Activity, Assessment, Course, FeeItem, FeePick, FeeRule, HouseholdSeason, Regie, Role, Season
+from app.models import Activity, Assessment, FeeItem, FeePick, FeeRule, HouseholdSeason, Regie, Role
 from app.services import fees
 
 from .conftest import login

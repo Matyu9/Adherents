@@ -6,7 +6,6 @@ from wtforms import IntegerField
 from wtforms.validators import NumberRange, Optional
 
 from ..extensions import db
-
 from ..permissions import require
 from ..services import retention
 from ..services.activity import log

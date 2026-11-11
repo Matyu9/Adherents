@@ -5,7 +5,7 @@ import pytest
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models import (Activity, Course, Discipline, Level, Person, Role, Room, Site, Teacher, TeacherDiscipline)
+from app.models import Activity, Course, Discipline, Level, Person, Role, Room, Site, Teacher, TeacherDiscipline
 from app.services import catalog, directory
 from app.services.catalog import CatalogError
 

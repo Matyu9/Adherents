@@ -5,8 +5,19 @@ import pytest
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models import (BankAccount, Campaign, CampaignConsent, Consent, Course, Discipline, Dossier, Enrollment,
-                        Level, Membership, Teacher)
+from app.models import (
+    BankAccount,
+    Campaign,
+    CampaignConsent,
+    Consent,
+    Course,
+    Discipline,
+    Dossier,
+    Enrollment,
+    Level,
+    Membership,
+    Teacher,
+)
 from app.services import bank, directory, registration
 from app.services.bank import BankKeyError
 from app.services.registration import RegistrationError

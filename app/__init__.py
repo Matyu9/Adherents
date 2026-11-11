@@ -1,3 +1,4 @@
+import contextlib
 import os
 from pathlib import Path
 
@@ -47,12 +48,12 @@ def create_app(config_class=Config):
     from .blueprints.applications import bp as applications_bp
     from .blueprints.auth import bp as auth_bp
     from .blueprints.campaigns import bp as campaigns_bp
-    from .blueprints.enrollment import bp as enrollment_bp
-    from .blueprints.fees import bp as fees_bp
     from .blueprints.catalog import bp as catalog_bp
     from .blueprints.csp import bp as csp_bp
     from .blueprints.dashboard import bp as dashboard_bp
     from .blueprints.directory import bp as directory_bp
+    from .blueprints.enrollment import bp as enrollment_bp
+    from .blueprints.fees import bp as fees_bp
     from .blueprints.groups import bp as groups_bp
     from .blueprints.health import bp as health_bp
     from .blueprints.journal import bp as journal_bp
@@ -100,10 +101,8 @@ def create_app(config_class=Config):
         """?v=<date du fichier> sur les fichiers statiques : après une mise à jour, le navigateur charge la
         nouvelle version au lieu de celle de son cache."""
         if endpoint == "static" and "filename" in values and "v" not in values:
-            try:
+            with contextlib.suppress(OSError):
                 values["v"] = int((Path(app.static_folder) / values["filename"]).stat().st_mtime)
-            except OSError:
-                pass
 
     @app.context_processor
     def inject_globals():

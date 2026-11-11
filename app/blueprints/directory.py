@@ -12,8 +12,20 @@ from wtforms import DateField, EmailField, SelectField, StringField, TextAreaFie
 from wtforms.validators import DataRequired, Length, Optional, Regexp, ValidationError
 
 from ..extensions import db
-from ..models import (Account, Activity, BankAccount, Campaign, Course, Household, HouseholdMember, Membership,
-                      Person, Phone, Season, SepaMandate)
+from ..models import (
+    Account,
+    Activity,
+    BankAccount,
+    Campaign,
+    Course,
+    Household,
+    HouseholdMember,
+    Membership,
+    Person,
+    Phone,
+    Season,
+    SepaMandate,
+)
 from ..permissions import can, require
 from ..services import accounts as accounts_service
 from ..services import bank, catalog, directory, guard, throttle

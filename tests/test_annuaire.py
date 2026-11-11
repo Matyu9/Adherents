@@ -6,8 +6,21 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import (Account, AccountToken, Activity, BankAccount, ExternalRef, Household, HouseholdMember,
-                        Membership, Person, Phone, Role, Season, Teacher)
+from app.models import (
+    Account,
+    AccountToken,
+    Activity,
+    BankAccount,
+    ExternalRef,
+    Household,
+    HouseholdMember,
+    Membership,
+    Person,
+    Phone,
+    Role,
+    Season,
+    Teacher,
+)
 from app.services import bank, directory
 from app.services.directory import DirectoryError
 

@@ -3,9 +3,27 @@ import re
 from datetime import datetime
 
 from ..extensions import db, fold, fold_contains
-from ..models import (Account, Activity, AppSetting, Assessment, AssessmentLine, BankAccount, Consent, Dossier,
-                      Enrollment, FeePick, Household, HouseholdMember, HouseholdSeason, Membership, Person, Phone, Role,
-                      Season, Teacher)
+from ..models import (
+    Account,
+    Activity,
+    AppSetting,
+    Assessment,
+    AssessmentLine,
+    BankAccount,
+    Consent,
+    Dossier,
+    Enrollment,
+    FeePick,
+    Household,
+    HouseholdMember,
+    HouseholdSeason,
+    Membership,
+    Person,
+    Phone,
+    Role,
+    Season,
+    Teacher,
+)
 from . import bank
 from .catalog import move_teaching
 

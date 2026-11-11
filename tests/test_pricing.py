@@ -4,7 +4,15 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from app.services.pricing import (
-    FIELDS, Household, Item, Order, PricingError, Student, compute, validate_rule, validate_settings,
+    FIELDS,
+    Household,
+    Item,
+    Order,
+    PricingError,
+    Student,
+    compute,
+    validate_rule,
+    validate_settings,
 )
 
 ADH, F30, F45, CHORALE, ORCH, LOC, F30_FAM, FRAIS = 1, 2, 3, 4, 5, 6, 7, 8

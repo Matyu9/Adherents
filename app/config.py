@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
-
 DEFAULT_SECRET = "dev-secret-change-me"
 # Valeurs connues de tous (défaut du code, modèle .env.example) : refusées en production.
 UNSAFE_SECRETS = (DEFAULT_SECRET, "change-moi")

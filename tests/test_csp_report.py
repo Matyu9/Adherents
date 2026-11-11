@@ -42,6 +42,7 @@ def test_nothing_is_kept_in_the_journal(client):
 
 def test_works_without_csrf_token(tmp_path):
     from app import create_app
+
     from .conftest import config_for, release, reset_database
     app = create_app(config_for(tmp_path, WTF_CSRF_ENABLED=True))
     with app.app_context():

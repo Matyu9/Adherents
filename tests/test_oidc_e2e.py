@@ -10,7 +10,7 @@ import pytest
 playwright = pytest.importorskip("playwright.sync_api")
 pytest.importorskip("requests")
 from authlib.integrations.flask_client import OAuth  # noqa: E402
-from flask import Flask, jsonify, redirect, session, url_for  # noqa: E402
+from flask import Flask, jsonify  # noqa: E402
 from werkzeug.serving import make_server  # noqa: E402
 
 from app import create_app  # noqa: E402

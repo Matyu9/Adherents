@@ -311,6 +311,7 @@ def test_replayed_code_is_refused_and_cancels_its_tokens(http, client_app, perso
 def test_two_simultaneous_exchanges_cannot_both_succeed(http, client_app):
     """Le second a lu le code avant que le premier ne valide : c'est la mise à jour conditionnelle qui tranche."""
     from authlib.oauth2.rfc6749 import InvalidGrantError
+
     from app.services.oidc_server import CodeGrant
     flow = Flow(client_app)
     code = signed_in_code(http, flow)
@@ -1146,7 +1147,8 @@ def test_odd_grant_type_is_a_clean_error(client, data):
 @pytest.mark.parametrize("kid", [{"x": 1}, ["a", "b"], 5, None, True])
 def test_hint_with_a_strange_kid_is_not_a_crash(http, client_app, kid):
     import json
-    part = lambda value: base64.urlsafe_b64encode(json.dumps(value).encode()).rstrip(b"=").decode()
+    def part(value):
+        return base64.urlsafe_b64encode(json.dumps(value).encode()).rstrip(b"=").decode()
     hint = f'{part({"alg": "RS256", "kid": kid})}.{part({"sub": "x"})}.{part("x")}'
     assert error_of(http.get(Flow(client_app, prompt="none", id_token_hint=hint).url).location) == "login_required"
 

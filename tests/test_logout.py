@@ -15,13 +15,37 @@ from joserfc import jwt
 from joserfc.jwk import RSAKey
 
 from app.extensions import db
-from app.models import (AccessGroup, Account, Activity, LoginSession, OidcClient, OidcCode, OidcConsent, OidcKey,
-                        OidcLogout, OidcSession, OidcToken, Role)
+from app.models import (
+    AccessGroup,
+    Account,
+    Activity,
+    LoginSession,
+    OidcClient,
+    OidcCode,
+    OidcConsent,
+    OidcKey,
+    OidcLogout,
+    OidcSession,
+    OidcToken,
+    Role,
+)
 from app.services import logout, oidc, sessions, tasks
 
 from .conftest import PASSWORD, config_for, login, make_account, release, reset_database, stamp_head
-from .test_oidc import (CB, SECRET_OF, Flow, base64_header, code_of, decode, exchange, follow, make_client,  # noqa: F401
-                        members, person, signed_in_code)
+from .test_oidc import (  # noqa: F401
+    CB,
+    SECRET_OF,
+    Flow,
+    base64_header,
+    code_of,
+    decode,
+    exchange,
+    follow,
+    make_client,
+    members,
+    person,
+    signed_in_code,
+)
 
 BACKCHANNEL = "https://appli.test/oidc/backchannel"
 AFTER = "https://appli.test/au-revoir"
@@ -745,6 +769,7 @@ def test_unreachable_app_is_a_failure_not_a_crash():
 
 def test_background_delivery_reaches_the_app(tmp_path, receiver):
     from app import create_app
+
     from .conftest import Client
     app = create_app(config_for(tmp_path, BACKCHANNEL_IN_BACKGROUND=True))
     app.test_client_class = Client

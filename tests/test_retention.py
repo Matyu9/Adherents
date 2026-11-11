@@ -5,8 +5,7 @@ import pytest
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models import (Activity, BankAccount, Campaign, Consent, Dossier, ExternalRef, Membership, Person, Phone,
-                        Season)
+from app.models import Activity, BankAccount, Campaign, Consent, Dossier, ExternalRef, Membership, Person, Phone, Season
 from app.services import bank, directory, registration, retention
 from app.services.activity import log
 

@@ -151,10 +151,10 @@ class RoomForm(FlaskForm):
 
 # Chaque liste de référence : modèle, formulaire, libellés, et champ qui doit être unique (avec sa portée).
 REFERENCES = {
-    "disciplines": dict(model=Discipline, form=DisciplineForm, one="discipline", title="Disciplines", fields=("name", "category")),
-    "niveaux": dict(model=Level, form=LevelForm, one="niveau", title="Niveaux", fields=("name", "position")),
-    "sites": dict(model=Site, form=SiteForm, one="site", title="Sites", fields=("name", "address")),
-    "salles": dict(model=Room, form=RoomForm, one="salle", title="Salles", fields=("site_id", "name")),
+    "disciplines": {"model": Discipline, "form": DisciplineForm, "one": "discipline", "title": "Disciplines", "fields": ("name", "category")},
+    "niveaux": {"model": Level, "form": LevelForm, "one": "niveau", "title": "Niveaux", "fields": ("name", "position")},
+    "sites": {"model": Site, "form": SiteForm, "one": "site", "title": "Sites", "fields": ("name", "address")},
+    "salles": {"model": Room, "form": RoomForm, "one": "salle", "title": "Salles", "fields": ("site_id", "name")},
 }
 
 
@@ -220,10 +220,10 @@ def create_course():
         flash("Créez d'abord une saison.", "error")
         return redirect(url_for(".index"))
     form = CourseForm(season=season)
-    if request.method == "GET" and (copy := db.session.get(Course, request.args.get("depuis", type=int) or 0)):
-        if copy.season_id == season.id:  # « dupliquer » : un autre groupe du même cours
-            form = CourseForm(season=season, obj=copy, formdata=None)
-            form.marked_full.data = False
+    copy = db.session.get(Course, request.args.get("depuis", type=int) or 0) if request.method == "GET" else None
+    if copy and copy.season_id == season.id:  # « dupliquer » : un autre groupe du même cours
+        form = CourseForm(season=season, obj=copy, formdata=None)
+        form.marked_full.data = False
     if form.validate_on_submit():
         course = Course(season=season, discipline_id=form.discipline_id.data)
         db.session.add(course)

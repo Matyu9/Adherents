@@ -1,4 +1,6 @@
+
 """Pages d'erreur : une seule mise en page, un message en français adapté à chaque code."""
+import contextlib
 import uuid
 from urllib.parse import urlsplit
 
@@ -86,10 +88,8 @@ def register_error_handlers(app):
     @app.errorhandler(InternalServerError)
     def server_error(_e):
         # La page 500 ne touche pas à la base (elle est peut-être la cause) : gabarit autonome, sans menu.
-        try:
+        with contextlib.suppress(Exception):
             db.session.rollback()
-        except Exception:  # noqa: BLE001
-            pass
         ref = uuid.uuid4().hex[:8]
         current_app.logger.error("Erreur 500, référence %s : %s %s", ref, request.method, request.path)
         if _is_api():

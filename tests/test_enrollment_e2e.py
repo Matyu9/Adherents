@@ -9,8 +9,20 @@ import pytest
 pytest.importorskip("playwright.sync_api")
 
 from app.extensions import db  # noqa: E402
-from app.models import (Account, Campaign, CampaignConsent, Course, Discipline, Dossier, Enrollment,  # noqa: E402
-                        Household, Membership, Person, Role, Season)
+from app.models import (  # noqa: E402
+    Account,
+    Campaign,
+    CampaignConsent,
+    Course,
+    Discipline,
+    Dossier,
+    Enrollment,
+    Household,
+    Membership,
+    Person,
+    Role,
+    Season,
+)
 from app.services import directory  # noqa: E402
 
 from .test_annuaire_e2e import shot  # noqa: E402

@@ -38,19 +38,19 @@ ADMIN_PASSWORD = "admin-inventaire-e2e"
 if not FLASK.exists():
     pytest.skip(f"Inventaire introuvable dans {INVENTAIRE} (INVENTAIRE_DIR)", allow_module_level=True)
 
-SEED = """
+SEED = f"""
 from app import create_app
 from app.extensions import db
 from app.models import Role, User
 app = create_app()
 with app.app_context():
     admin = User(first_name="Ada", last_name="Admin", email="ada@inventaire.test", role=Role.ADMIN, active=True)
-    admin.set_password(%r)
+    admin.set_password({ADMIN_PASSWORD!r})
     db.session.add_all([admin,
         User(first_name="Élise", last_name="Test", email="elise@e2e.test", role=Role.EMPRUNTEUR),
         User(first_name="Léo", last_name="Durand", email="famille@e2e.test", role=Role.EMPRUNTEUR)])
     db.session.commit()
-""" % ADMIN_PASSWORD
+"""
 
 
 def free_port():

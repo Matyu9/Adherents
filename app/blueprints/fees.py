@@ -9,8 +9,19 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import current_user
 
 from ..extensions import db, fold
-from ..models import (Assessment, AssessmentLine, Course, FeeItem, FeePick, FeeRule, Household, Membership, Person,
-                      Regie, Season)
+from ..models import (
+    Assessment,
+    AssessmentLine,
+    Course,
+    FeeItem,
+    FeePick,
+    FeeRule,
+    Household,
+    Membership,
+    Person,
+    Regie,
+    Season,
+)
 from ..permissions import require
 from ..services import catalog, directory, fees, pricing
 from ..services.fees import FeeError
@@ -645,7 +656,7 @@ def household(household_id):
     drift = fees.drift(assessment) if assessment else None
     record = fees.situation(household, season)
     settings = fees.season_settings(season)
-    students = [p for p in prepared.persons.values()]
+    students = list(prepared.persons.values())
     picks = db.session.scalars(db.select(FeePick).join(FeeItem).where(
         FeePick.household_id == household.id, FeeItem.season_id == season.id).order_by(FeePick.id)).all()
     return render_template("fees/household.html", household=household, season=season, seasons=seasons,

@@ -6,7 +6,7 @@ import pytest
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models import (Activity, BankAccount, Campaign, Consent, Dossier, Enrollment, Household, Notification, Role)
+from app.models import Activity, BankAccount, Campaign, Consent, Dossier, Enrollment, Household, Notification, Role
 from app.services import bank, registration
 
 from .conftest import login, make_account
@@ -90,6 +90,7 @@ def test_student_form_with_a_full_course(client, parent, opened):
     other = make_account(email="autre@asso.test")
     assert other  # un autre élève occupe déjà la seule place du cours de flûte
     from app.models import Membership
+
     from .test_annuaire import person
     leo = person("Léo", "Autre")
     membership = Membership(person=leo, season=opened["new"])

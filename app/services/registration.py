@@ -1,3 +1,4 @@
+
 """Inscriptions : campagnes et dossiers des familles. Voir docs/inscriptions.md. Les services ne font pas de commit.
 
 Ce que la famille saisit reste dans `Dossier.data` jusqu'à la validation : l'annuaire n'est modifié que par
@@ -14,14 +15,27 @@ Ce que la famille saisit reste dans `Dossier.data` jusqu'à la validation : l'an
 
 `guardian` (entier ou None) : l'élève est ce responsable lui-même (un adulte qui prend des cours).
 """
+import contextlib
 import hashlib
 import secrets
 import uuid
 from datetime import date, datetime, timedelta
 
 from ..extensions import db, fold
-from ..models import (BankAccount, Campaign, CampaignConsent, Consent, Course, Dossier, Enrollment, Household,
-                      HouseholdMember, Membership, Person, Season)
+from ..models import (
+    BankAccount,
+    Campaign,
+    CampaignConsent,
+    Consent,
+    Course,
+    Dossier,
+    Enrollment,
+    Household,
+    HouseholdMember,
+    Membership,
+    Person,
+    Season,
+)
 from . import bank, directory
 from .directory import DirectoryError
 
@@ -382,10 +396,8 @@ def _apply(record, values):
 def _set_phone(owner, number, label=None):
     if not number:
         return
-    try:
+    with contextlib.suppress(DirectoryError):  # déjà sur la fiche
         directory.add_phone(owner, number, label)
-    except DirectoryError:
-        pass  # déjà sur la fiche
 
 
 def _students_without_duplicates(dossier):

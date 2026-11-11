@@ -10,8 +10,7 @@ from functools import wraps
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
-from wtforms import (BooleanField, DateField, EmailField, SelectField, SelectMultipleField, StringField,
-                     TextAreaField)
+from wtforms import BooleanField, DateField, EmailField, SelectField, SelectMultipleField, StringField, TextAreaField
 from wtforms.validators import DataRequired, Length, Optional, Regexp, ValidationError
 from wtforms.widgets import CheckboxInput, ListWidget
 
@@ -351,7 +350,7 @@ def student(dossier, student_key):
             s.update({f: _blank(getattr(form, f).data) for f in ("first_name", "last_name", "sex")})
             s["birth_date"] = form.birth_date.data.isoformat() if form.birth_date.data else None
         s.update({f: _blank(getattr(form, f).data) for f in ("category", "school_level", "school_class", "wishes")})
-        s["courses"] = [c for c in form.courses.data or []]
+        s["courses"] = list(form.courses.data or [])
         s["consents"] = {str(c.id): request.form.get(f"consent-{c.id}") == "y" for c in _student_consents(dossier)}
         registration.save(dossier, data)
         db.session.commit()

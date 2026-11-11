@@ -1,7 +1,7 @@
 """Balayage systématique : toutes les routes × tous les rôles, puis tous les liens de toutes les pages."""
 import re
-from datetime import datetime
 from collections import deque
+from datetime import datetime
 from urllib.parse import urljoin, urlsplit
 
 import pytest
@@ -181,8 +181,7 @@ def _directory(accounts):
     """Un foyer complet, avec du HTML dans chaque champ affiché."""
     from datetime import date
 
-    from app.models import (BankAccount, ExternalRef, Household, Membership, Person, Phone, Season, SepaMandate,
-                            Teacher)
+    from app.models import BankAccount, ExternalRef, Household, Membership, Person, Phone, Season, SepaMandate, Teacher
     from app.services import bank, directory
 
     season = Season(label="2026-2027", starts_on=date(2026, 9, 1), ends_on=date(2027, 8, 31))

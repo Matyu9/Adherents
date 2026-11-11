@@ -12,7 +12,6 @@ from app.services.activity import diff
 from .conftest import login, make_account
 from .test_annuaire import family, person  # noqa: F401
 
-
 # ---------------------------------------------------------------------------
 # Limite de lecture
 # ---------------------------------------------------------------------------

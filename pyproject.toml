@@ -1,0 +1,32 @@
+[project]
+name = "adherents"
+version = "0.1.0"
+description = "Plateforme de l'association pour les adhérents : annuaire, inscriptions, cotisations et serveur de connexion (OIDC)."
+readme = "README.md"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore:Passing SelectField choices as tuples:DeprecationWarning",
+]
+markers = [
+    "e2e: tests dans un vrai navigateur (Playwright) ; exclure avec -m \"not e2e\"",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM"]
+ignore = [
+    "E501",    # la longueur des lignes est l'affaire du formateur
+    "SIM108",  # un if/else lisible vaut mieux qu'une longue expression ternaire
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Une fixture importée d'un autre module de tests, puis reçue en argument : pas une redéfinition.
+"tests/*" = ["F811"]

@@ -7,8 +7,22 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from ..extensions import db, fold
-from ..models import (Assessment, AssessmentLine, Course, Enrollment, FeeItem, FeePick, FeeRule, FeeSeason,
-                      Household, HouseholdMember, HouseholdSeason, Membership, Regie, Season)
+from ..models import (
+    Assessment,
+    AssessmentLine,
+    Course,
+    Enrollment,
+    FeeItem,
+    FeePick,
+    FeeRule,
+    FeeSeason,
+    Household,
+    HouseholdMember,
+    HouseholdSeason,
+    Membership,
+    Regie,
+    Season,
+)
 from . import pricing
 from .activity import log
 from .pricing import PricingError

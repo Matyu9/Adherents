@@ -383,6 +383,9 @@ progress { height: .6rem; border-radius: 999px; }
   table.responsive tbody td, table.responsive tbody tr:hover td, table.responsive.striped tbody tr:nth-child(odd) td { background: transparent; }
   table.responsive td.actions { justify-content: flex-end; padding-top: .35rem; }
   table.responsive td > .badge-list { justify-content: flex-end; }
+  /* La valeur peut rétrécir et ses badges passer à la ligne : sinon un long libellé élargit la carte. */
+  table.responsive td > * { min-width: 0; }
+  table.responsive td .badge { white-space: normal; text-align: left; }
   /* Doigt plutôt que souris : des actions de tableau assez hautes pour être touchées sans erreur. */
   table.responsive td.actions .link-button, table.responsive td.actions a { padding: .35rem .25rem; }
   th, td { padding: .5rem .6rem; }

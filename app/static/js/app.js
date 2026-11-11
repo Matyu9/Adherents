@@ -61,8 +61,8 @@
 })();
 
 // <button data-dismiss> : referme le message qui le contient.
-// <div data-show-when="champ" data-show-value="valeur"> : visible seulement quand ce champ du même formulaire vaut
-// cette valeur (date d'abandon d'une adhésion…). Sans JavaScript, tout reste affiché.
+// <div data-show-when="champ" data-show-value="valeur autre"> : visible seulement quand ce champ du même formulaire vaut
+// l'une de ces valeurs, séparées par des espaces (date d'abandon, effet d'une règle…). Sans JavaScript, tout reste affiché.
 (function () {
   document.addEventListener("click", function (event) {
     const button = event.target.closest("[data-dismiss]");
@@ -75,7 +75,7 @@
   function refresh(form) {
     form.querySelectorAll("[data-show-when]").forEach(function (block) {
       const field = form.elements[block.dataset.showWhen];
-      block.hidden = !!field && field.value !== block.dataset.showValue;
+      block.hidden = !!field && !block.dataset.showValue.split(" ").includes(field.value);
     });
   }
   document.addEventListener("change", function (event) {

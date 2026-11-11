@@ -24,6 +24,7 @@ LINKING = "account.manage+directory.edit"
 TEACHERS = "teacher.manage"
 CAT_VIEW, CAT_EDIT = "catalog.view", "catalog.edit"
 REG_VIEW, REG_MANAGE, REG_IBAN = "registration.view", "registration.manage", "registration.manage+bank.view"
+FEE_VIEW, FEE_EDIT, FEE_ASSESS, FEE_SITUATION = "fee.view", "fee.edit", "fee.assess", "fee.situation"
 ACCESS = {
     "static": PUBLIC, "auth.login": PUBLIC, "csp.report": PUBLIC, "settings.logo_file": PUBLIC,
     "auth.two_factor": PUBLIC, "auth.forgot": PUBLIC, "auth.token_link": PUBLIC,
@@ -60,6 +61,15 @@ ACCESS = {
                                                     "validate", "send_back", "mark_transferred", "report",
                                                     "report_csv", "report_done")},
     "campaigns.report_csv_iban": REG_IBAN,
+    **{f"fees.{name}": FEE_VIEW for name in ("index", "rules", "courses", "rule_impact", "simulator", "assessments",
+                                            "household")},
+    **{f"fees.{name}": FEE_EDIT for name in ("create_item", "edit_item", "delete_item", "save_courses", "settings",
+                                            "create_regie", "toggle_regie", "create_rule", "edit_rule", "move_rule",
+                                            "toggle_rule", "delete_rule", "copy")},
+    **{f"fees.{name}": FEE_ASSESS for name in ("assess_all", "assess_household", "add_pick", "remove_pick",
+                                              "correct_line", "undo_line", "validate_assessment",
+                                              "reopen_assessment", "delete_assessment")},
+    "fees.situation": FEE_SITUATION,
     **{f"retention.{name}": "directory.anonymize" for name in ("index", "anonymize", "purge_dossiers")},
     "enrollment.index": LOGGED_IN, "enrollment.start": LOGGED_IN, "enrollment.my_students": LOGGED_IN,
     # Un dossier s'ouvre par son compte ou par le lien reçu par email : un identifiant inconnu donne 404.
@@ -79,12 +89,13 @@ ACCESS = {
 HOLDERS = {SETTINGS: {A}, JOURNAL: {A, G}, ADMIN_ONLY: {A}, HIDDEN: {A}, ACCOUNTS: {A}, GROUPS: {A}, CLIENTS: {A},
            DIR_VIEW: {A, G}, DIR_EDIT: {A, G}, DIR_MERGE: {A, G}, BANK: {A}, LINKING: {A}, TEACHERS: {A},
            CAT_VIEW: {A, G}, CAT_EDIT: {A, G}, REG_VIEW: {A, G}, REG_MANAGE: {A, G}, REG_IBAN: {A},
-           "directory.anonymize": {A}}
+           "directory.anonymize": {A}, FEE_VIEW: {A, G}, FEE_EDIT: {A, G}, FEE_ASSESS: {A, G}, FEE_SITUATION: {A}}
 ARGUMENTS = {"filename": "css/app.css", "key": "adherent", "sid": "inconnue", "name": "absent",
              "account_id": 1, "group_id": 999, "token": "inconnu", "client_pk": 999, "person_id": 999,
              "household_id": 999, "phone_id": 999, "membership_id": 999, "season_id": 999, "mandate_id": 999,
              "course_id": 999, "kind": "disciplines", "item_id": 999, "campaign_id": 999, "dossier_id": 999,
-             "consent_id": 999, "uuid": "inconnu", "student_key": "inconnue"}
+             "consent_id": 999, "uuid": "inconnu", "student_key": "inconnue", "rule_id": 999, "line_id": 999,
+             "assessment_id": 999, "pick_id": 999, "regie_id": 999}
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
 SENDS_TO_LOGIN = {"auth.logout", "auth.two_factor", "auth.token_link", "oidc.end_session", "enrollment.access"}
 
@@ -105,7 +116,7 @@ def test_every_route_is_declared(app):
 def test_every_declared_permission_exists():
     from app.permissions import PERMISSIONS
     assert {SETTINGS, JOURNAL, ACCOUNTS, GROUPS, CLIENTS, DIR_VIEW, DIR_EDIT, DIR_MERGE, BANK, TEACHERS, CAT_VIEW,
-            CAT_EDIT, REG_VIEW, REG_MANAGE} <= set(PERMISSIONS)
+            CAT_EDIT, REG_VIEW, REG_MANAGE, FEE_VIEW, FEE_EDIT, FEE_ASSESS, FEE_SITUATION} <= set(PERMISSIONS)
 
 
 @pytest.mark.parametrize("who", [ANONYMOUS, H, G, A])
@@ -241,6 +252,39 @@ def _registrations(season):
     new, _ = registration.new_family_dossier(campaign, "nouvelle@famille.test")
     new.data = {**new.data, "household": {"name": "Famille <b>Nouvelle</b>"}}
     db.session.flush()
+    _fees(season, household)
+
+
+def _fees(season, household):
+    """Tarifs complets, avec du HTML dans chaque libellé : éléments, règles active et en brouillon, situation,
+    élément pris à part, cotisation corrigée."""
+    from app.models import Course, Membership
+    from app.services import fees
+
+    regie = fees.create_regie("Régie <b>")
+    formule = fees.save_item(season, {"label": "Formule <b>", "price": 42000, "category": "Formules <i>",
+                                      "regie": regie, "code": "<b>F1"})
+    location = fees.save_item(season, {"label": "Location <script>", "price": 12000})
+    fees.save_settings(season, {"rounding": "tenth"}, [{"label": "A<b>", "max": 600}, {"label": "C"}], "C",
+                       ["Rouen <b>"])
+    rule = fees.save_rule(season, {"name": "Réduction <b>", "group": "social <i>",
+                                   "effect": {"kind": "percent", "value": "-10"},
+                                   "target": {"categories": ["Formules <i>"]},
+                                   "conditions": [[{"field": "foyer.etiquettes", "op": "has_any", "value": ["<b>x"]}],
+                                                  [{"field": "ligne.element", "op": "in", "value": [formule.id]}]]})
+    fees.set_rule_active(rule, True)
+    fees.save_rule(season, {"name": "Brouillon <b>", "effect": {"kind": "add", "item": location.id, "per": "household"}})
+    for course in db.session.scalars(db.select(Course).where(Course.season_id == season.id)):
+        course.fee_item = formule
+    membership = db.session.scalar(db.select(Membership).where(Membership.season_id == season.id))
+    from app.models import Enrollment
+    membership.enrollments.append(Enrollment(course=db.session.scalar(
+        db.select(Course).where(Course.season_id == season.id))))
+    fees.save_situation(household, season, {"quotient": 450, "tags": ["<b>x"], "qf_proof": "<i>CAF"})
+    fees.add_pick(household, membership.person, location, "<b>violon")
+    assessment = fees.assess(household, season)
+    fees.correct_line(assessment.lines[0], 30000, "Geste <b>")
+    db.session.flush()
 
 
 INLINE = re.compile(r"""<[a-z][^>]*\son[a-z]+\s*=|<[a-z][^>]*\sstyle\s*=|<style\b|<script\b(?![^>]*\ssrc=)|href\s*=\s*["']javascript:""", re.I)
@@ -273,7 +317,8 @@ def test_crawl_every_link(app, rich, who):
         if match := INLINE.search(html):
             problems.append(f"{path} : contenu en ligne interdit par la CSP : {match.group(0)!r}")
         if "<script>" in html or "<b>à compléter" in html or "<em>modifiée" in html or "Flûte <b>" in html \
-                or "Famille <b>Nouvelle" in html or "Image <b>" in html:
+                or "Famille <b>Nouvelle" in html or "Image <b>" in html or "Formule <b>" in html \
+                or "Location <script>" in html or "Réduction <b>" in html:
             problems.append(f"{path} : une donnée n'a pas été échappée")
         for link in LINK.findall(html):
             target = urlsplit(urljoin(path, link.replace("&amp;", "&")))
@@ -301,6 +346,10 @@ def test_crawl_every_link(app, rich, who):
     assert any(p.startswith("/campagnes/dossiers/") for p in seen) == (who in (A, G))
     assert any(p.startswith("/inscription/dossier/") for p in seen) == (who == H)  # le compte d'Anne, responsable
     assert ("/mon-espace" in seen) == (who == H)
+    assert ("/tarifs" in seen) == (who in (A, G)) and any(p.startswith("/tarifs/regles/") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/tarifs/foyers/") and "/situation" not in p for p in seen) == (who in (A, G))
+    assert any("/situation" in p for p in seen) == (who == A)
+    assert any(p.startswith("/tarifs/reglages") for p in seen) == (who in (A, G))
 
 
 def test_custom_role_gets_exactly_its_rights(app, rich):

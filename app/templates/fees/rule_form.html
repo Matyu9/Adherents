@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}{{ "Règle " ~ rule.name if rule else "Nouvelle règle" }}{% endblock %}
+{% macro selected(values, key, value) -%}{{ "selected" if value | string in (values.get(key) or []) | map("string") | list }}{%- endmacro %}
+{% block content %}
+<article class="rule-form">
+  <h1>{{ "Modifier la règle" if rule else "Nouvelle règle" }}</h1>
+  <p class="muted">Tarifs {{ season.label }}</p>
+  {% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" novalidate>
+    {{ csrf() }}
+    {#- Bouton par défaut : la touche Entrée enregistre au lieu de retirer la première condition. -#}
+    <button type="submit" name="action" value="save" class="sr-only" tabindex="-1">Enregistrer</button>
+    <input type="hidden" name="saison" value="{{ season.id }}">
+    <div class="grid">
+      <div><label for="name">Nom *</label><input id="name" name="name" required maxlength="120" value="{{ values.get('name', '') }}" placeholder="Dégressivité 2ᵉ enfant"></div>
+      <div><label for="group">Groupe exclusif</label><input id="group" name="group" maxlength="60" value="{{ values.get('group', '') }}" placeholder="social">
+        <small class="muted">Facultatif. Deux règles du même groupe ne se cumulent pas sur un même élément : la première dans l'ordre l'emporte.</small></div>
+      {% if rule %}<div><label for="position">Position (1 à {{ count }})</label><input id="position" name="position" type="number" min="1" max="{{ count }}" value="{{ values.get('position', '') }}"></div>{% endif %}
+    </div>
+
+    <fieldset class="card">
+      <legend>Conditions</legend>
+      <p class="muted small">Les conditions d'un même bloc doivent <strong>toutes</strong> être vraies (ET). La règle s'applique si <strong>l'un des blocs</strong> est vrai (OU). Sans condition, elle s'applique toujours.<br>
+        Valeurs : un nombre (« 3 »), deux pour « entre » (« 10 et 14 »), « oui » ou « non », ou une liste séparée par des virgules (« A, B » ; pour les éléments, leurs libellés).</p>
+      {% for group in groups %}{% set g = loop.index0 %}
+      {% if not loop.first %}<p class="or-separator"><strong>OU</strong></p>{% endif %}
+      <div class="condition-group">
+        {% for row in group %}{% set i = loop.index0 %}
+        <div class="condition-row">
+          {% if not loop.first %}<span class="muted small">et</span>{% endif %}
+          <select name="c-{{ g }}-{{ i }}-field" aria-label="Critère">
+            <option value="">— critère —</option>
+            {% for level, fields in fields_by_level.items() %}<optgroup label="{{ level_names[level] }}">
+              {% for name, label in fields %}<option value="{{ name }}" {{ "selected" if row.field == name }}>{{ label }}</option>{% endfor %}
+            </optgroup>{% endfor %}
+          </select>
+          <span class="condition-param" data-show-when="c-{{ g }}-{{ i }}-field" data-show-value="foyer.nb_elements eleve.nb_elements">
+          <select name="c-{{ g }}-{{ i }}-param" aria-label="Éléments comptés">
+            <option value="">tous les éléments</option>
+            {% for c in categories %}<option value="cat:{{ c }}" {{ "selected" if row.param == "cat:" ~ c }}>catégorie {{ c }}</option>{% endfor %}
+            {% for item in items %}<option value="item:{{ item.id }}" {{ "selected" if row.param == "item:" ~ item.id }}>{{ item.label }}</option>{% endfor %}
+          </select>
+          </span>
+          <select name="c-{{ g }}-{{ i }}-op" aria-label="Comparaison">
+            <option value="">—</option>
+            {% for key, label in operators.items() %}<option value="{{ key }}" {{ "selected" if row.op == key }}>{{ label }}</option>{% endfor %}
+          </select>
+          <input name="c-{{ g }}-{{ i }}-value" aria-label="Valeur" value="{{ row.value }}">
+          <button type="submit" name="action" value="remove-{{ g }}-{{ i }}" class="link-button" aria-label="Retirer cette condition">Retirer</button>
+        </div>
+        {% endfor %}
+        <button type="submit" name="action" value="add-condition-{{ g }}" class="secondary small">+ ET une condition</button>
+      </div>
+      {% endfor %}
+      <button type="submit" name="action" value="add-group" class="secondary small">+ OU un autre bloc</button>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Effet</legend>
+      <div class="grid">
+        <div><label for="effect_kind">Effet *</label>
+          <select id="effect_kind" name="effect_kind">{% for key, label in effects.items() %}<option value="{{ key }}" {{ "selected" if values.get('effect_kind') == key }}>{{ label }}</option>{% endfor %}</select></div>
+        <div data-show-when="effect_kind" data-show-value="percent total_percent amount total_amount fixed">
+          <label for="effect_value">Valeur</label>
+          <input id="effect_value" name="effect_value" inputmode="decimal" value="{{ values.get('effect_value', '') }}" placeholder="-10 (%) ou -50 (€)">
+          <small class="muted">Pourcentage ou montant en euros ; négatif pour une réduction.</small></div>
+        <div data-show-when="effect_kind" data-show-value="percent">
+          <label for="effect_base">Pourcentage calculé sur</label>
+          <select id="effect_base" name="effect_base">{% for key, label in bases.items() %}<option value="{{ key }}" {{ "selected" if values.get('effect_base') == key }}>{{ label }}</option>{% endfor %}</select></div>
+        <div data-show-when="effect_kind" data-show-value="replace add">
+          <label for="effect_item">Élément</label>
+          <select id="effect_item" name="effect_item"><option value="">—</option>{% for item in items %}<option value="{{ item.id }}" {{ "selected" if values.get('effect_item') | string == item.id | string }}>{{ item.label }} ({{ item.price | euros }})</option>{% endfor %}</select></div>
+        <div data-show-when="effect_kind" data-show-value="add">
+          <label for="effect_per">Ajouté</label>
+          <select id="effect_per" name="effect_per">
+            <option value="student" {{ "selected" if values.get('effect_per') == "student" }}>Pour chaque élève</option>
+            <option value="household" {{ "selected" if values.get('effect_per') == "household" }}>Une fois pour le foyer</option>
+          </select></div>
+      </div>
+      <div class="grid" data-show-when="effect_kind" data-show-value="percent amount fixed free replace">
+        <div><label for="target_items">Éléments visés</label>
+          <select id="target_items" name="target_items" multiple size="5">{% for item in items %}<option value="{{ item.id }}" {{ selected(values, 'target_items', item.id) }}>{{ item.label }}</option>{% endfor %}</select></div>
+        <div><label for="target_categories">Catégories visées</label>
+          <select id="target_categories" name="target_categories" multiple size="5">{% for c in categories %}<option value="{{ c }}" {{ selected(values, 'target_categories', c) }}>{{ c }}</option>{% endfor %}</select>
+          <small class="muted">Rien de choisi : tous les éléments.</small></div>
+        <div><label for="target_exclude_items">Sauf les éléments</label>
+          <select id="target_exclude_items" name="target_exclude_items" multiple size="5">{% for item in items %}<option value="{{ item.id }}" {{ selected(values, 'target_exclude_items', item.id) }}>{{ item.label }}</option>{% endfor %}</select></div>
+        <div><label for="target_exclude_categories">Sauf les catégories</label>
+          <select id="target_exclude_categories" name="target_exclude_categories" multiple size="5">{% for c in categories %}<option value="{{ c }}" {{ selected(values, 'target_exclude_categories', c) }}>{{ c }}</option>{% endfor %}</select></div>
+      </div>
+    </fieldset>
+
+    <label for="notes">Notes</label>
+    <textarea id="notes" name="notes" rows="2">{{ values.get('notes', '') }}</textarea>
+    {% if not rule %}<label class="form-check"><input type="checkbox" name="activate" value="1" {{ "checked" if values.get('activate') }}> L'activer tout de suite (sinon : brouillon)</label>{% endif %}
+    <button type="submit" name="action" value="save">Enregistrer</button>
+  </form>
+  <p class="small"><a href="{{ url_for('fees.rules', saison=season.id) }}">Annuler</a></p>
+</article>
+{% endblock %}

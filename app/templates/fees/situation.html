@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Situation {{ household.name }}{% endblock %}
+{% block content %}
+<article class="narrow wide-form">
+  <p><a href="{{ url_for('fees.household', household_id=household.id, saison=season.id) }}">← Cotisation</a></p>
+  <h1>Situation de {{ household.name }}</h1>
+  <p class="muted">Saison {{ season.label }} · tranche retenue aujourd'hui : <strong>{{ band or "inconnue" }}</strong> · résident : <strong>{{ {True: "oui", False: "non"}.get(resident, "inconnu") }}</strong></p>
+  {% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" novalidate>
+    {{ csrf() }}
+    <input type="hidden" name="saison" value="{{ season.id }}">
+    <div class="grid">
+      <div><label for="quotient">Quotient familial</label>
+        <input id="quotient" name="quotient" inputmode="numeric" value="{{ record.quotient if record.quotient is not none else '' }}">
+        <small class="muted">Facultatif : la tranche peut être saisie seule.</small></div>
+      <div><label for="qf_band">Tranche</label>
+        <select id="qf_band" name="qf_band">
+          <option value="">Selon le quotient{% if settings.default_band %} (sinon {{ settings.default_band }}){% endif %}</option>
+          {% for b in settings.qf_bands %}<option value="{{ b.label }}" {{ "selected" if record.qf_band == b.label }}>{{ b.label }}</option>{% endfor %}
+        </select>
+        {% if not settings.qf_bands %}<small class="muted">Aucune tranche n'est définie dans les réglages de la saison.</small>{% endif %}</div>
+    </div>
+    <label for="qf_proof">Justificatif</label>
+    <input id="qf_proof" name="qf_proof" maxlength="40" list="proofs" value="{{ record.qf_proof or '' }}">
+    <datalist id="proofs"><option value="Attestation CAF"><option value="Avis d'imposition"><option value="Non communiqué"></datalist>
+    <label for="resident">Résident de la commune</label>
+    <select id="resident" name="resident">
+      <option value="">Selon la commune du foyer ({{ household.city or "non renseignée" }})</option>
+      <option value="1" {{ "selected" if record.resident == true }}>Oui</option>
+      <option value="0" {{ "selected" if record.resident == false }}>Non</option>
+    </select>
+    <label for="tags">Étiquettes du foyer</label>
+    <input id="tags" name="tags" value="{{ (record.tags or []) | join(', ') }}" placeholder="boursier, personnel">
+    <small class="muted">Séparées par des virgules. Les règles peuvent s'en servir.</small>
+    {% if memberships %}
+    <h2>Étiquettes des élèves</h2>
+    {% for m in memberships %}
+    <label for="tags-{{ m.id }}">{{ m.person.full_name }}</label>
+    <input id="tags-{{ m.id }}" name="tags-{{ m.id }}" value="{{ (m.fee_tags or []) | join(', ') }}">
+    {% endfor %}
+    {% endif %}
+    <button type="submit">Enregistrer</button>
+  </form>
+</article>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "fees/_nav.html" import tabs, head, steps_of with context %}
+{% block title %}Simulateur de tarifs{% endblock %}
+{% block content %}
+{% call head("Tarifs", season, seasons, "fees.simulator") %}{% endcall %}
+{{ tabs("simulateur", season) }}
+<p class="muted">Composez un foyer fictif : le calcul utilise les éléments et les règles actives de la saison, plus les règles en brouillon cochées. Rien n'est enregistré.</p>
+<form method="get" novalidate>
+  <input type="hidden" name="saison" value="{{ season.id }}">
+  <section class="card">
+    <h2>Foyer</h2>
+    <div class="grid">
+      <div><label for="band">Tranche de quotient familial</label>
+        <select id="band" name="band"><option value="">Inconnue</option>{% for b in bands %}<option value="{{ b }}" {{ "selected" if args.get('band') == b }}>{{ b }}</option>{% endfor %}</select></div>
+      <div><label for="resident">Résident</label>
+        <select id="resident" name="resident">
+          <option value="">Inconnu</option>
+          <option value="1" {{ "selected" if args.get('resident') == "1" }}>Oui</option>
+          <option value="0" {{ "selected" if args.get('resident') == "0" }}>Non</option>
+        </select></div>
+      <div><label for="htags">Étiquettes du foyer</label><input id="htags" name="htags" value="{{ args.get('htags', '') }}" placeholder="boursier, personnel"></div>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Élèves</h2>
+    <div class="overflow-auto"><table>
+      <thead><tr><th>Prénom</th><th>Âge</th><th>Adulte</th><th>Saisons suivies</th><th>Étiquettes</th><th>Éléments</th></tr></thead>
+      <tbody>
+      {% for row in rows %}{% set k = loop.index0 %}
+      <tr>
+        <td><input name="s{{ k }}-name" aria-label="Prénom de l'élève {{ k + 1 }}" value="{{ row.name }}" placeholder="Élève {{ k + 1 }}"></td>
+        <td><input name="s{{ k }}-age" type="number" min="0" max="120" aria-label="Âge de l'élève {{ k + 1 }}" value="{{ row.age if row.age is not none else '' }}"></td>
+        <td><input type="checkbox" name="s{{ k }}-adult" value="1" aria-label="Élève {{ k + 1 }} adulte" {{ "checked" if row.adult }}></td>
+        <td><input name="s{{ k }}-seniority" type="number" min="0" max="50" aria-label="Saisons déjà suivies par l'élève {{ k + 1 }}" value="{{ args.get('s' ~ k ~ '-seniority', '') }}"></td>
+        <td><input name="s{{ k }}-tags" aria-label="Étiquettes de l'élève {{ k + 1 }}" value="{{ row.tags }}"></td>
+        <td><select name="s{{ k }}-items" multiple size="3" aria-label="Éléments de l'élève {{ k + 1 }}">
+          {% for item in items %}<option value="{{ item.id }}" {{ "selected" if item.id in row["items"] }}>{{ item.label }}</option>{% endfor %}
+        </select></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% if more %}<p class="small"><a href="{{ url_for('fees.simulator', saison=season.id, n=more) }}">Plus de lignes</a></p>{% endif %}
+  </section>
+  {% if drafts %}
+  <section class="card">
+    <h2>Règles en brouillon à inclure</h2>
+    {% for r in drafts %}<label class="form-check"><input type="checkbox" name="drafts" value="{{ r.id }}" {{ "checked" if r.id in chosen }}> {{ r.position + 1 }}. {{ r.name }}</label>{% endfor %}
+  </section>
+  {% endif %}
+  <button type="submit">Calculer</button>
+</form>
+{% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+{% if result %}
+<section class="card">
+  <h2>Résultat : {{ result.total | euros }}</h2>
+  <div class="overflow-auto"><table class="striped responsive">
+    <thead><tr><th>Élève</th><th>Élément</th><th class="amount">Prix de base</th><th class="amount">Montant</th></tr></thead>
+    <tbody>
+    {% for line in result.lines %}
+    <tr>
+      <td data-label="Élève">{{ names.get(line.student_id, "Foyer") }}</td>
+      <td data-label="Élément">{{ line.item.label }}{% if line.added_by %} <small class="muted">ajouté par « {{ line.added_by }} »</small>{% endif %}{{ steps_of(line.steps) }}</td>
+      <td data-label="Prix de base" class="amount">{{ line.base | euros }}</td>
+      <td data-label="Montant" class="amount">{{ line.amount | euros }}</td>
+    </tr>
+    {% endfor %}
+    {% for step in result.adjustments %}
+    <tr><td data-label="Élève">Foyer</td><td data-label="Élément">{{ step.rule }}</td><td></td><td data-label="Montant" class="amount">{{ (step.after - step.before) | euros }}</td></tr>
+    {% endfor %}
+    {% if result.rounding %}<tr><td data-label="Élève">Foyer</td><td data-label="Élément">Arrondi</td><td></td><td data-label="Montant" class="amount">{{ result.rounding | euros }}</td></tr>{% endif %}
+    <tr class="total"><td colspan="3">Total</td><td class="amount">{{ result.total | euros }}</td></tr>
+    </tbody>
+  </table></div>
+  {% set regies = result.by_regie() %}
+  {% if regies | length > 1 %}<p class="small muted">Par régie (avant les règles sur le total) : {% for name, amount in regies.items() %}{{ name or "sans régie" }} {{ amount | euros }}{{ " · " if not loop.last }}{% endfor %}</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

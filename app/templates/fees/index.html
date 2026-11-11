@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import post_button %}
+{% from "fees/_nav.html" import tabs, head with context %}
+{% block title %}Tarifs{% endblock %}
+{% block content %}
+{% call head("Tarifs", season, seasons, "fees.index") %}{% if season %}<p class="muted">{{ items | length }} élément{{ "s" if items | length > 1 }}, {{ rules | selectattr("active") | list | length }} règle{{ "s" if rules | selectattr("active") | list | length > 1 }} active{{ "s" if rules | selectattr("active") | list | length > 1 }}.</p>{% endif %}{% endcall %}
+{% if not season %}
+<p class="muted">Aucune saison pour l'instant.</p>
+{% else %}
+{{ tabs("grille", season) }}
+<p class="muted">Les éléments sont ce qu'on facture, à leur prix de base. Les <a href="{{ url_for('fees.rules', saison=season.id) }}">règles</a> modifient ensuite ces prix, dans l'ordre choisi.</p>
+{% if can(current_user, "fee.edit") %}
+<div class="actions">
+  <a href="{{ url_for('fees.create_item', saison=season.id) }}" role="button">+ Nouvel élément</a>
+  <a href="{{ url_for('fees.copy') }}" role="button" class="secondary">Copier une saison</a>
+</div>
+{% endif %}
+{% if without %}<p class="flash flash-warning">{{ without }} cours de la saison ne facturent aucun élément : <a href="{{ url_for('fees.courses', saison=season.id) }}">choisir leur élément</a>.</p>{% endif %}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Élément</th><th>Catégorie</th><th>Régie</th><th>Prix de base</th><th>Cours</th>{% if can(current_user, "fee.edit") %}<th></th>{% endif %}</tr></thead>
+  <tbody>
+  {% for item in items %}
+  <tr>
+    <td data-label="Élément"><strong>{{ item.label }}</strong>{% if item.code %} <small class="muted">{{ item.code }}</small>{% endif %}{% if item.notes %}<br><small class="muted">{{ item.notes }}</small>{% endif %}</td>
+    <td data-label="Catégorie">{{ item.category or "—" }}</td>
+    <td data-label="Régie">{{ item.regie.name if item.regie else "—" }}</td>
+    <td data-label="Prix de base">{{ item.price | euros }}</td>
+    <td data-label="Cours">{{ usage.get(item.id, 0) }}</td>
+    {% if can(current_user, "fee.edit") %}
+    <td data-label="" class="actions">
+      <a href="{{ url_for('fees.edit_item', item_id=item.id) }}">Modifier</a>
+      {{ post_button(url_for('fees.delete_item', item_id=item.id), "Supprimer", "link-button", "Supprimer « " ~ item.label ~ " » ?") }}
+    </td>
+    {% endif %}
+  </tr>
+  {% else %}
+  <tr><td colspan="6" class="muted">Aucun élément pour cette saison.{% if can(current_user, "fee.edit") %} Créez-en un, ou <a href="{{ url_for('fees.copy') }}">recopiez une saison précédente</a>.{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+{% endblock %}

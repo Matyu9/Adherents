@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf, post_button %}
+{% from "fees/_nav.html" import steps_of %}
+{% block title %}Cotisation {{ household.name }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('fees.assessments', saison=season.id) }}">← Cotisations {{ season.label }}</a>{% if can(current_user, "directory.view") %} · <a href="{{ url_for('directory.household', household_id=household.id) }}">Fiche du foyer</a>{% endif %}</p>
+<div class="page-head">
+  <div>
+    <h1>{{ household.name }}</h1>
+    <p class="muted">Cotisation {{ season.label }}{% if assessment %} · {{ assessment.status_label | lower }}{% if assessment.validated_at %} le {{ assessment.validated_at | date_fr }}{% endif %}{% else %} · pas encore calculée{% endif %}</p>
+  </div>
+</div>
+{% set assess = can(current_user, "fee.assess") %}
+
+<section class="card">
+  <h2>Situation {{ season.label }}</h2>
+  {% if can(current_user, "fee.situation") %}
+  <p>Tranche : <strong>{{ band or "inconnue" }}</strong>{% if situation.quotient is not none %} (quotient {{ situation.quotient }}){% endif %}{% if situation.qf_proof %} · justificatif : {{ situation.qf_proof }}{% endif %}
+    · Résident : <strong>{{ {True: "oui", False: "non"}.get(resident, "inconnu") }}</strong>
+    {% if situation.tags %}· Étiquettes : {{ situation.tags | join(", ") }}{% endif %}</p>
+  <a href="{{ url_for('fees.situation', household_id=household.id, saison=season.id) }}">Modifier la situation</a>
+  {% else %}
+  <p class="muted small">La situation du foyer (quotient familial) est réservée au trésorier et à la direction.</p>
+  {% endif %}
+</section>
+
+{% for w in (assessment.warnings if assessment else prepared.warnings) %}<p class="flash flash-warning">{{ w }}</p>{% endfor %}
+{% if assessment and drift is not none %}
+<p class="flash flash-warning">Un nouveau calcul donnerait {{ drift | euros }} au lieu de {{ assessment.computed_total | euros }} : les inscriptions, la situation ou les règles ont changé depuis.{% if assessment.status == "validated" %} Rouvrez la cotisation pour la recalculer.{% endif %}</p>
+{% endif %}
+
+{% if assessment %}
+<section class="card">
+  <h2>Cotisation enregistrée : {{ assessment.total | euros }}</h2>
+  <div class="overflow-auto"><table class="striped responsive">
+    <thead><tr><th>Élève</th><th>Élément</th><th>Régie</th><th class="amount">Prix de base</th><th class="amount">Montant</th>{% if assess and assessment.status == "proposed" %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for line in assessment.lines %}
+    <tr>
+      <td data-label="Élève">{{ line.person_name or "Foyer" }}</td>
+      <td data-label="Élément">{{ line.label }}
+        {%- for s in line.steps %}<br><small class="muted">{{ s.rule }} : {{ s.before | euros }} → {{ s.after | euros }}{% if s.note %} ({{ s.note }}){% endif %}</small>{% endfor %}
+        {% if line.corrected %}<br><small><span class="badge health-warn">corrigé</span> calculé {{ line.computed | euros }} · {{ line.correction_reason }}{% if line.corrected_by %} ({{ line.corrected_by.first_name }} {{ line.corrected_by.last_name }}, {{ line.corrected_at | date_fr }}){% endif %}</small>{% endif %}</td>
+      <td data-label="Régie">{{ line.regie_name or "—" }}</td>
+      <td data-label="Prix de base" class="amount">{{ line.base | euros if line.kind == "item" else "" }}</td>
+      <td data-label="Montant" class="amount">{{ line.amount | euros }}</td>
+      {% if assess and assessment.status == "proposed" %}
+      <td data-label="">
+        <details><summary>Corriger</summary>
+          <form method="post" action="{{ url_for('fees.correct_line', line_id=line.id) }}">
+            {{ csrf() }}
+            <label for="amount-{{ line.id }}">Nouveau montant (€)</label>
+            <input id="amount-{{ line.id }}" name="amount" inputmode="decimal" value="{{ line.amount | euros_input }}" required>
+            <label for="reason-{{ line.id }}">Motif</label>
+            <input id="reason-{{ line.id }}" name="reason" maxlength="255" required>
+            <button type="submit" class="secondary small">Corriger</button>
+          </form>
+          {% if line.corrected %}{{ post_button(url_for('fees.undo_line', line_id=line.id), "Annuler la correction", "link-button") }}{% endif %}
+        </details>
+      </td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+    <tr class="total"><td colspan="4">Total</td><td class="amount">{{ assessment.total | euros }}</td>{% if assess and assessment.status == "proposed" %}<td></td>{% endif %}</tr>
+    </tbody>
+  </table></div>
+  {% if assess %}
+  <div class="actions">
+    {% if assessment.status == "proposed" %}
+    {{ post_button(url_for('fees.validate_assessment', assessment_id=assessment.id), "Valider la cotisation", "", "Valider la cotisation de " ~ (assessment.total | euros) ~ " ? Elle ne bougera plus.") }}
+    <form method="post" action="{{ url_for('fees.assess_household', household_id=household.id) }}" class="button-form"{% if assessment.lines | selectattr("corrected") | list %} data-confirm="Le recalcul efface les corrections. Continuer ?"{% endif %}>
+      {{ csrf() }}<input type="hidden" name="saison" value="{{ season.id }}">
+      {% if assessment.lines | selectattr("corrected") | list %}<input type="hidden" name="effacer" value="1">{% endif %}
+      <button type="submit" class="secondary">Recalculer</button>
+    </form>
+    {{ post_button(url_for('fees.delete_assessment', assessment_id=assessment.id), "Supprimer", "link-button", "Supprimer cette cotisation ?") }}
+    {% else %}
+    <details><summary>Rouvrir la cotisation</summary>
+      <form method="post" action="{{ url_for('fees.reopen_assessment', assessment_id=assessment.id) }}">
+        {{ csrf() }}
+        <label for="reopen-reason">Pourquoi ?</label>
+        <input id="reopen-reason" name="reason" maxlength="200" required>
+        <button type="submit" class="secondary small">Rouvrir</button>
+      </form>
+    </details>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if not assessment or drift is not none %}
+<section class="card">
+  <h2>{{ "Calcul actuel" if assessment else "Calcul" }} : {{ preview.total | euros }}</h2>
+  {% if preview.lines %}
+  <div class="overflow-auto"><table class="striped responsive">
+    <thead><tr><th>Élève</th><th>Élément</th><th class="amount">Prix de base</th><th class="amount">Montant</th></tr></thead>
+    <tbody>
+    {% for line in preview.lines %}
+    <tr>
+      <td data-label="Élève">{{ names.get(line.student_id, "Foyer") }}</td>
+      <td data-label="Élément">{{ line.item.label }}{{ steps_of(line.steps) }}</td>
+      <td data-label="Prix de base" class="amount">{{ line.base | euros }}</td>
+      <td data-label="Montant" class="amount">{{ line.amount | euros }}</td>
+    </tr>
+    {% endfor %}
+    {% for step in preview.adjustments %}<tr><td data-label="Élève">Foyer</td><td data-label="Élément">{{ step.rule }}</td><td></td><td data-label="Montant" class="amount">{{ (step.after - step.before) | euros }}</td></tr>{% endfor %}
+    {% if preview.rounding %}<tr><td data-label="Élève">Foyer</td><td data-label="Élément">Arrondi</td><td></td><td data-label="Montant" class="amount">{{ preview.rounding | euros }}</td></tr>{% endif %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="muted">Rien à facturer : aucun élève de ce foyer ne suit un cours qui facture un élément.</p>{% endif %}
+  {% if assess and not assessment %}
+  <form method="post" action="{{ url_for('fees.assess_household', household_id=household.id) }}">
+    {{ csrf() }}<input type="hidden" name="saison" value="{{ season.id }}">
+    <button type="submit">Enregistrer cette cotisation</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="card" id="a-part">
+  <h2>Éléments pris en dehors des cours</h2>
+  <ul class="plain-list">
+    {% for pick in picks %}
+    <li>{{ pick.person.full_name }} : {{ pick.item.label }} ({{ pick.item.price | euros }}){% if pick.note %} <small class="muted">{{ pick.note }}</small>{% endif %}
+      {% if assess %}{{ post_button(url_for('fees.remove_pick', pick_id=pick.id), "Retirer", "link-button", "Retirer cet élément ?") }}{% endif %}</li>
+    {% else %}<li class="muted">Aucun.</li>{% endfor %}
+  </ul>
+  {% if assess and students and items %}
+  <form method="post" action="{{ url_for('fees.add_pick', household_id=household.id) }}" class="inline-form">
+    {{ csrf() }}<input type="hidden" name="saison" value="{{ season.id }}">
+    <select name="person" aria-label="Élève">{% for p in students %}<option value="{{ p.id }}">{{ p.full_name }}</option>{% endfor %}</select>
+    <select name="item" aria-label="Élément">{% for item in items %}<option value="{{ item.id }}">{{ item.label }}</option>{% endfor %}</select>
+    <input name="note" maxlength="255" aria-label="Note" placeholder="Note (instrument…)">
+    <button type="submit" class="secondary">Ajouter</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

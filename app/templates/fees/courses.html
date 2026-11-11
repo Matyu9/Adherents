@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% from "fees/_nav.html" import tabs, head with context %}
+{% block title %}Élément facturé par cours{% endblock %}
+{% block content %}
+{% call head("Tarifs", season, seasons, "fees.courses") %}{% endcall %}
+{{ tabs("cours", season) }}
+<p class="muted">Chaque élève d'un cours se voit facturer l'élément choisi ici. Les éléments pris en dehors des cours (location…) s'ajoutent depuis la cotisation du foyer, et les règles peuvent en ajouter d'autres (adhésion…).</p>
+{% set edit = can(current_user, "fee.edit") %}
+<form method="post" action="{{ url_for('fees.save_courses') }}">
+  {{ csrf() }}
+  <input type="hidden" name="saison" value="{{ season.id }}">
+  <div class="overflow-auto"><table class="striped responsive">
+    <thead><tr><th>Cours</th><th>Horaire</th><th>Élément facturé</th></tr></thead>
+    <tbody>
+    {% for c in rows %}
+    <tr>
+      <td data-label="Cours"><strong>{{ c.discipline.name }}</strong>{% if c.level %} · {{ c.level.name }}{% endif %}{% if c.group_label %} · {{ c.group_label }}{% endif %}</td>
+      <td data-label="Horaire"><small>{% if c.weekday is not none %}{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}{% endif %}{% else %}—{% endif %}</small></td>
+      <td data-label="Élément">
+        {% if edit %}
+        <select name="course-{{ c.id }}" aria-label="Élément facturé pour {{ c.title }}">
+          <option value="">Rien</option>
+          {% for item in items %}<option value="{{ item.id }}" {{ "selected" if c.fee_item_id == item.id }}>{{ item.label }} ({{ item.price | euros }})</option>{% endfor %}
+        </select>
+        {% elif c.fee_item %}{{ c.fee_item.label }}{% else %}<span class="badge health-warn">rien</span>{% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="3" class="muted">Aucun cours sur cette saison.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if edit and rows %}<button type="submit">Enregistrer</button>{% endif %}
+</form>
+{% endblock %}

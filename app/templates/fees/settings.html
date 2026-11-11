@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf, post_button %}
+{% from "fees/_nav.html" import tabs, head with context %}
+{% block title %}Réglages des tarifs{% endblock %}
+{% block content %}
+{% call head("Tarifs", season, seasons, "fees.settings") %}{% endcall %}
+{{ tabs("reglages", season) }}
+{% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" novalidate>
+  {{ csrf() }}
+  <input type="hidden" name="saison" value="{{ season.id }}">
+  <section class="card">
+    <h2>Rang des élèves dans le foyer</h2>
+    <p class="muted small">Il sert à la dégressivité : une règle « si rang de l'élève ≥ 2 » vise le 2ᵉ élève et les suivants. Les égalités sont départagées par l'ordre d'inscription.</p>
+    <div class="grid">
+      <div><label for="ranking">Classement</label>
+        <select id="ranking" name="ranking">{% for key, label in rankings.items() %}<option value="{{ key }}" {{ "selected" if engine.ranking == key }}>{{ label }}</option>{% endfor %}</select></div>
+      <div><label for="ranking_categories">Pour un classement par prix, ne compter que</label>
+        <select id="ranking_categories" name="ranking_categories" multiple size="{{ [categories | length, 2] | max }}">
+          {% for c in categories %}<option value="{{ c }}" {{ "selected" if c in engine.ranking_categories }}>{{ c }}</option>{% endfor %}
+        </select>
+        <small class="muted">Rien de choisi : tous les éléments comptent.</small></div>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Arrondi</h2>
+    <div class="grid">
+      <div><label for="rounding">Arrondi</label>
+        <select id="rounding" name="rounding">{% for key, label in roundings.items() %}<option value="{{ key }}" {{ "selected" if engine.rounding == key }}>{{ label }}</option>{% endfor %}</select></div>
+      <div><label for="rounding_scope">Appliqué à</label>
+        <select id="rounding_scope" name="rounding_scope">{% for key, label in scopes.items() %}<option value="{{ key }}" {{ "selected" if engine.rounding_scope == key }}>{{ label }}</option>{% endfor %}</select></div>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Tranches de quotient familial</h2>
+    <p class="muted small">De la plus basse à la plus haute. Un quotient égal au plafond passe dans la tranche suivante. La dernière tranche n'a pas de plafond.</p>
+    <div class="overflow-auto"><table>
+      <thead><tr><th>Tranche</th><th>Plafond (exclu)</th></tr></thead>
+      <tbody>
+      {% for k in range(band_rows) %}{% set band = settings.qf_bands[k] if k < settings.qf_bands | length else none %}
+      <tr>
+        <td><input name="band-{{ k }}-label" maxlength="10" aria-label="Nom de la tranche {{ k + 1 }}" value="{{ band.label if band else '' }}"></td>
+        <td><input name="band-{{ k }}-max" inputmode="numeric" aria-label="Plafond de la tranche {{ k + 1 }}" value="{{ band.max if band and band.max is not none else '' }}"></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <label for="default_band">Tranche d'un foyer qui ne donne pas son quotient</label>
+    <select id="default_band" name="default_band">
+      <option value="">Aucune (tranche inconnue)</option>
+      {% for band in settings.qf_bands %}<option value="{{ band.label }}" {{ "selected" if settings.default_band == band.label }}>{{ band.label }}</option>{% endfor %}
+    </select>
+  </section>
+  <section class="card">
+    <h2>Communes résidentes</h2>
+    <label for="resident_cities">Une commune par ligne</label>
+    <textarea id="resident_cities" name="resident_cities" rows="4">{{ settings.resident_cities | join("\n") }}</textarea>
+    <small class="muted">Un foyer domicilié dans l'une d'elles est résident, sans tenir compte des accents ni des majuscules. On peut forcer la réponse dans la situation du foyer. Liste vide : résidence inconnue.</small>
+  </section>
+  <button type="submit">Enregistrer les réglages</button>
+</form>
+
+<section class="card" id="regies">
+  <h2>Régies</h2>
+  <p class="muted small">Communes à toutes les saisons. Chaque élément relève d'une régie ; une régie qui a servi s'archive.</p>
+  <ul class="plain-list">
+    {% for r in regies %}
+    <li>{{ r.name }}{% if r.archived %} <span class="badge">archivée</span>{% endif %}
+      <form method="post" action="{{ url_for('fees.toggle_regie', regie_id=r.id) }}" class="button-form">{{ csrf() }}<input type="hidden" name="saison" value="{{ season.id }}"><button type="submit" class="link-button">{{ "Rouvrir" if r.archived else "Archiver" }}</button></form></li>
+    {% else %}<li class="muted">Aucune régie.</li>{% endfor %}
+  </ul>
+  <form method="post" action="{{ url_for('fees.create_regie') }}" class="inline-form">
+    {{ csrf() }}
+    <input type="hidden" name="saison" value="{{ season.id }}">
+    <input name="name" maxlength="60" aria-label="Nom de la nouvelle régie" placeholder="EMHN, OHN…">
+    <button type="submit" class="secondary">Ajouter</button>
+  </form>
+</section>
+{% endblock %}

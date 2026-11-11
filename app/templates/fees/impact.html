@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import post_button %}
+{% block title %}Effet de « {{ rule.name }} »{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('fees.rules', saison=season.id) }}#regle-{{ rule.id }}">← Règles {{ season.label }}</a></p>
+<h1>Effet de « {{ rule.name }} »</h1>
+<section class="card">
+  <p class="small">
+    {% if conditions %}<span class="muted">Si</span> {% for c in conditions %}{{ c }}{% if not loop.last %} <strong>ou</strong> {% endif %}{% endfor %}<br>{% else %}<span class="muted">Toujours</span><br>{% endif %}
+    <span class="muted">Alors</span> {% if rule.effect.kind in ("percent", "amount", "fixed", "free", "replace") %}{{ target }} : {% endif %}{{ effect }}
+  </p>
+  <p>{% if rule.active %}Si on <strong>remettait cette règle en brouillon</strong>{% else %}Si on <strong>activait cette règle</strong>, à sa place (n° {{ rule.position + 1 }}){% endif %} :
+    {{ impacts | length }} foyer{{ "s" if impacts | length > 1 }} sur {{ households }} changeraient, pour un total de <strong>{{ "+" if total > 0 }}{{ total | euros }}</strong>.</p>
+  <p class="muted small">Calculé à partir des inscriptions actuelles, sans rien enregistrer. Les cotisations déjà enregistrées ne changent pas.</p>
+  {% if can(current_user, "fee.edit") %}{{ post_button(url_for('fees.toggle_rule', rule_id=rule.id), "Remettre en brouillon" if rule.active else "Activer la règle", "") }}{% endif %}
+</section>
+{% if impacts %}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Foyer</th><th class="amount">Avant</th><th class="amount">Après</th><th class="amount">Écart</th></tr></thead>
+  <tbody>
+  {% for i in impacts %}
+  <tr>
+    <td data-label="Foyer"><a href="{{ url_for('fees.household', household_id=i.household.id, saison=season.id) }}">{{ i.household.name }}</a></td>
+    <td data-label="Avant" class="amount">{{ i.before | euros }}</td>
+    <td data-label="Après" class="amount">{{ i.after | euros }}</td>
+    <td data-label="Écart" class="amount">{{ "+" if i.delta > 0 }}{{ i.delta | euros }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+{% endblock %}

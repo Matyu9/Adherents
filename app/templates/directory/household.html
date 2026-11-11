@@ -11,6 +11,7 @@
     {% if household.archived_at %}<p class="muted"><span class="badge">Archivé le {{ household.archived_at | date_fr }}</span></p>{% endif %}
   </div>
   <div class="actions">
+    {% if can(current_user, "fee.view") %}<a href="{{ url_for('fees.household', household_id=household.id) }}" role="button" class="secondary">Cotisation</a>{% endif %}
     {% if edit %}<a href="{{ url_for('directory.edit_household', household_id=household.id) }}" role="button" class="secondary">Modifier</a>{% endif %}
     {% if can(current_user, "directory.merge") %}<a href="{{ url_for('directory.merge_household', household_id=household.id) }}" role="button" class="secondary outline">Fusionner un doublon</a>{% endif %}
   </div>

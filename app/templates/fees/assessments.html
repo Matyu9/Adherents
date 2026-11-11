@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% from "fees/_nav.html" import tabs, head with context %}
+{% block title %}Cotisations{% endblock %}
+{% block content %}
+{% call head("Cotisations", season, seasons, "fees.assessments") %}{% if season %}<p class="muted">{{ totals.count }} calculée{{ "s" if totals.count > 1 }}, dont {{ totals.validated }} validée{{ "s" if totals.validated > 1 }} · {{ totals.amount | euros }}</p>{% endif %}{% endcall %}
+{% if season %}
+{{ tabs("cotisations", season) }}
+<form method="get" class="filters">
+  <input type="hidden" name="saison" value="{{ season.id }}">
+  <select name="statut" aria-label="Statut" data-autosubmit>
+    <option value="">Tous les foyers</option>
+    <option value="none" {{ "selected" if status == "none" }}>Pas encore calculée</option>
+    <option value="proposed" {{ "selected" if status == "proposed" }}>Proposée</option>
+    <option value="validated" {{ "selected" if status == "validated" }}>Validée</option>
+  </select>
+  <noscript><button type="submit">Filtrer</button></noscript>
+</form>
+{% if can(current_user, "fee.assess") %}
+<form method="post" action="{{ url_for('fees.assess_all') }}" data-confirm="Calculer les cotisations de tous les foyers de {{ season.label }} ? Les cotisations validées ou corrigées ne sont pas touchées.">
+  {{ csrf() }}<input type="hidden" name="saison" value="{{ season.id }}">
+  <button type="submit" class="secondary">Calculer toutes les cotisations</button>
+</form>
+{% endif %}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Foyer</th><th>Statut</th><th class="amount">Total</th></tr></thead>
+  <tbody>
+  {% for household, a in rows %}
+  <tr>
+    <td data-label="Foyer"><a href="{{ url_for('fees.household', household_id=household.id, saison=season.id) }}">{{ household.name }}</a>
+      {% if a and a.warnings %} <span class="badge health-warn">{{ a.warnings | length }} avertissement{{ "s" if a.warnings | length > 1 }}</span>{% endif %}</td>
+    <td data-label="Statut">{% if not a %}<span class="muted">à calculer</span>{% elif a.status == "validated" %}<span class="badge badge-ok">validée</span>{% else %}<span class="badge">proposée</span>{% endif %}</td>
+    <td data-label="Total" class="amount">{{ a.total | euros if a else "—" }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="3" class="muted">Aucun foyer n'a d'élève cette saison.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}<p class="muted">Aucune saison pour l'instant.</p>{% endif %}
+{% endblock %}

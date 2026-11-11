@@ -1,0 +1,24 @@
+{#- Onglets des tarifs et choix de la saison. -#}
+{% from "catalog/_season_picker.html" import season_picker %}
+{% macro tabs(active, season) -%}
+{%- set s = season.id if season else none -%}
+<nav class="tabs" aria-label="Tarifs">
+  <a href="{{ url_for('fees.index', saison=s) }}"{% if active == "grille" %} aria-current="page"{% endif %}>Éléments</a>
+  <a href="{{ url_for('fees.rules', saison=s) }}"{% if active == "regles" %} aria-current="page"{% endif %}>Règles</a>
+  <a href="{{ url_for('fees.courses', saison=s) }}"{% if active == "cours" %} aria-current="page"{% endif %}>Cours</a>
+  <a href="{{ url_for('fees.simulator', saison=s) }}"{% if active == "simulateur" %} aria-current="page"{% endif %}>Simulateur</a>
+  <a href="{{ url_for('fees.assessments', saison=s) }}"{% if active == "cotisations" %} aria-current="page"{% endif %}>Cotisations</a>
+  {% if can(current_user, "fee.edit") %}<a href="{{ url_for('fees.settings', saison=s) }}"{% if active == "reglages" %} aria-current="page"{% endif %}>Réglages</a>{% endif %}
+</nav>
+{%- endmacro %}
+
+{% macro head(title, season, seasons, endpoint) -%}
+<div class="page-head">
+  <div><h1>{{ title }}{% if season %} {{ season.label }}{% endif %}</h1>{{ caller() if caller }}</div>
+  <div class="actions">{{ season_picker(seasons, season, endpoint) }}</div>
+</div>
+{%- endmacro %}
+
+{% macro steps_of(steps) -%}
+{%- for s in steps %}<br><small class="muted">{{ s.rule }} : {{ s.before | euros }} → {{ s.after | euros }}{% if s.note %} ({{ s.note }}){% endif %}</small>{% endfor -%}
+{%- endmacro %}

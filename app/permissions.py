@@ -32,6 +32,12 @@ PERMISSION_GROUPS = [
         ("registration.view", "Consulter les campagnes et les dossiers d'inscription"),
         ("registration.manage", "Ouvrir les campagnes, valider ou renvoyer les dossiers, préparer le report"),
     ]),
+    ("Tarifs", [
+        ("fee.view", "Consulter les tarifs et les cotisations des foyers"),
+        ("fee.edit", "Modifier les éléments, les règles et les réglages des tarifs, copier une saison"),
+        ("fee.assess", "Calculer, corriger et valider les cotisations des foyers"),
+        ("fee.situation", "Voir et modifier la situation des foyers : quotient familial, tranche, étiquettes"),
+    ]),
     ("Comptes", [
         ("account.manage", "Gérer les comptes : créer, inviter, couper, fermer les sessions"),
         ("group.manage", "Gérer les groupes, qui donnent accès aux applis de l'association"),
@@ -48,7 +54,7 @@ PERMISSIONS = {key: label for _, perms in PERMISSION_GROUPS for key, label in pe
 DEFAULT_PERMISSIONS = {
     A: set(PERMISSIONS),
     G: {"activity.view", "directory.view", "directory.edit", "directory.merge", "catalog.view", "catalog.edit",
-        "registration.view", "registration.manage"},
+        "registration.view", "registration.manage", "fee.view", "fee.edit", "fee.assess"},
     H: set(),
 }
 

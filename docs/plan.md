@@ -230,14 +230,19 @@ Modèle : voir [catalogue.md](catalogue.md).
 - **Tests :** copie de saison, cours complet, professeur parti, valeurs archivées, chevauchements, fusion de deux fiches de professeur, contraintes de la migration.
 - **Pas fait :** l'import des cours (avec celui de la phase 1), le remplaçant et l'accompagnateur d'un cours.
 
-### Phase 9 : tarifs et cotisations
+### Phase 9 : tarifs et cotisations (écrite les 10 et 11 novembre 2026, branche `phase-9-tarifs`)
 
-- **Grille par saison** : éléments de cotisation (adhésion, formules, pratiques collectives, location…) et tarifs selon la commune, la tranche de quotient familial et le statut adulte. Les codes d'éléments changent d'une saison à l'autre : aucun ne sert de clé durable.
+Modèle : voir [tarifs.md](tarifs.md).
+
+- **Grille construite depuis zéro** : le gestionnaire crée les éléments (prix de base) et des **règles ordonnées** : conditions reliées par ET et OU, cible, effet (pourcentage, montant, prix fixe, offert, remplacement, ajout, total du foyer), groupes exclusifs. Le classement des élèves (dégressivité) et l'arrondi sont des réglages de la saison. Une grille « par critères » (commune, tranche, adulte) n'est qu'un ensemble de règles de prix fixe.
+- **Grille par saison** : les codes d'éléments changent d'une saison à l'autre, et aucun ne sert de clé durable.
 - **Régies** : EMHN et OHN, chaque élément relevant de l'une d'elles.
 - **Situation du foyer par saison** : tranche de quotient familial, et le quotient seulement si nécessaire, visible du trésorier et de la direction.
 - **Calcul des cotisations** d'un foyer à partir de ses inscriptions, avec la dégressivité et l'arrondi au décime. Le calcul est proposé, puis validé : un gestionnaire peut le corriger, et la correction est tracée.
-- **Prérequis :** les réponses de la directrice sur la dégressivité et le quotient familial.
-- **Tests :** grille comparée aux montants appelés par le logiciel de gestion sur une saison importée ; c'est le critère de réussite.
+- **Simulation** : foyer fictif avec le calcul détaillé, et effet d'une règle en brouillon sur toute la saison avant de l'activer.
+- **Prérequis :** aucun pour construire le moteur. Les réponses de la directrice sur la dégressivité et le quotient familial ne servent plus qu'à régler la grille.
+- **Écrans** : menu Tarifs (éléments, règles, cours, simulateur, cotisations, réglages), cotisation et situation de chaque foyer.
+- **Tests :** moteur (dont propriétés vérifiées sur des données générées), services, migration, écrans, balayage des droits et des liens, parcours dans un navigateur. Reste la grille comparée aux montants appelés par le logiciel de gestion sur une saison importée : c'est le critère de réussite, il attend les exports.
 
 ### Phase 10 : règlements
 

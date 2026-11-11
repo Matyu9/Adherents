@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Copier les tarifs d'une saison{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('fees.index', saison=target.id if target) }}">← Tarifs</a></p>
+<h1>Copier les tarifs d'une saison</h1>
+<p class="muted">Éléments, règles (avec leur ordre et leur état) et réglages sont recopiés sur une saison qui n'a encore aucun tarif. Les cours de la nouvelle saison qui ne facturent rien reprennent l'élément du cours équivalent (même discipline, même niveau, même groupe).</p>
+<form method="get" class="filters">
+  <select name="depuis" aria-label="Saison d'origine">
+    <option value="">Saison d'origine</option>
+    {% for s in seasons %}<option value="{{ s.id }}" {{ "selected" if source and source.id == s.id }}>De {{ s.label }}</option>{% endfor %}
+  </select>
+  <select name="vers" aria-label="Saison à remplir">
+    <option value="">Saison à remplir</option>
+    {% for s in seasons %}<option value="{{ s.id }}" {{ "selected" if target and target.id == s.id }}>Vers {{ s.label }}</option>{% endfor %}
+  </select>
+  <button type="submit" class="secondary">Voir l'aperçu</button>
+</form>
+{% if preview and target %}
+<section class="card">
+  {% if source.id == target.id %}<p class="flash flash-error">Choisissez deux saisons différentes.</p>
+  {% elif preview.target_items or preview.target_rules %}<p class="flash flash-error">La saison {{ target.label }} a déjà des tarifs ({{ preview.target_items }} élément(s), {{ preview.target_rules }} règle(s)) : la copie ne se fait que sur une saison vide.</p>
+  {% else %}
+  <p>{{ preview["items"] }} élément(s) et {{ preview.rules }} règle(s) de {{ source.label }} seront recopiés sur {{ target.label }}.</p>
+  <form method="post" action="{{ url_for('fees.copy') }}" data-confirm="Recopier les tarifs de {{ source.label }} sur {{ target.label }} ?">
+    {{ csrf() }}
+    <input type="hidden" name="depuis" value="{{ source.id }}">
+    <input type="hidden" name="vers" value="{{ target.id }}">
+    <button type="submit">Recopier</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

@@ -48,13 +48,14 @@
       {% if can(current_user, "directory.edit") and can(current_user, "account.manage") %}{{ navlink("directory.link_accounts", "Rattachement", "user-check") }}{% endif %}
       {% if can(current_user, "directory.anonymize") %}{{ navlink("retention.index", "Conservation", "clock", ["retention"]) }}{% endif %}
       {% endif %}
-      {% if can(current_user, "catalog.view") or can(current_user, "registration.view") %}
+      {% if can(current_user, "catalog.view") or can(current_user, "registration.view") or can(current_user, "fee.view") %}
       <p class="nav-title">Enseignement</p>
       {% endif %}
       {% if can(current_user, "catalog.view") %}
       {{ navlink("catalog.index", "Catalogue", "layers", ["catalog"]) }}
       {% endif %}
       {% if can(current_user, "registration.view") %}{{ navlink("campaigns.index", "Campagnes", "calendar", ["campaigns"]) }}{% endif %}
+      {% if can(current_user, "fee.view") %}{{ navlink("fees.index", "Tarifs", "tag", ["fees"]) }}{% endif %}
       {% if current_user.is_admin or can(current_user, "account.manage") or can(current_user, "group.manage") or can(current_user, "client.manage") or can(current_user, "settings.manage") or can(current_user, "activity.view") %}
       <p class="nav-title">Administration</p>
       {% if can(current_user, "account.manage") %}{{ navlink("accounts.index", "Comptes", "users", ["accounts"]) }}{% endif %}

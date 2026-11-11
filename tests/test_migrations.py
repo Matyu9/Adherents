@@ -313,7 +313,76 @@ def test_registration_on_the_real_schema(migrated):
 def test_saved_manager_role_gets_the_registration_rights(migrated):
     upgrade(MIGRATIONS, revision="a0000002catalogue")
     run_sql(migrated, "INSERT INTO role (key, name, permissions) VALUES ('gestionnaire', 'Gestionnaire', '[]')")
-    upgrade(MIGRATIONS)
+    upgrade(MIGRATIONS, revision="a0000003inscriptions")
     assert run_sql(migrated, "SELECT permissions::text FROM role") == [[('["registration.view", "registration.manage"]',)]]
     downgrade(MIGRATIONS, revision="a0000002catalogue")
     assert run_sql(migrated, "SELECT permissions::text FROM role") == [[("[]",)]]
+
+
+FEES = (
+    "INSERT INTO household (id, uuid, name, country, created_at, updated_at) "
+    "VALUES (1, 'h1', 'Famille Martin', 'FR', now(), now())",
+    "INSERT INTO membership (id, person_id, season_id, status, created_at, updated_at) "
+    "VALUES (1, 1, 1, 'active', now(), now())",
+    "INSERT INTO regie (id, name) VALUES (1, 'EMHN')",
+    "INSERT INTO fee_item (id, season_id, label, regie_id, price, created_at, updated_at) "
+    "VALUES (1, 1, 'Formule 30 min', 1, 42000, now(), now())",
+    "UPDATE course SET fee_item_id = 1",
+    "INSERT INTO fee_rule (id, season_id, position, name, conditions, target, effect, created_at, updated_at) "
+    "VALUES (1, 1, 0, 'Offert', '[]', '{}', '{\"kind\": \"free\"}', now(), now())",
+    "INSERT INTO fee_season (season_id, engine, qf_bands, resident_cities) VALUES (1, '{}', '[]', '[]')",
+    "INSERT INTO household_season (household_id, season_id, quotient, tags, updated_at) "
+    "VALUES (1, 1, 450, '[]', now())",
+    "INSERT INTO fee_pick (id, household_id, person_id, item_id, created_at) VALUES (1, 1, 1, 1, now())",
+    "INSERT INTO assessment (id, household_id, season_id, status, computed_total, computed_at, warnings, "
+    "created_at, updated_at) VALUES (1, 1, 1, 'proposed', 42000, now(), '[]', now(), now())",
+    "INSERT INTO assessment_line (id, assessment_id, position, kind, person_id, person_name, item_id, label, base, "
+    "computed, amount, steps) VALUES (1, 1, 0, 'item', 1, 'Élodie Martin', 1, 'Formule 30 min', 42000, 42000, "
+    "42000, '[]')",
+)
+
+
+def test_fees_on_the_real_schema(migrated):
+    """Contraintes et cascades des tarifs, telles que la migration les crée."""
+    upgrade(MIGRATIONS)
+    run_sql(migrated, *CATALOG, *FEES)
+    assert run_sql(migrated, "SELECT fee_tags::text, (SELECT active FROM fee_rule) FROM membership") == [
+        [("[]", False)]]
+    for statement in (
+        "INSERT INTO regie (name) VALUES ('EMHN')",
+        "INSERT INTO fee_item (season_id, label, price, created_at, updated_at) "
+        "VALUES (1, 'Formule 30 min', 1, now(), now())",  # même libellé dans la saison
+        "INSERT INTO fee_item (season_id, label, price, created_at, updated_at) VALUES (1, 'x', -1, now(), now())",
+        "INSERT INTO fee_rule (season_id, position, name, conditions, target, effect, created_at, updated_at) "
+        "VALUES (1, -1, 'x', '[]', '{}', '{}', now(), now())",
+        "INSERT INTO assessment (household_id, season_id, status, computed_total, computed_at, warnings, created_at, "
+        "updated_at) VALUES (1, 1, 'proposed', 0, now(), '[]', now(), now())",  # une par foyer et par saison
+        "UPDATE assessment SET status = 'payee'",
+        "UPDATE assessment_line SET kind = 'autre'",
+        "UPDATE assessment_line SET corrected_at = now()",  # correction sans motif
+        # Ce qui a servi ne se supprime pas.
+        "DELETE FROM fee_item WHERE id = 1",
+        "DELETE FROM regie WHERE id = 1",
+        "DELETE FROM household WHERE id = 1",
+        "DELETE FROM season WHERE id = 1",
+    ):
+        assert_fails(migrated, statement)
+    # Une fiche supprimée : ses éléments pris à part partent, la ligne de cotisation reste avec son nom.
+    run_sql(migrated, "DELETE FROM person WHERE id = 1")
+    assert run_sql(migrated, "SELECT count(*) FROM fee_pick",
+                   "SELECT person_id, person_name FROM assessment_line") == [[(0,)], [(None, "Élodie Martin")]]
+    run_sql(migrated, "DELETE FROM assessment")
+    assert run_sql(migrated, "SELECT count(*) FROM assessment_line") == [[(0,)]]
+
+
+def test_saved_manager_role_gets_the_fee_rights(migrated):
+    upgrade(MIGRATIONS, revision="a0000004conservation")
+    run_sql(migrated, "INSERT INTO role (key, name, permissions) VALUES ('gestionnaire', 'Gestionnaire', "
+                      "'[\"catalog.view\"]'), ('regie', 'Régie', '[\"activity.view\"]')")
+    upgrade(MIGRATIONS)
+    (rows,) = run_sql(migrated, "SELECT key, permissions::text FROM role ORDER BY key")
+    assert rows == [("gestionnaire", '["catalog.view", "fee.view", "fee.edit", "fee.assess"]'),
+                    ("regie", '["activity.view"]')]
+    downgrade(MIGRATIONS, revision="a0000004conservation")
+    (rows,) = run_sql(migrated, "SELECT key, permissions::text FROM role ORDER BY key")
+    assert rows == [("gestionnaire", '["catalog.view"]'), ("regie", '["activity.view"]')]

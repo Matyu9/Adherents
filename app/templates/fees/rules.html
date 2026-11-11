@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf, post_button %}
+{% from "fees/_nav.html" import tabs, head with context %}
+{% block title %}Règles des tarifs{% endblock %}
+{% block content %}
+{% call head("Tarifs", season, seasons, "fees.rules") %}{% endcall %}
+{% if season %}
+{{ tabs("regles", season) }}
+<p class="muted">Les règles s'appliquent <strong>de haut en bas</strong>, chacune sur le résultat des précédentes. Une règle en brouillon ne compte pas : voyez son effet avant de l'activer. Dans un groupe exclusif, seule la première règle qui s'applique à un élément compte.</p>
+{% set edit = can(current_user, "fee.edit") %}
+{% if edit %}<div class="actions"><a href="{{ url_for('fees.create_rule', saison=season.id) }}" role="button">+ Nouvelle règle</a></div>{% endif %}
+<ol class="rule-list">
+{% for rule, conditions, target, effect in described %}
+  <li id="regle-{{ rule.id }}" class="card{{ ' draft' if not rule.active }}">
+    <div class="rule-head">
+      <strong>{{ rule.position + 1 }}. {{ rule.name }}</strong>
+      {% if not rule.active %}<span class="badge health-warn">brouillon</span>{% endif %}
+      {% if rule.exclusive_group %}<span class="badge">groupe {{ rule.exclusive_group }}</span>{% endif %}
+    </div>
+    <p class="small">
+      {% if conditions %}<span class="muted">Si</span> {% for c in conditions %}{{ c }}{% if not loop.last %} <strong>ou</strong> {% endif %}{% endfor %}<br>{% else %}<span class="muted">Toujours</span><br>{% endif %}
+      {% if rule.effect.kind in line_effects %}<span class="muted">Alors</span> {{ target }} : {{ effect }}{% else %}<span class="muted">Alors</span> {{ effect }}{% endif %}
+    </p>
+    {% if rule.notes %}<p class="small muted">{{ rule.notes }}</p>{% endif %}
+    <div class="actions">
+      <a href="{{ url_for('fees.rule_impact', rule_id=rule.id) }}">{{ "Effet de l'activation" if not rule.active else "Effet de la désactivation" }}</a>
+      {% if edit %}
+      <a href="{{ url_for('fees.edit_rule', rule_id=rule.id) }}">Modifier</a>
+      {% if not loop.first %}<form method="post" action="{{ url_for('fees.move_rule', rule_id=rule.id) }}" class="button-form">{{ csrf() }}<input type="hidden" name="sens" value="haut"><button type="submit" class="link-button" aria-label="Monter {{ rule.name }}">↑ Monter</button></form>{% endif %}
+      {% if not loop.last %}<form method="post" action="{{ url_for('fees.move_rule', rule_id=rule.id) }}" class="button-form">{{ csrf() }}<input type="hidden" name="sens" value="bas"><button type="submit" class="link-button" aria-label="Descendre {{ rule.name }}">↓ Descendre</button></form>{% endif %}
+      {{ post_button(url_for('fees.toggle_rule', rule_id=rule.id), "Remettre en brouillon" if rule.active else "Activer", "link-button") }}
+      {{ post_button(url_for('fees.delete_rule', rule_id=rule.id), "Supprimer", "link-button", "Supprimer la règle « " ~ rule.name ~ " » ?") }}
+      {% endif %}
+    </div>
+  </li>
+{% else %}
+  <li class="muted">Aucune règle : chaque élément est facturé à son prix de base.</li>
+{% endfor %}
+</ol>
+{% else %}<p class="muted">Aucune saison pour l'instant.</p>{% endif %}
+{% endblock %}

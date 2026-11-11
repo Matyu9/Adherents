@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}{{ item.label if item else "Nouvel élément" }}{% endblock %}
+{% block content %}
+<article class="narrow wide-form">
+  <h1>{{ "Modifier l'élément" if item else "Nouvel élément" }}</h1>
+  <p class="muted">Tarifs {{ season.label }}</p>
+  {% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" novalidate>
+    {{ csrf() }}
+    <input type="hidden" name="saison" value="{{ season.id }}">
+    <label for="label">Libellé *</label>
+    <input id="label" name="label" required maxlength="120" value="{{ values.get('label', '') }}">
+    <div class="grid">
+      <div><label for="price">Prix de base (€) *</label>
+        <input id="price" name="price" inputmode="decimal" required value="{{ values.get('price', '') }}" placeholder="420 ou 12,50"></div>
+      <div><label for="category">Catégorie</label>
+        <input id="category" name="category" maxlength="60" list="categories" value="{{ values.get('category', '') }}">
+        <datalist id="categories">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
+        <small class="muted">Les règles peuvent viser une catégorie entière : « Formules », « Pratiques collectives »…</small></div>
+    </div>
+    <div class="grid">
+      <div><label for="regie">Régie</label>
+        <select id="regie" name="regie">
+          <option value="">—</option>
+          {% for r in regies %}<option value="{{ r.id }}" {{ "selected" if values.get('regie') | string == r.id | string }}>{{ r.name }}</option>{% endfor %}
+          {% if item and item.regie and item.regie.archived %}<option value="{{ item.regie.id }}" selected>{{ item.regie.name }} (archivée)</option>{% endif %}
+        </select></div>
+      <div><label for="code">Code du logiciel de gestion</label>
+        <input id="code" name="code" maxlength="20" value="{{ values.get('code', '') }}">
+        <small class="muted">Pour information seulement : les codes changent d'une saison à l'autre.</small></div>
+    </div>
+    <label for="notes">Notes</label>
+    <textarea id="notes" name="notes" rows="2">{{ values.get('notes', '') }}</textarea>
+    <button type="submit">Enregistrer</button>
+  </form>
+  <p class="small"><a href="{{ url_for('fees.index', saison=season.id) }}">Annuler</a></p>
+</article>
+{% endblock %}

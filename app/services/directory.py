@@ -3,8 +3,9 @@ import re
 from datetime import datetime
 
 from ..extensions import db, fold, fold_contains
-from ..models import (Account, Activity, AppSetting, BankAccount, Consent, Dossier, Enrollment, Household,
-                      HouseholdMember, Membership, Person, Phone, Role, Season, Teacher)
+from ..models import (Account, Activity, AppSetting, Assessment, AssessmentLine, BankAccount, Consent, Dossier,
+                      Enrollment, FeePick, Household, HouseholdMember, HouseholdSeason, Membership, Person, Phone, Role,
+                      Season, Teacher)
 from . import bank
 from .catalog import move_teaching
 
@@ -358,6 +359,8 @@ def merge_persons(keep, drop, take=()):
     db.session.execute(db.update(BankAccount).where(BankAccount.holder_person_id == drop.id)
                        .values(holder_person_id=keep.id))
     db.session.execute(db.update(Activity).where(Activity.person_id == drop.id).values(person_id=keep.id))
+    db.session.execute(db.update(FeePick).where(FeePick.person_id == drop.id).values(person_id=keep.id))
+    db.session.execute(db.update(AssessmentLine).where(AssessmentLine.person_id == drop.id).values(person_id=keep.id))
     db.session.flush()
     db.session.expire(drop, ["consents"])  # repris par la requête ci-dessus : la suppression ne doit pas les emporter
     db.session.delete(drop)
@@ -385,6 +388,11 @@ def household_merge_problems(keep, drop):
            db.session.scalars(db.select(Dossier).filter_by(household_id=drop.id))):
         problems.append("Les deux foyers ont chacun un dossier pour la même campagne d'inscription : traitez-en "
                         "un d'abord.")
+    assessed = set(db.session.scalars(db.select(Assessment.season_id).filter_by(household_id=keep.id)))
+    if any(season_id in assessed for season_id in
+           db.session.scalars(db.select(Assessment.season_id).filter_by(household_id=drop.id))):
+        problems.append("Les deux foyers ont chacun une cotisation pour la même saison : supprimez d'abord celle "
+                        "qui n'est pas validée.")
     return problems
 
 
@@ -419,6 +427,16 @@ def merge_households(keep, drop, take=()):
     db.session.execute(db.update(Activity).where(Activity.household_id == drop.id).values(household_id=keep.id))
     db.session.execute(db.update(Consent).where(Consent.household_id == drop.id).values(household_id=keep.id))
     db.session.execute(db.update(Dossier).where(Dossier.household_id == drop.id).values(household_id=keep.id))
+    db.session.execute(db.update(FeePick).where(FeePick.household_id == drop.id).values(household_id=keep.id))
+    db.session.execute(db.update(Assessment).where(Assessment.household_id == drop.id).values(household_id=keep.id))
+    kept_seasons = set(db.session.scalars(db.select(HouseholdSeason.season_id).filter_by(household_id=keep.id)))
+    for record in list(drop.seasons):
+        if record.season_id in kept_seasons:
+            summary.append(f"situation {record.season.label} en double : celle du foyer gardé reste")
+        else:
+            db.session.add(HouseholdSeason(household=keep, season_id=record.season_id, qf_band=record.qf_band,
+                                           quotient=record.quotient, qf_proof=record.qf_proof,
+                                           resident=record.resident, tags=list(record.tags or [])))
     db.session.flush()
     db.session.expire(drop)
     db.session.delete(drop)

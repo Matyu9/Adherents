@@ -586,6 +586,8 @@ class Membership(TimestampMixin, db.Model):
     category = db.Column(db.String(40))  # scolaire, non scolaire, adulte…
     school_level = db.Column(db.String(40))
     school_class = db.Column(db.String(40))
+    # Étiquettes de l'élève pour les tarifs de la saison (« personnel », « boursier »…), voir docs/tarifs.md.
+    fee_tags = db.Column(db.JSON, nullable=False, default=list, server_default="[]")
 
     person = db.relationship("Person", back_populates="memberships")
     season = db.relationship("Season")
@@ -712,12 +714,15 @@ class Course(TimestampMixin, db.Model):
     # Fermé aux inscriptions à la main. Les inscriptions (phase 6) le rendront complet aussi une fois l'effectif atteint.
     marked_full = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     notes = db.Column(db.Text)
+    # Élément de cotisation facturé à chaque élève du cours (phase 9), de la même saison. Vide : rien de facturé.
+    fee_item_id = db.Column(db.ForeignKey("fee_item.id", ondelete="RESTRICT"), index=True)
 
     season = db.relationship("Season")
     discipline = db.relationship("Discipline")
     level = db.relationship("Level")
     teacher = db.relationship("Teacher", backref=db.backref("courses", passive_deletes=True))
     room = db.relationship("Room")
+    fee_item = db.relationship("FeeItem")
 
     @property
     def weekday_name(self):
@@ -954,6 +959,199 @@ class SepaMandate(db.Model):
     @property
     def active(self):
         return self.revoked_on is None
+
+
+# ---------------------------------------------------------------------------
+# Tarifs et cotisations (voir docs/tarifs.md)
+# ---------------------------------------------------------------------------
+
+class Regie(ArchivableMixin, db.Model):
+    """Régie qui encaisse : EMHN, OHN… Chaque élément de cotisation relève de l'une d'elles."""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(60), nullable=False, unique=True)
+
+    def __repr__(self):
+        return f"<Regie {self.name}>"
+
+
+class FeeSeason(db.Model):
+    """Réglages des tarifs d'une saison : classement des élèves, arrondi, tranches de QF, communes résidentes."""
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="CASCADE"), primary_key=True)
+    # Réglages du moteur (services/pricing.py : DEFAULT_SETTINGS), vérifiés par validate_settings.
+    engine = db.Column(db.JSON, nullable=False, default=dict)
+    # Tranches de quotient familial, de la plus basse à la plus haute : [{"label": "A", "max": 600}, …, {"label": "C"}].
+    qf_bands = db.Column(db.JSON, nullable=False, default=list)
+    default_band = db.Column(db.String(10))  # tranche d'un foyer qui ne donne pas son quotient
+    resident_cities = db.Column(db.JSON, nullable=False, default=list)  # communes « résidentes »
+
+    season = db.relationship("Season", backref=db.backref("fee_season", uselist=False, cascade="all, delete-orphan",
+                                                          passive_deletes=True))
+
+
+class FeeItem(TimestampMixin, db.Model):
+    """Élément de cotisation d'une saison : adhésion, formule, pratique collective, location…
+
+    Le code repris du logiciel de gestion n'est qu'une information : les codes changent d'une saison à l'autre.
+    """
+    __table_args__ = (
+        db.UniqueConstraint("season_id", "label"),
+        db.CheckConstraint("price >= 0", name="ck_fee_item_price"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    # Une saison qui a des éléments ne se supprime pas.
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="RESTRICT"), nullable=False, index=True)
+    label = db.Column(db.String(120), nullable=False)
+    code = db.Column(db.String(20))
+    category = db.Column(db.String(60))
+    regie_id = db.Column(db.ForeignKey("regie.id", ondelete="RESTRICT"), index=True)
+    price = db.Column(db.Integer, nullable=False)  # prix de base, en centimes
+    position = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    notes = db.Column(db.Text)
+
+    season = db.relationship("Season")
+    regie = db.relationship("Regie")
+
+    def __repr__(self):
+        return f"<FeeItem {self.label}>"
+
+
+class FeeRule(TimestampMixin, db.Model):
+    """Règle de tarif d'une saison. Les règles s'appliquent dans l'ordre de `position`, de la plus petite à la plus
+    grande. Conditions, cible et effet sont vérifiés par services/pricing.py avant tout enregistrement."""
+    __table_args__ = (db.CheckConstraint("position >= 0", name="ck_fee_rule_position"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="RESTRICT"), nullable=False, index=True)
+    position = db.Column(db.Integer, nullable=False)
+    name = db.Column(db.String(120), nullable=False)
+    active = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())  # sinon : brouillon
+    conditions = db.Column(db.JSON, nullable=False, default=list)
+    target = db.Column(db.JSON, nullable=False, default=dict)
+    effect = db.Column(db.JSON, nullable=False)
+    exclusive_group = db.Column(db.String(60))
+    notes = db.Column(db.Text)
+
+    season = db.relationship("Season")
+
+    def as_dict(self):
+        """La règle telle que le moteur la lit."""
+        return {"name": self.name, "conditions": self.conditions, "target": self.target, "effect": self.effect,
+                "group": self.exclusive_group}
+
+    def __repr__(self):
+        return f"<FeeRule {self.position} {self.name}>"
+
+
+class HouseholdSeason(db.Model):
+    """Situation d'un foyer pour une saison : ce qui fixe ses tarifs. Réservée au trésorier et à la direction."""
+    household_id = db.Column(db.ForeignKey("household.id", ondelete="CASCADE"), primary_key=True)
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="RESTRICT"), primary_key=True, index=True)
+    qf_band = db.Column(db.String(10))  # tranche saisie ; vide : déduite du quotient, sinon tranche par défaut
+    quotient = db.Column(db.Integer)  # quotient familial, seulement si nécessaire
+    qf_proof = db.Column(db.String(40))  # justificatif : attestation CAF, avis d'imposition…
+    resident = db.Column(db.Boolean)  # vide : déduit de la commune du foyer
+    tags = db.Column(db.JSON, nullable=False, default=list)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+
+    household = db.relationship("Household", backref=db.backref("seasons", cascade="all, delete-orphan",
+                                                                passive_deletes=True))
+    season = db.relationship("Season")
+
+
+class FeePick(db.Model):
+    """Élément pris en dehors des cours : location d'instrument, frais particuliers… ajouté par un gestionnaire."""
+    id = db.Column(db.Integer, primary_key=True)
+    household_id = db.Column(db.ForeignKey("household.id", ondelete="CASCADE"), nullable=False, index=True)
+    person_id = db.Column(db.ForeignKey("person.id", ondelete="CASCADE"), nullable=False, index=True)
+    item_id = db.Column(db.ForeignKey("fee_item.id", ondelete="RESTRICT"), nullable=False, index=True)
+    note = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    household = db.relationship("Household")
+    person = db.relationship("Person")
+    item = db.relationship("FeeItem")
+
+
+class Assessment(TimestampMixin, db.Model):
+    """Cotisation d'un foyer pour une saison : calculée (proposée), éventuellement corrigée, puis validée.
+
+    Les lignes gardent libellés, régies et montants tels qu'ils étaient : supprimer un élément ou une fiche ne change
+    pas une cotisation validée.
+    """
+    PROPOSED = "proposed"
+    VALIDATED = "validated"
+    STATUSES = {PROPOSED: "Proposée", VALIDATED: "Validée"}
+    __table_args__ = (
+        db.UniqueConstraint("household_id", "season_id"),
+        db.CheckConstraint("status IN ('proposed', 'validated')", name="ck_assessment_status"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    # L'historique des cotisations reste : un foyer ou une saison qui en ont ne se suppriment pas.
+    household_id = db.Column(db.ForeignKey("household.id", ondelete="RESTRICT"), nullable=False, index=True)
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="RESTRICT"), nullable=False, index=True)
+    status = db.Column(db.String(10), nullable=False, default=PROPOSED)
+    computed_total = db.Column(db.Integer, nullable=False)  # total calculé par le moteur, avant corrections
+    computed_at = db.Column(db.DateTime, nullable=False)
+    validated_at = db.Column(db.DateTime)
+    validated_by_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"))
+    warnings = db.Column(db.JSON, nullable=False, default=list)
+
+    household = db.relationship("Household")
+    season = db.relationship("Season")
+    validated_by = db.relationship("Account")
+    lines = db.relationship("AssessmentLine", back_populates="assessment", cascade="all, delete-orphan",
+                            order_by="AssessmentLine.position")
+
+    @property
+    def total(self):
+        return sum(line.amount for line in self.lines)
+
+    @property
+    def status_label(self):
+        return self.STATUSES[self.status]
+
+    def __repr__(self):
+        return f"<Assessment {self.household_id}/{self.season_id} {self.status}>"
+
+
+class AssessmentLine(db.Model):
+    """Ligne d'une cotisation : un élément pour un élève, une règle sur le total du foyer, ou l'arrondi."""
+    ITEM = "item"
+    ADJUSTMENT = "adjustment"
+    ROUNDING = "rounding"
+    __table_args__ = (
+        db.CheckConstraint("kind IN ('item', 'adjustment', 'rounding')", name="ck_assessment_line_kind"),
+        db.CheckConstraint("(corrected_at IS NULL) = (correction_reason IS NULL)",
+                           name="ck_assessment_line_correction"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    assessment_id = db.Column(db.ForeignKey("assessment.id", ondelete="CASCADE"), nullable=False, index=True)
+    position = db.Column(db.Integer, nullable=False)
+    kind = db.Column(db.String(10), nullable=False, default=ITEM)
+    person_id = db.Column(db.ForeignKey("person.id", ondelete="SET NULL"), index=True)
+    person_name = db.Column(db.String(160))
+    item_id = db.Column(db.ForeignKey("fee_item.id", ondelete="SET NULL"), index=True)
+    label = db.Column(db.String(160), nullable=False)
+    regie_name = db.Column(db.String(60))
+    base = db.Column(db.Integer, nullable=False, default=0)  # prix de base de l'élément
+    computed = db.Column(db.Integer, nullable=False)  # montant calculé par le moteur
+    amount = db.Column(db.Integer, nullable=False)  # montant retenu : le calculé, ou la correction
+    steps = db.Column(db.JSON, nullable=False, default=list)  # règles appliquées : [{rule, before, after, note}]
+    correction_reason = db.Column(db.String(255))
+    corrected_at = db.Column(db.DateTime)
+    corrected_by_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"))
+
+    assessment = db.relationship("Assessment", back_populates="lines")
+    person = db.relationship("Person")
+    item = db.relationship("FeeItem")
+    corrected_by = db.relationship("Account")
+
+    @property
+    def corrected(self):
+        return self.corrected_at is not None
 
 
 # ---------------------------------------------------------------------------

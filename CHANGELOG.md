@@ -9,6 +9,7 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 - **Ruff** vérifie et met en forme tout le code (`pyproject.toml`, qui remplace aussi `pytest.ini`), avec `pre-commit` pour le lancer avant chaque commit.
 - **Intégration continue** sur GitHub Actions : Ruff, tests sous Python 3.12 et 3.14 avec PostgreSQL 18, tests dans un navigateur, failles connues des dépendances (`pip-audit`). Dependabot pour les mises à jour.
 - **Tests en parallèle** avec `pytest -m "not e2e" -n auto` (une base par processus) et couverture avec `--cov=app`.
+- **Dépendances** : Flask 3.1.3, Pillow 13.0.0 et python-dotenv 1.2.2, qui corrigent des failles connues signalées par `pip-audit`.
 - **Guide d'utilisation** ([docs/guide-utilisateur.md](docs/guide-utilisateur.md)) pour les familles, les professeurs, le secrétariat et les administrateurs.
 
 ### Changé : PostgreSQL remplace SQLite

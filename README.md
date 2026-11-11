@@ -15,9 +15,10 @@ Déjà en place :
 - **l'annuaire** : personnes, foyers, téléphones, saisons et adhésions, professeurs, fusion des doublons, IBAN chiffrés et mandats SEPA, rattachement des comptes à leur fiche ;
 - **le catalogue** : disciplines, niveaux, sites et salles, cours de chaque saison, disciplines des professeurs, copie d'une saison sur la suivante ;
 - **les inscriptions** : campagnes, dossier pré-rempli des familles, formulaire public des nouvelles familles, revue et validation par le secrétariat, report vers le logiciel de gestion, relances, « Mes élèves » pour les professeurs, conservation et anonymisation ;
-- **l'espace adhérent** : chaque famille voit son foyer, ses cours, ses dossiers et les instruments prêtés (lus dans l'Inventaire).
+- **l'espace adhérent** : chaque famille voit son foyer, ses cours, ses dossiers et les instruments prêtés (lus dans l'Inventaire) ;
+- **les tarifs et cotisations** : grille d'éléments et de règles par saison, situation des foyers, cotisations proposées, corrigées puis validées, simulateur.
 
-Pas encore : l'import depuis le logiciel de gestion, qui attend ses exports, puis les tarifs et cotisations et les règlements. La suite est décrite dans le [plan du projet](docs/plan.md).
+Pas encore : l'import depuis le logiciel de gestion, qui attend ses exports, puis les règlements et la bascule. La suite est décrite dans le [plan du projet](docs/plan.md).
 
 ## Démarrage rapide (développement)
 

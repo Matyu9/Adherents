@@ -1,8 +1,8 @@
-"""Instruments prêtés, lus dans l'API de l'Inventaire pour l'espace adhérent.
+"""Matériel prêté, lu dans l'API de l'Inventaire pour l'espace adhérent.
 
 L'Inventaire ne sait pas qui est connecté ici : c'est Adhérents qui vérifie que la personne connectée est responsable
 de celles qu'il demande, puis appelle l'API avec le jeton du compte de service (droit loan.by_person seulement).
-Une panne de l'Inventaire ne casse pas l'espace adhérent : la section des instruments dit seulement qu'elle est
+Une panne de l'Inventaire ne casse pas l'espace adhérent : la section du matériel prêté dit seulement qu'elle est
 indisponible.
 """
 

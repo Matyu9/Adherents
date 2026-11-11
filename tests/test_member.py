@@ -1,4 +1,4 @@
-"""Espace adhérent (phase 7) : chacun ne voit que son foyer ; instruments lus dans l'Inventaire ; personnes de
+"""Espace adhérent (phase 7) : chacun ne voit que son foyer ; matériel prêté lu dans l'Inventaire ; personnes de
 l'annuaire transmises aux applis de l'association."""
 
 import base64
@@ -87,7 +87,7 @@ def test_anonymous_is_sent_to_login(client):
 
 
 # ---------------------------------------------------------------------------
-# Instruments, lus dans l'Inventaire
+# Matériel prêté, lu dans l'Inventaire
 # ---------------------------------------------------------------------------
 
 
@@ -185,7 +185,7 @@ def test_inventaire_needs_https_and_a_token(app):
 
 def test_no_instrument_section_without_inventaire(client, family):
     login(client, family["account"])
-    assert "Instruments prêtés" not in client.get("/mon-espace").get_data(as_text=True)
+    assert "Matériel prêté" not in client.get("/mon-espace").get_data(as_text=True)
 
 
 # ---------------------------------------------------------------------------

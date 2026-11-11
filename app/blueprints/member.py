@@ -43,7 +43,7 @@ def _seasons_of(person):
 def index():
     person = getattr(current_user, "person", None)
     households = registration.guarded_households(current_user)
-    people = []  # toutes les personnes montrées, pour les instruments
+    people = []  # toutes les personnes montrées, pour le matériel prêté
     blocks = []
     for household in households:
         members = [link.person for link in household.guardians] + [link.person for link in household.dependents]

@@ -17,7 +17,7 @@ Le nom, le sous-titre, la couleur et le logo se règlent directement dans **Para
 | `POSTGRES_PASSWORD` | aucun | Docker uniquement : mot de passe de la base, **obligatoire**. |
 | `TZ` | `Europe/Paris` dans Docker | Fuseau horaire des dates. |
 | `BANK_DATA_KEYS` | aucune | Clés de chiffrement des IBAN, voir [plus bas](#coordonnées-bancaires). Sans elle, l'annuaire marche mais aucun IBAN ne peut être enregistré. |
-| `INVENTAIRE_API_URL` | vide | API de l'Inventaire (`https://inventaire.<domaine>/api/v1`), pour montrer aux familles, dans leur espace adhérent, les instruments prêtés. En https, sauf sur `localhost`. |
+| `INVENTAIRE_API_URL` | vide | API de l'Inventaire (`https://inventaire.<domaine>/api/v1`), pour montrer aux familles, dans leur espace adhérent, le matériel prêté. En https, sauf sur `localhost`. |
 | `INVENTAIRE_API_TOKEN` | vide | Jeton du compte de service de l'Inventaire, créé par `flask jeton-espace-adherent` dans l'Inventaire. Il ne permet que de lire le matériel en garde des personnes de l'annuaire. |
 
 ## Réseau et sécurité
@@ -111,9 +111,9 @@ Avant la bascule, l'appli rattache chaque compte à sa fiche (pour l'Inventaire 
 
 Une appli de l'association voit tous ses comptes. Une appli tierce ne voit que les personnes qui lui ont donné leur accord, et seulement ce qu'elles ont accepté de transmettre : la liste n'en dit pas plus que la connexion. Chaque lecture et chaque export sont notés au journal. Un fichier exporté contient des données personnelles : à supprimer une fois le rattachement fait.
 
-### Espace adhérent : les instruments prêtés
+### Espace adhérent : le matériel prêté
 
-Pour que les familles voient dans **Mon espace** les instruments prêtés à leurs enfants :
+Pour que les familles voient dans **Mon espace** le matériel prêté à leurs enfants :
 
 1. Sur l'application de l'Inventaire, cochez « Peut récupérer la liste des comptes ». Une appli de l'association peut alors lire aussi `<OIDC_ISSUER>/oidc/personnes` : identifiant public, nom, année de naissance de chaque personne de l'annuaire, et son `sub` si elle a un compte qui entre dans l'appli. Ni email, ni adresse, ni date de naissance complète. Une appli tierce y est refusée.
 2. Dans l'Inventaire, **Personnes → Rattacher à l'annuaire** relie chaque fiche à sa personne, après vérification.

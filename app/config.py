@@ -54,8 +54,8 @@ class Config:
     # Distinctes de SECRET_KEY, et sauvegardées à part de la base.
     BANK_DATA_KEYS = os.environ.get("BANK_DATA_KEYS", "")
 
-    # Espace adhérent : instruments prêtés, lus dans l'API de l'Inventaire avec le jeton de son compte de service
-    # (`flask jeton-espace-adherent` dans l'Inventaire). Vide : l'espace adhérent ne montre pas les instruments.
+    # Espace adhérent : matériel prêté, lu dans l'API de l'Inventaire avec le jeton de son compte de service
+    # (`flask jeton-espace-adherent` dans l'Inventaire). Vide : l'espace adhérent ne montre pas le matériel prêté.
     INVENTAIRE_API_URL = os.environ.get("INVENTAIRE_API_URL", "").strip().rstrip("/")
     INVENTAIRE_API_TOKEN = os.environ.get("INVENTAIRE_API_TOKEN", "").strip()
 

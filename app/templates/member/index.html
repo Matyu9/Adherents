@@ -11,9 +11,9 @@
 {% endif %}
 {% else %}<p class="small muted">Pas d'adhésion enregistrée.</p>{% endfor %}
 {% endmacro %}
-{% macro instruments(person) %}
+{% macro loaned(person) %}
 {% if inventory_on %}
-{% if loans is none %}<p class="small muted">Instruments prêtés : indisponible pour le moment.</p>
+{% if loans is none %}<p class="small muted">Matériel prêté : indisponible pour le moment.</p>
 {% else %}
 {% for loan in loans.get(person.uuid, []) %}
 <p class="small">Prêt : {% for item in loan["items"] %}<strong>{{ item.name }}</strong>{% if item.quantity > 1 %} × {{ item.quantity }}{% endif %}{{ ", " if not loop.last }}{% endfor %}
@@ -52,7 +52,7 @@
     <h3>{{ p.full_name }} <small class="muted">{{ "responsable" if p in (h.guardians | map(attribute="person") | list) else "à charge" }}</small></h3>
     {% if p in (h.guardians | map(attribute="person") | list) %}<p class="small muted">{{ p.email or "" }}{% for ph in p.phones %} · {{ ph.number | phone }}{% endfor %}</p>{% endif %}
     {{ courses_of(p, seasons) }}
-    {{ instruments(p) }}
+    {{ loaned(p) }}
   </div>
   {% endfor %}
   {% if block.dossiers %}
@@ -74,7 +74,7 @@
 <section class="card settings-block">
   <h2>Mes cours</h2>
   {{ courses_of(own[0], own[1]) }}
-  {{ instruments(own[0]) }}
+  {{ loaned(own[0]) }}
 </section>
 {% endif %}
 {% endblock %}

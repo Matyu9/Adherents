@@ -51,13 +51,13 @@ Si, une fois connecté, **Mon espace** n'apparaît pas dans le menu, votre compt
 - l'**adresse** et les **téléphones** du foyer ;
 - le **prélèvement** : vos coordonnées bancaires, masquées (seuls les quatre derniers chiffres de l'IBAN), et si un mandat est signé ;
 - chaque **membre du foyer**, avec ses adhésions saison par saison et ses **cours** (jour, horaire, salle, professeur) ;
-- les **instruments prêtés** à chacun, s'ils sont suivis dans l'Inventaire ;
+- le **matériel prêté** à chacun, s'il est suivi dans l'Inventaire ;
 - vos **dossiers d'inscription** et leur statut ;
 - les **engagements** donnés (droit à l'image, règlement intérieur…), datés.
 
 **Plusieurs foyers ?** Un parent présent dans deux familles (famille recomposée) voit les deux.
 
-**Un élève de 16 ans ou plus** avec son propre compte voit seulement ses cours et ses instruments, pas le reste du foyer.
+**Un élève de 16 ans ou plus** avec son propre compte voit seulement ses cours et le matériel qui lui est prêté, pas le reste du foyer.
 
 **Rien ne se modifie ici.** Pour corriger une information, passez par votre dossier d'inscription pendant une campagne, ou contactez le secrétariat.
 
@@ -265,12 +265,12 @@ Voir et modifier les IBAN demande le droit « Voir et modifier les coordonnées 
 
 ### Relier l'Inventaire à l'espace adhérent
 
-Pour que les familles voient les instruments prêtés dans **Mon espace**, à faire une fois :
+Pour que les familles voient le matériel prêté dans **Mon espace**, à faire une fois :
 
 1. **Ici, Applications → Inventaire → Modifier** : cochez « Peut récupérer la liste des comptes… ». L'Inventaire peut alors lire la liste des personnes de l'annuaire (nom, année de naissance, sans email ni adresse).
 2. **Dans l'Inventaire, Personnes → Rattacher à l'annuaire → Récupérer les personnes depuis Adhérents.** Chaque fiche de l'Inventaire (élève, musicien) est reliée à sa personne d'Adhérents. Seule une fiche déjà reliée au même compte de connexion est cochée d'office ; **un même nom ne suffit pas** : vérifiez (année de naissance, pupitre, classe) avant de cocher.
 3. **Sur le serveur de l'Inventaire**, `flask jeton-espace-adherent` crée un compte de service qui ne peut que lire les prêts, et affiche son jeton une seule fois.
-4. **Sur le serveur d'Adhérents**, renseignez `INVENTAIRE_API_URL` et `INVENTAIRE_API_TOKEN`, puis redémarrez (voir [configuration.md](configuration.md#espace-adhérent--les-instruments-prêtés)).
+4. **Sur le serveur d'Adhérents**, renseignez `INVENTAIRE_API_URL` et `INVENTAIRE_API_TOKEN`, puis redémarrez (voir [configuration.md](configuration.md#espace-adhérent--le-matériel-prêté)).
 
 Refaites l'étape 2 quand de nouveaux élèves arrivent : les fiches déjà reliées sont simplement signalées. Si le jeton a pu fuiter, relancez l'étape 3 (l'ancien jeton ne sert plus) et recopiez le nouveau.
 
@@ -334,6 +334,6 @@ Ce tableau décrit les rôles de base. Les droits de chaque rôle se cochent dan
 
 **Le dossier d'une nouvelle famille concerne une famille déjà connue.** Validez-le, puis fusionnez les fiches et les foyers en double depuis l'annuaire : adhésions, cours, consentements et dossiers suivent.
 
-**Mon espace dit « Instruments prêtés : indisponible ».** L'Inventaire ne répond pas, ou le jeton n'est plus valable. Le reste de la page marche ; voir [Relier l'Inventaire](#relier-linventaire-à-lespace-adhérent).
+**Mon espace dit « Matériel prêté : indisponible ».** L'Inventaire ne répond pas, ou le jeton n'est plus valable. Le reste de la page marche ; voir [Relier l'Inventaire](#relier-linventaire-à-lespace-adhérent).
 
-**Un instrument prêté n'apparaît pas.** La fiche de l'élève dans l'Inventaire n'est pas encore reliée à l'annuaire (**Personnes → Rattacher à l'annuaire**, dans l'Inventaire), ou le prêt n'est pas une garde validée ou en cours.
+**Un matériel prêté n'apparaît pas.** La fiche de l'élève dans l'Inventaire n'est pas encore reliée à l'annuaire (**Personnes → Rattacher à l'annuaire**, dans l'Inventaire), ou le prêt n'est pas une garde validée ou en cours.

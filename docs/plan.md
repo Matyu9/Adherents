@@ -47,7 +47,7 @@ Adhérents a deux missions :
 Ces principes ont été proposés mais pas formellement validés. Ils guident le travail tant qu'aucune décision ne les remplace :
 
 - **Séparer `Account`, `Person` et `Household`.** Un parent a une seule adresse email et plusieurs enfants, et un enfant sans email n'a pas de compte : son responsable légal le gère depuis le sien.
-- **Garder l'adhésion et l'accès indépendants.** Une saison terminée ne coupe pas un compte : un parent doit encore voir l'instrument que son enfant a en garde.
+- **Garder l'adhésion et l'accès indépendants.** Une saison terminée ne coupe pas un compte : un parent doit encore voir le matériel que son enfant a en garde.
 - **Considérer le logiciel de gestion comme la référence jusqu'à la bascule**, sauf pendant qu'un dossier est ouvert.
 
 ## Questions ouvertes
@@ -206,14 +206,14 @@ Une fois cette phase faite, chaque professeur voit ses élèves.
 
 - **Fait :**
   - **Mon espace** (`/mon-espace`) : une seule page, sans identifiant dans l'adresse. Le parent y voit les foyers dont il est responsable : adresse, téléphones, IBAN masqués, membres, adhésions et cours de chaque saison, dossiers d'inscription, consentements donnés. Un élève de 16 ans ou plus, avec son propre compte, n'y voit que ses cours.
-  - **Instruments prêtés**, lus dans l'API de l'Inventaire (`INVENTAIRE_API_URL`, `INVENTAIRE_API_TOKEN`). Si l'Inventaire ne répond pas, la page le dit, sans casser le reste.
+  - **Matériel prêté**, lu dans l'API de l'Inventaire (`INVENTAIRE_API_URL`, `INVENTAIRE_API_TOKEN`). Si l'Inventaire ne répond pas, la page le dit, sans casser le reste.
   - **Côté Inventaire** : l'écran « Rattacher à l'annuaire » remplit `external_id`, à partir de la liste `/oidc/personnes` d'Adhérents (réservée aux applis de l'association, sans email ni adresse). La commande `flask jeton-espace-adherent` crée un compte de service limité au droit `loan.by_person`, et `GET /api/v1/annuaire/prets?personne=…` donne le matériel en garde.
 - **Tests :** un parent ne voit que ses foyers ; un enfant d'un autre foyer n'est jamais demandé à l'Inventaire ; Inventaire en panne ou réponse inattendue ; parcours complet avec le vrai Inventaire (`test_inventaire_e2e.py`, test 8).
 - **Pas fait :** les cotisations, les règlements et le lien de paiement HelloAsso, qui attendent les phases 9 et 10. La modification de ses coordonnées depuis l'espace : elle passe par le dossier d'inscription ou par le secrétariat.
 
 Prévu au départ :
 
-- Le parent voit son foyer, ses dossiers et les instruments de ses enfants.
+- Le parent voit son foyer, ses dossiers et le matériel prêté à ses enfants.
 - Nouvelle route API dans l'Inventaire pour lire les prêts par `external_id`, avec un compte de service limité à cette lecture.
 - Une fois les phases 9 et 10 faites : ses cotisations, ses règlements et son solde, et un lien de paiement HelloAsso.
 - **Tests :** un parent ne voit que son foyer, y compris en modifiant l'identifiant dans l'URL.

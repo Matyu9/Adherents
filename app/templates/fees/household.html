@@ -131,7 +131,7 @@
     {{ csrf() }}<input type="hidden" name="saison" value="{{ season.id }}">
     <select name="person" aria-label="Élève">{% for p in students %}<option value="{{ p.id }}">{{ p.full_name }}</option>{% endfor %}</select>
     <select name="item" aria-label="Élément">{% for item in items %}<option value="{{ item.id }}">{{ item.label }}</option>{% endfor %}</select>
-    <input name="note" maxlength="255" aria-label="Note" placeholder="Note (instrument…)">
+    <input name="note" maxlength="255" aria-label="Note" placeholder="Note (matériel loué…)">
     <button type="submit" class="secondary">Ajouter</button>
   </form>
   {% endif %}

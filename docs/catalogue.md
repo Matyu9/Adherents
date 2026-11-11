@@ -14,7 +14,7 @@ Mis en place le 10 novembre 2026 (phase 8, migration `a0000002catalogue`). Le ca
 
 Deux règles le structurent :
 
-1. **Les listes de référence sont communes à toutes les saisons** : disciplines, niveaux, sites et salles. Une valeur qui a servi ne se supprime pas, on l'archive. Elle n'est plus proposée pour les nouveaux cours, mais les saisons passées la gardent.
+1. **Les listes de référence sont communes à toutes les saisons** : types de discipline, disciplines, niveaux, sites et salles. Une valeur qui a servi ne se supprime pas, on l'archive. Elle n'est plus proposée pour les nouveaux cours, mais les saisons passées la gardent.
 2. **Un cours appartient à une saison.** On ne le modifie pas d'une saison à l'autre : on recopie le catalogue sur la saison suivante, puis on l'ajuste. L'historique reste donc exact.
 
 ## Tables
@@ -23,7 +23,8 @@ Deux règles le structurent :
 
 | Table | Colonnes | Remarque |
 |---|---|---|
-| `discipline` | `name` (unique), `category`, `archived_at` | `category` : instrument, formation musicale, pratique collective, éveil, autre. C'est le « type de discipline » des exports. |
+| `discipline_type` | `name` (unique), `position`, `archived_at` | Les types que l'association se donne (« Instrument », « Atelier », « Sport collectif »…). Aucun n'existe à l'installation. `position` fixe leur ordre, et celui des disciplines avec eux. C'est le « type de discipline » des exports. |
+| `discipline` | `name` (unique), `type_id`, `archived_at` | `type_id` est facultatif. Un type qui a des disciplines ne se supprime pas ; archivé, il n'est plus proposé pour les nouvelles disciplines. |
 | `level` | `name` (unique), `position`, `archived_at` | `position` fixe l'ordre des listes (cycle 1 avant cycle 2). |
 | `site` | `name` (unique), `address`, `archived_at` | L'école, une salle municipale… Un site archivé ferme toutes ses salles. |
 | `room` | `site_id`, `name`, `archived_at` | Nom unique dans son site. |

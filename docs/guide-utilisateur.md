@@ -144,7 +144,9 @@ La fiche d'une personne montre aussi l'historique de ce qui l'a concernée (jour
 
 **Menu → Catalogue.** Il a trois onglets.
 
-**Disciplines, niveaux et lieux.** Ces listes valent pour toutes les saisons : disciplines (avec leur type : instrument, formation musicale, pratique collective…), niveaux (dans l'ordre, cycle 1 avant cycle 2), sites et leurs salles.
+**Disciplines, niveaux et lieux.** Ces listes valent pour toutes les saisons : types de discipline, disciplines, niveaux (dans l'ordre, cycle 1 avant cycle 2), sites et leurs salles.
+
+- **Les types de discipline sont les vôtres.** Aucun n'existe au départ : créez ceux qui conviennent à votre association (« Instrument » et « Pratique collective » pour une école de musique, « Sport collectif » ou « Atelier » ailleurs). Ils regroupent les disciplines dans les listes, dans l'ordre que vous leur donnez. Une discipline peut ne pas avoir de type.
 
 - Deux noms qui ne diffèrent que par un accent sont refusés : « Flute » et « Flûte » sont la même discipline.
 - Ce qui a déjà servi ne se supprime pas : **Archiver** le retire des choix pour les nouveaux cours, sans toucher aux saisons passées. **Rouvrir** le remet.

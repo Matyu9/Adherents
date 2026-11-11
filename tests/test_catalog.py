@@ -6,7 +6,19 @@ import pytest
 import sqlalchemy as sa
 
 from app.extensions import db
-from app.models import Activity, Course, Discipline, Level, Person, Role, Room, Site, Teacher, TeacherDiscipline
+from app.models import (
+    Activity,
+    Course,
+    Discipline,
+    DisciplineType,
+    Level,
+    Person,
+    Role,
+    Room,
+    Site,
+    Teacher,
+    TeacherDiscipline,
+)
 from app.services import catalog, directory
 from app.services.catalog import CatalogError
 
@@ -25,10 +37,12 @@ def teacher(first="Élodie", last="Martin", **contract):
 def school(app):
     """Deux saisons, une flûtiste qui reste, un pianiste qui part fin juin 2027, des disciplines, niveaux et salles."""
     old, new = season("2026-2027", current=True), season("2027-2028")
+    instrument = DisciplineType(name="Instrument", position=10)
+    theory = DisciplineType(name="Formation musicale", position=20)
     flute, piano, fm = (
-        Discipline(name="Flûte traversière", category="Instrument"),
-        Discipline(name="Piano", category="Instrument"),
-        Discipline(name="Formation musicale", category="Formation musicale"),
+        Discipline(name="Flûte traversière", type=instrument),
+        Discipline(name="Piano", type=instrument),
+        Discipline(name="Formation musicale", type=theory),
     )
     c1, c2 = Level(name="Cycle 1", position=1), Level(name="Cycle 2", position=2)
     ecole = Site(name="École", address="2 place de la Mairie")
@@ -43,6 +57,8 @@ def school(app):
         "flute": flute,
         "piano": piano,
         "fm": fm,
+        "instrument": instrument,
+        "theory": theory,
         "c1": c1,
         "c2": c2,
         "ecole": ecole,
@@ -451,9 +467,12 @@ def test_catalogue_without_any_season(client, manager):
 
 def test_reference_lists(client, manager, school):
     assert (
-        client.post("/catalogue/disciplines/nouveau", data={"name": "Violon", "category": "Instrument"}).status_code
+        client.post(
+            "/catalogue/disciplines/nouveau", data={"name": "Violon", "type_id": school["instrument"].id}
+        ).status_code
         == 302
     )
+    assert db.session.scalar(sa.select(Discipline).filter_by(name="Violon")).type is school["instrument"]
     response = client.post("/catalogue/disciplines/nouveau", data={"name": "  FLUTE Traversiere "})
     assert "Ce nom existe déjà." in response.get_data(as_text=True)
     assert client.post("/catalogue/niveaux/nouveau", data={"name": "Débutant", "position": "0"}).status_code == 302
@@ -463,9 +482,9 @@ def test_reference_lists(client, manager, school):
     response = client.post("/catalogue/salles/nouveau", data={"site_id": college.id, "name": "salle a"})
     assert "Ce nom existe déjà sur ce site." in response.get_data(as_text=True)
     client.post(
-        f"/catalogue/disciplines/{school['piano'].id}/modifier", data={"name": "Piano classique", "category": ""}
+        f"/catalogue/disciplines/{school['piano'].id}/modifier", data={"name": "Piano classique", "type_id": ""}
     )
-    assert school["piano"].name == "Piano classique" and school["piano"].category is None
+    assert school["piano"].name == "Piano classique" and school["piano"].type is None
     actions = set(db.session.scalars(sa.select(Activity.action)))
     assert {"discipline.create", "level.create", "site.create", "room.create", "discipline.update"} <= actions
     page = client.get("/catalogue/referentiels").get_data(as_text=True)
@@ -492,6 +511,86 @@ def test_used_values_are_archived_not_deleted(client, manager, school):
     assert not school["flute"].archived
     client.post(f"/catalogue/disciplines/{school['piano'].id}/supprimer")  # n'a jamais servi
     assert db.session.get(Discipline, school["piano"].id) is None
+
+
+# Types de discipline : une liste que chaque association compose
+
+
+def test_no_discipline_type_exists_at_first(client, manager):
+    """Rien n'est propre à une activité : sans type créé, le formulaire d'une discipline ne propose que « — »."""
+    assert count(DisciplineType) == 0
+    form = client.get("/catalogue/disciplines/nouveau").get_data(as_text=True)
+    assert "Instrument" not in form and "Formation musicale" not in form
+    assert client.post("/catalogue/disciplines/nouveau", data={"name": "Poterie"}).status_code == 302
+    assert db.session.scalar(sa.select(Discipline).filter_by(name="Poterie")).type is None
+    assert "Aucun type" in client.get("/catalogue/referentiels").get_data(as_text=True)
+
+
+def test_an_association_composes_its_own_types(client, manager):
+    assert (
+        client.post("/catalogue/types/nouveau", data={"name": "Sport collectif", "position": "20"}).status_code == 302
+    )
+    assert (
+        client.post("/catalogue/types/nouveau", data={"name": "Arts plastiques", "position": "10"}).status_code == 302
+    )
+    response = client.post("/catalogue/types/nouveau", data={"name": "  SPORT collectif "})
+    assert "Ce nom existe déjà." in response.get_data(as_text=True)
+    assert "Nouveau type de discipline" in client.get("/catalogue/types/nouveau").get_data(as_text=True)
+    sport = db.session.scalar(sa.select(DisciplineType).filter_by(name="Sport collectif"))
+    arts = db.session.scalar(sa.select(DisciplineType).filter_by(name="Arts plastiques"))
+    assert [t.name for t in catalog.discipline_types()] == ["Arts plastiques", "Sport collectif"]
+    form = client.get("/catalogue/disciplines/nouveau").get_data(as_text=True)
+    assert form.index("Arts plastiques") < form.index("Sport collectif")
+    for name, kind in (("Handball", sport), ("Basket", sport), ("Poterie", arts), ("Chorale", None)):
+        assert client.post("/catalogue/disciplines/nouveau", data={"name": name, "type_id": kind.id if kind else ""})
+    # Les disciplines suivent l'ordre de leurs types ; celles qui n'en ont pas viennent à la fin.
+    assert [d.name for d in catalog.disciplines()] == ["Poterie", "Basket", "Handball", "Chorale"]
+    client.post(f"/catalogue/types/{sport.id}/modifier", data={"name": "Sports", "position": "5"})
+    assert sport.name == "Sports" and [d.name for d in catalog.disciplines()][:2] == ["Basket", "Handball"]
+    page = client.get("/catalogue/referentiels").get_data(as_text=True)
+    assert "Sports" in page and "Arts plastiques" in page
+    actions = set(db.session.scalars(sa.select(Activity.action)))
+    assert {"discipline_type.create", "discipline_type.update"} <= actions
+
+
+def test_a_type_that_does_not_exist_is_refused(client, manager, school):
+    response = client.post("/catalogue/disciplines/nouveau", data={"name": "Violon", "type_id": "9999"})
+    assert "Ce choix n&#39;est pas proposé." in response.get_data(as_text=True)
+    assert db.session.scalar(sa.select(Discipline).filter_by(name="Violon")) is None
+    response = client.post("/catalogue/disciplines/nouveau", data={"name": "Violon", "type_id": "abc"})
+    assert response.status_code == 200 and db.session.scalar(sa.select(Discipline).filter_by(name="Violon")) is None
+
+
+def test_a_used_type_is_archived_not_deleted(client, manager, school):
+    instrument, theory = school["instrument"], school["theory"]
+    page = client.post(f"/catalogue/types/{instrument.id}/supprimer", follow_redirects=True).get_data(as_text=True)
+    assert "a déjà servi" in page and count(DisciplineType) == 2
+    page = client.post(f"/catalogue/types/{instrument.id}/archiver", follow_redirects=True).get_data(as_text=True)
+    assert instrument.archived and "pour les nouvelles disciplines" in page
+    # Archivé : plus proposé pour une nouvelle discipline, mais gardé par celles qui l'ont déjà.
+    assert ">Instrument<" not in client.get("/catalogue/disciplines/nouveau").get_data(as_text=True)
+    url = f"/catalogue/disciplines/{school['flute'].id}/modifier"
+    assert ">Instrument<" in client.get(url).get_data(as_text=True)
+    client.post(url, data={"name": "Flûte", "type_id": instrument.id})
+    assert school["flute"].name == "Flûte" and school["flute"].type is instrument
+    assert (
+        client.post("/catalogue/disciplines/nouveau", data={"name": "Violon", "type_id": instrument.id}).status_code
+        == 200
+    )  # refusé : le formulaire revient
+    client.post(f"/catalogue/types/{instrument.id}/restaurer")
+    assert not instrument.archived
+    # Un type sans discipline se supprime.
+    school["fm"].type = None
+    db.session.commit()
+    client.post(f"/catalogue/types/{theory.id}/supprimer")
+    assert db.session.get(DisciplineType, theory.id) is None
+
+
+def test_only_who_edits_the_catalogue_manages_types(client, accounts, school):
+    login(client, accounts[Role.ADHERENT])
+    assert client.post("/catalogue/types/nouveau", data={"name": "X"}).status_code == 403
+    assert client.post(f"/catalogue/types/{school['instrument'].id}/archiver").status_code == 403
+    assert count(DisciplineType) == 2 and not school["instrument"].archived
 
 
 def test_unknown_reference_kind_is_404(client, manager):

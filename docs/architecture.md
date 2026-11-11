@@ -70,7 +70,7 @@ Décrit dans [catalogue.md](catalogue.md) :
 
 | Table | Rôle |
 |---|---|
-| `discipline`, `level`, `site`, `room` | Listes de référence communes à toutes les saisons, archivées plutôt que supprimées |
+| `discipline_type`, `discipline`, `level`, `site`, `room` | Listes de référence communes à toutes les saisons, archivées plutôt que supprimées |
 | `course` | Cours d'une saison : discipline, niveau, professeur, créneau, salle, effectif maximum |
 | `teacher_discipline` | Disciplines enseignées par un professeur pendant une saison |
 

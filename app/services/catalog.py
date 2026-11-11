@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from ..extensions import db, fold
-from ..models import Course, Discipline, Level, Person, Room, Site, Teacher, TeacherDiscipline
+from ..models import Course, Discipline, DisciplineType, Level, Person, Room, Site, Teacher, TeacherDiscipline
 
 
 class CatalogError(ValueError):
@@ -12,7 +12,7 @@ class CatalogError(ValueError):
 
 
 # ---------------------------------------------------------------------------
-# Listes de référence : disciplines, niveaux, sites, salles
+# Listes de référence : types de discipline, disciplines, niveaux, sites, salles
 # ---------------------------------------------------------------------------
 
 
@@ -20,7 +20,19 @@ def disciplines(include_archived=False):
     query = db.select(Discipline)
     if not include_archived:
         query = query.where(Discipline.archived_at.is_(None))
-    return sorted(db.session.scalars(query), key=lambda d: (d.archived, fold(d.category or "~"), fold(d.name)))
+    return sorted(db.session.scalars(query), key=lambda d: (d.archived, _type_rank(d.type), fold(d.name)))
+
+
+def _type_rank(kind):
+    """Les disciplines suivent l'ordre de leurs types ; celles qui n'en ont pas viennent à la fin."""
+    return (1, 0, "") if kind is None else (0, kind.position, fold(kind.name))
+
+
+def discipline_types(include_archived=False):
+    query = db.select(DisciplineType).order_by(DisciplineType.position, DisciplineType.name)
+    if not include_archived:
+        query = query.where(DisciplineType.archived_at.is_(None))
+    return sorted(db.session.scalars(query), key=lambda t: t.archived)
 
 
 def levels(include_archived=False):
@@ -55,6 +67,8 @@ def usage(item):
         return _count(Course.id, Course.discipline_id == item.id) + _count(
             TeacherDiscipline.season_id, TeacherDiscipline.discipline_id == item.id
         )
+    if isinstance(item, DisciplineType):
+        return _count(Discipline.id, Discipline.type_id == item.id)
     if isinstance(item, Level):
         return _count(Course.id, Course.level_id == item.id)
     if isinstance(item, Room):

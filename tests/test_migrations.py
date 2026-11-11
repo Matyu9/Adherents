@@ -248,7 +248,8 @@ CATALOG = (
     "VALUES (1, 'u1', 'Élodie', 'Martin', 'FR', now(), now())",
     "INSERT INTO teacher (person_id, status) VALUES (1, 'CDI')",
     "INSERT INTO season (id, label, starts_on, ends_on) VALUES (1, '2026-2027', '2026-09-01', '2027-08-31')",
-    "INSERT INTO discipline (id, name) VALUES (1, 'Flûte')",
+    "INSERT INTO discipline_type (id, name) VALUES (1, 'Instrument')",
+    "INSERT INTO discipline (id, name, type_id) VALUES (1, 'Flûte', 1)",
     "INSERT INTO level (id, name) VALUES (1, 'Cycle 1')",
     "INSERT INTO site (id, name) VALUES (1, 'École')",
     "INSERT INTO room (id, site_id, name) VALUES (1, 1, 'Salle A')",
@@ -265,6 +266,8 @@ def test_catalog_on_the_real_schema(migrated):
     assert run_sql(migrated, "SELECT marked_full FROM course") == [[(False,)]]
     for statement in (
         "INSERT INTO discipline (name) VALUES ('Flûte')",
+        "INSERT INTO discipline_type (name) VALUES ('Instrument')",
+        "INSERT INTO discipline (name, type_id) VALUES ('Piano', 99)",
         "INSERT INTO room (site_id, name) VALUES (1, 'Salle A')",
         "INSERT INTO course (season_id, discipline_id, weekday) VALUES (1, 1, 7)",
         "INSERT INTO course (season_id, discipline_id, starts_at) VALUES (1, 1, '17:00')",
@@ -275,6 +278,7 @@ def test_catalog_on_the_real_schema(migrated):
         # Ce qui a servi ne se supprime pas.
         "DELETE FROM season WHERE id = 1",
         "DELETE FROM discipline WHERE id = 1",
+        "DELETE FROM discipline_type WHERE id = 1",
         "DELETE FROM level WHERE id = 1",
         "DELETE FROM room WHERE id = 1",
         "DELETE FROM site WHERE id = 1",
@@ -285,6 +289,45 @@ def test_catalog_on_the_real_schema(migrated):
     assert run_sql(migrated, "SELECT teacher_id FROM course", "SELECT count(*) FROM teacher_discipline") == [
         [(None,)],
         [(0,)],
+    ]
+
+
+def test_typed_categories_become_discipline_types(migrated):
+    """Les types saisis du temps de la liste fixe deviennent des lignes de la nouvelle liste, et reviennent tels
+    quels si on recule."""
+    upgrade(MIGRATIONS, revision="a0000005tarifs")
+    run_sql(
+        migrated,
+        "INSERT INTO discipline (id, name, category) VALUES (1, 'Flûte', 'Instrument'), (2, 'Piano', 'Instrument'), "
+        "(3, 'Chorale', 'Pratique collective'), (4, 'Jardin', NULL), (5, 'Atelier', ' '), (6, 'Éveil 5 ans', 'Éveil ')",
+    )
+    upgrade(MIGRATIONS)
+    types, disciplines = run_sql(
+        migrated,
+        "SELECT name, position FROM discipline_type ORDER BY position",
+        "SELECT d.name, t.name FROM discipline d LEFT JOIN discipline_type t ON t.id = d.type_id ORDER BY d.id",
+    )
+    # L'ordre alphabétique dépend de la collation de la base : on vérifie les noms et les rangs séparément.
+    assert sorted(name for name, _ in types) == ["Instrument", "Pratique collective", "Éveil"]
+    assert [position for _, position in types] == [10, 20, 30]
+    assert disciplines == [
+        ("Flûte", "Instrument"),
+        ("Piano", "Instrument"),
+        ("Chorale", "Pratique collective"),
+        ("Jardin", None),
+        ("Atelier", None),
+        ("Éveil 5 ans", "Éveil"),
+    ]
+    downgrade(MIGRATIONS, revision="a0000005tarifs")
+    assert run_sql(migrated, "SELECT name, category FROM discipline ORDER BY id") == [
+        [
+            ("Flûte", "Instrument"),
+            ("Piano", "Instrument"),
+            ("Chorale", "Pratique collective"),
+            ("Jardin", None),
+            ("Atelier", None),
+            ("Éveil 5 ans", "Éveil"),
+        ]
     ]
 
 

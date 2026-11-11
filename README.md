@@ -4,7 +4,7 @@
 
 L'appli d'une association pour ses adhérents : annuaire, inscriptions aux cours, cotisations, et un compte unique pour toutes les applis de l'association.
 
-Elle est écrite pour une association de musique. Les disciplines, les niveaux, les cours et les tarifs sont ceux que l'association crée ; seuls les types de discipline proposés (instrument, formation musicale, pratique collective, éveil, autre) sont propres à la musique.
+Elle est née dans une association de musique, mais rien n'y est propre à la musique : les types de discipline, les disciplines, les niveaux, les cours et les tarifs sont ceux que l'association crée.
 
 Elle a deux missions :
 
@@ -47,7 +47,7 @@ Elle a deux missions :
 ### Pour le secrétariat
 
 - **Annuaire** : une seule fiche par personne, les foyers et leurs responsables, les saisons et les adhésions, la fusion des doublons, l'historique de chaque fiche.
-- **Catalogue** : disciplines, niveaux, sites et salles, cours de chaque saison, copie d'une saison sur la suivante. Les chevauchements de salle ou de professeur sont signalés.
+- **Catalogue** : disciplines et leurs types, niveaux, sites et salles, cours de chaque saison, copie d'une saison sur la suivante. Les chevauchements de salle ou de professeur sont signalés.
 - **Campagnes d'inscription** : revue de chaque dossier, champ par champ, puis validation ou renvoi à la famille ; relances hebdomadaires ; report des changements vers le logiciel de gestion.
 - **Tarifs et cotisations** : une grille d'éléments et de règles par saison, la situation de chaque foyer, des cotisations proposées, corrigées avec un motif puis validées, et un simulateur.
 - **Coordonnées bancaires** : IBAN chiffrés et suivi des mandats SEPA.

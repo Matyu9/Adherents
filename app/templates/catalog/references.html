@@ -2,13 +2,13 @@
 {% from "directory/_macros.html" import post_button %}
 {% from "catalog/_season_picker.html" import tabs %}
 {% block title %}Disciplines, niveaux et lieux{% endblock %}
-{% macro row_actions(kind, item, label) %}
+{% macro row_actions(kind, item, label, used_for="les nouveaux cours") %}
 {% if can(current_user, "catalog.edit") %}
 <a href="{{ url_for('catalog.edit_item', kind=kind, item_id=item.id) }}">Modifier</a>
 {% if item.archived %}
 {{ post_button(url_for('catalog.restore_item', kind=kind, item_id=item.id), "Rouvrir", "link-button") }}
 {% else %}
-{{ post_button(url_for('catalog.archive_item', kind=kind, item_id=item.id), "Archiver", "link-button", "Ne plus proposer " ~ label ~ " pour les nouveaux cours ?") }}
+{{ post_button(url_for('catalog.archive_item', kind=kind, item_id=item.id), "Archiver", "link-button", "Ne plus proposer " ~ label ~ " pour " ~ used_for ~ " ?") }}
 {% endif %}
 {% if not usage(item) %}{{ post_button(url_for('catalog.delete_item', kind=kind, item_id=item.id), "Supprimer", "link-button", "Supprimer " ~ label ~ " ?") }}{% endif %}
 {% endif %}
@@ -22,6 +22,23 @@
 </div>
 {{ tabs("refs", none) }}
 
+<section id="types" class="settings-block">
+  <div class="page-head">
+    <div><h2>Types de discipline</h2><p class="muted small">Ils regroupent les disciplines dans les listes : à chaque association les siens.</p></div>
+    {% if can(current_user, "catalog.edit") %}<a href="{{ url_for('catalog.create_item', kind='types') }}" role="button" class="secondary small">+ Type</a>{% endif %}
+  </div>
+  <div class="overflow-auto"><table class="striped responsive">
+    <thead><tr><th>Type</th><th>Ordre</th><th></th></tr></thead>
+    <tbody>
+    {% for t in lists.types %}
+    <tr><td data-label="Type">{{ t.name }}{% if t.archived %} <span class="badge">archivé</span>{% endif %}</td>
+      <td data-label="Ordre"><small>{{ t.position }}</small></td>
+      <td data-label="" class="actions">{{ row_actions("types", t, t.name, "les nouvelles disciplines") }}</td></tr>
+    {% else %}<tr><td colspan="3" class="muted">Aucun type : les disciplines ne sont pas regroupées.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
 <section id="disciplines" class="settings-block">
   <div class="page-head"><h2>Disciplines</h2>{% if can(current_user, "catalog.edit") %}<a href="{{ url_for('catalog.create_item', kind='disciplines') }}" role="button" class="secondary small">+ Discipline</a>{% endif %}</div>
   <div class="overflow-auto"><table class="striped responsive">
@@ -29,7 +46,7 @@
     <tbody>
     {% for d in lists.disciplines %}
     <tr><td data-label="Discipline">{{ d.name }}{% if d.archived %} <span class="badge">archivée</span>{% endif %}</td>
-      <td data-label="Type"><small>{{ d.category or "—" }}</small></td>
+      <td data-label="Type"><small>{{ d.type.name if d.type else "—" }}</small></td>
       <td data-label="" class="actions">{{ row_actions("disciplines", d, d.name) }}</td></tr>
     {% else %}<tr><td colspan="3" class="muted">Aucune discipline.</td></tr>{% endfor %}
     </tbody>

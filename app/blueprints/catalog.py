@@ -9,16 +9,16 @@ from wtforms.widgets import CheckboxInput, ListWidget
 
 from ..extensions import db, fold
 from ..filters import date_fr
-from ..models import Course, Discipline, Level, Room, Season, Site, Teacher
+from ..models import Course, Discipline, DisciplineType, Level, Room, Season, Site, Teacher
 from ..permissions import require
 from ..services import catalog, directory, registration
 from ..services.activity import diff, log
 from ..services.catalog import CatalogError
-from .directory import _blank, _strip, _text
+from .directory import _blank, _strip
 
 bp = Blueprint("catalog", __name__, url_prefix="/catalogue")
 
-KINDS = "any(disciplines, niveaux, sites, salles)"
+KINDS = "any(types, disciplines, niveaux, sites, salles)"
 COURSE_FIELDS = (
     "discipline_id",
     "level_id",
@@ -147,21 +147,35 @@ def _with(items, keep):
     return items + [keep] if keep is not None and keep not in items else items
 
 
-class DisciplineForm(FlaskForm):
-    name = StringField("Nom", validators=[DataRequired(), Length(max=80)], filters=[_strip])
-    category = SelectField(
-        "Type",
-        default="",
-        coerce=_text,
-        validate_choice=False,
-        choices=[("", "—"), *((c, c) for c in Discipline.CATEGORIES)],
+class DisciplineTypeForm(FlaskForm):
+    name = StringField("Nom", validators=[DataRequired(), Length(max=40)], filters=[_strip])
+    position = IntegerField(
+        "Ordre",
+        default=0,
+        validators=[Optional(), NumberRange(min=0, max=9999, message="Entre 0 et 9999.")],
+        description="Les types, et leurs disciplines avec eux, sont classés par ordre croissant, puis par nom.",
     )
 
     def values(self):
-        return {
-            "name": self.name.data,
-            "category": self.category.data if self.category.data in Discipline.CATEGORIES else None,
-        }
+        return {"name": self.name.data, "position": self.position.data or 0}
+
+
+class DisciplineForm(FlaskForm):
+    name = StringField("Nom", validators=[DataRequired(), Length(max=80)], filters=[_strip])
+    type_id = Choice(
+        "Type",
+        coerce=_optional_int,
+        validators=[Optional()],
+        description="Facultatif. Les types se créent dans la liste « Types de discipline ».",
+    )
+
+    def __init__(self, *args, obj=None, **kwargs):
+        super().__init__(*args, obj=obj, **kwargs)
+        types = _with(catalog.discipline_types(), obj.type if obj else None)
+        self.type_id.choices = [("", "—")] + [(str(t.id), t.name) for t in types]
+
+    def values(self):
+        return {"name": self.name.data, "type_id": self.type_id.data}
 
 
 class LevelForm(FlaskForm):
@@ -201,12 +215,20 @@ class RoomForm(FlaskForm):
 
 # Chaque liste de référence : modèle, formulaire, libellés, et champ qui doit être unique (avec sa portée).
 REFERENCES = {
+    "types": {
+        "model": DisciplineType,
+        "form": DisciplineTypeForm,
+        "one": "type de discipline",
+        "title": "Types de discipline",
+        "fields": ("name", "position"),
+        "used_for": "les nouvelles disciplines",
+    },
     "disciplines": {
         "model": Discipline,
         "form": DisciplineForm,
         "one": "discipline",
         "title": "Disciplines",
-        "fields": ("name", "category"),
+        "fields": ("name", "type_id"),
     },
     "niveaux": {"model": Level, "form": LevelForm, "one": "niveau", "title": "Niveaux", "fields": ("name", "position")},
     "sites": {"model": Site, "form": SiteForm, "one": "site", "title": "Sites", "fields": ("name", "address")},
@@ -459,7 +481,7 @@ def teacher_disciplines(person_id):
 
 
 # ---------------------------------------------------------------------------
-# Listes de référence : disciplines, niveaux, sites, salles
+# Listes de référence : types de discipline, disciplines, niveaux, sites, salles
 # ---------------------------------------------------------------------------
 
 
@@ -467,6 +489,7 @@ def teacher_disciplines(person_id):
 @require("catalog.view")
 def references():
     lists = {
+        "types": catalog.discipline_types(include_archived=True),
         "disciplines": catalog.disciplines(include_archived=True),
         "niveaux": catalog.levels(include_archived=True),
         "sites": catalog.sites(include_archived=True),
@@ -532,7 +555,8 @@ def archive_item(kind, item_id):
     log(f"{spec['model'].__tablename__}.archive", f"{spec['one'].capitalize()} archivé(e) : {_item_label(item)}")
     db.session.commit()
     flash(
-        f"{_item_label(item)} n'est plus proposé(e) pour les nouveaux cours. Les cours existants ne changent pas.",
+        f"{_item_label(item)} n'est plus proposé(e) pour {spec.get('used_for', 'les nouveaux cours')}. "
+        "Ce qui existe déjà ne change pas.",
         "success",
     )
     return redirect(url_for(".references") + f"#{kind}")

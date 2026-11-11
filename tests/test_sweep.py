@@ -456,11 +456,13 @@ def _catalog(season, old, teacher):
     """Un catalogue sur deux saisons, avec du HTML dans chaque nom, un chevauchement et un cours complet."""
     from datetime import time
 
-    from app.models import Course, Discipline, Level, Room, Site
+    from app.models import Course, Discipline, DisciplineType, Level, Room, Site
     from app.services import catalog
 
-    discipline = Discipline(name="Flûte <b>", category="Instrument")
+    kind = DisciplineType(name="Type <b>")
+    discipline = Discipline(name="Flûte <b>", type=kind)
     archived = Discipline(name="Cor <i>", archived_at=datetime(2026, 1, 1))
+    db.session.add(DisciplineType(name="Ancien <i>", archived_at=datetime(2026, 1, 1)))
     level = Level(name="Cycle <b>1</b>")
     site = Site(name="École <b>", address="<i>place</i>")
     room = Room(site=site, name="Salle <script>")

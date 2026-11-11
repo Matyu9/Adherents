@@ -4,6 +4,12 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ## Non publié
 
+### Changé : les types de discipline se composent
+
+- **Types de discipline** : la liste fixe (instrument, formation musicale, pratique collective, éveil, autre) laisse place à une liste que chaque association compose, dans **Catalogue → Disciplines, niveaux et lieux**. Un type a un nom et un ordre ; un type qui a servi s'archive au lieu de se supprimer. Rien n'est plus propre à la musique.
+- **Migration `a0000006types`** : les types déjà saisis deviennent des lignes de la nouvelle liste, et chaque discipline garde le sien.
+- Dans Mon espace et la documentation, « instruments prêtés » devient « matériel prêté ».
+
 ### Outillage
 
 - **Ruff** vérifie et met en forme tout le code (`pyproject.toml`, qui remplace aussi `pytest.ini`), avec `pre-commit` pour le lancer avant chaque commit.

@@ -674,14 +674,27 @@ class ArchivableMixin:
         return self.archived_at is not None
 
 
+class DisciplineType(ArchivableMixin, db.Model):
+    """Type de discipline (« Instrument », « Atelier », « Sport collectif »…), choisi par l'association : il regroupe
+    les disciplines dans les listes."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(40), nullable=False, unique=True)
+    position = db.Column(db.Integer, nullable=False, default=0, server_default="0")  # ordre dans les listes
+
+    def __repr__(self):
+        return f"<DisciplineType {self.name}>"
+
+
 class Discipline(ArchivableMixin, db.Model):
     """Discipline enseignée (« Flûte traversière », « Formation musicale »…), commune à toutes les saisons."""
 
-    CATEGORIES = ("Instrument", "Formation musicale", "Pratique collective", "Éveil", "Autre")
-
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False, unique=True)
-    category = db.Column(db.String(40))  # type de discipline, pour regrouper les listes
+    # Facultatif. Un type qui a des disciplines ne se supprime pas.
+    type_id = db.Column(db.ForeignKey("discipline_type.id", ondelete="RESTRICT"), index=True)
+
+    type = db.relationship("DisciplineType")
 
     def __repr__(self):
         return f"<Discipline {self.name}>"

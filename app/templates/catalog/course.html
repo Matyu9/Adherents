@@ -14,7 +14,9 @@
     </p>
     <p><strong>{{ count }}</strong> élève{{ "s" if count > 1 }}{% if course.capacity %} sur {{ course.capacity }}{% endif %}
       {% if full %} <span class="badge health-warn">complet</span>{% endif %}
-      {% if course.marked_full %} <small class="muted">(fermé aux inscriptions à la main)</small>{% endif %}</p>
+      {% if course.marked_full %} <small class="muted">(fermé aux inscriptions à la main)</small>{% endif %}
+      {% if course.individual %} <span class="badge">cours individuel</span>{% endif %}</p>
+    {% if course.individual and free %}<p class="small muted">Plages libres : {% for a, b in free %}{{ a }}-{{ b }}{{ ", " if not loop.last }}{% endfor %}</p>{% endif %}
   </div>
   <div class="actions">
     {% if edit %}<a href="{{ url_for('catalog.enroll_student', course_id=course.id) }}" role="button">+ Inscrire un élève</a>{% endif %}
@@ -28,10 +30,24 @@
   {% if recipients %} · <a href="mailto:?bcc={{ recipients | join(',') | urlencode }}">Écrire aux familles</a> <small class="muted">({{ recipients | length }} adresse{{ "s" if recipients | length > 1 }}, en copie cachée)</small>{% endif %}
 </p>
 <div class="overflow-auto"><table class="striped responsive">
-  <thead><tr><th>Élève</th><th>Âge</th><th>Responsables</th><th>Depuis le</th>{% if edit %}<th></th>{% endif %}</tr></thead>
+  <thead><tr>{% if course.individual %}<th>Passage</th>{% endif %}<th>Élève</th><th>Âge</th><th>Responsables</th><th>Depuis le</th>{% if edit %}<th></th>{% endif %}</tr></thead>
   <tbody>
   {% for e in active %}{% set student = e.membership.person %}
-  <tr>
+  <tr id="e{{ e.id }}">
+    {% if course.individual %}
+    <td data-label="Passage">
+      {% if e.slot_starts_at %}<strong>{{ e.slot_starts_at.strftime("%H:%M") }}-{{ e.slot_ends_at.strftime("%H:%M") }}</strong>{% elif e.slot_minutes %}{{ e.slot_minutes }} min, heure à fixer{% else %}<span class="muted">à fixer</span>{% endif %}
+      {% for w in slot_warnings.get(e.id, []) %}<br><small class="error">{{ w }}</small>{% endfor %}
+      {% if edit %}
+      <form method="post" action="{{ url_for('catalog.set_slot', enrollment_id=e.id) }}" class="inline-form">
+        {{ csrf() }}
+        <input type="time" name="starts_at" value="{{ e.slot_starts_at.strftime('%H:%M') if e.slot_starts_at }}" aria-label="Heure de passage">
+        <input type="number" name="minutes" min="1" max="240" step="5" value="{{ e.slot_minutes or '' }}" aria-label="Durée en minutes" placeholder="min" class="narrow-number">
+        <button type="submit" class="secondary small">OK</button>
+      </form>
+      {% endif %}
+    </td>
+    {% endif %}
     <td data-label="Élève"><a href="{{ url_for('directory.person', person_id=student.id) }}">{{ student.sort_name }}</a>{% if e.replaces %}<br><small class="muted">venu(e) de {{ e.replaces.course.title }}</small>{% endif %}</td>
     <td data-label="Âge"><small>{{ student.age() ~ " ans" if student.birth_date else "—" }}</small></td>
     <td data-label="Responsables"><small>{% for g in guardians[e.id] %}{{ g.full_name }}{% for p in g.phones[:1] %} · <a href="tel:{{ p.number }}">{{ p.number | phone }}</a>{% endfor %}{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}</small></td>

@@ -53,7 +53,7 @@ Adhérents a deux missions :
 | Campagnes d'inscription | Fait | [inscriptions.md](inscriptions.md) |
 | Espace adhérent | Fait | Foyer, cours, dossiers, matériel prêté |
 | Tarifs et cotisations | Fait | [tarifs.md](tarifs.md) |
-| Gestion des cours | En cours : effectifs et inscriptions en cours de saison faits | [cours.md](cours.md), et ci-dessous |
+| Gestion des cours | En cours : effectifs, inscriptions en cours de saison et cours individuels faits | [cours.md](cours.md), et ci-dessous |
 | Import depuis un logiciel de gestion | À faire | Voir ci-dessous |
 | Règlements | À faire | Voir ci-dessous |
 | Bascule | À faire | Voir ci-dessous |
@@ -70,7 +70,7 @@ La vie d'un cours pendant la saison, une fois le catalogue construit. Chaque ét
    - Un cours complet n'est plus proposé dans les dossiers.
    - Tout changement d'inscription marque la cotisation du foyer « à revoir », sans la recalculer seul. Une cotisation validée garde son statut et porte le signal.
    - Droit `enrollment.edit`.
-2. **Cours individuels.** Un cours est individuel par un choix explicite, pas parce qu'il n'a pas de capacité. Chaque élève a son heure de passage et sa durée. Deux passages qui se chevauchent, ou un passage hors du créneau, sont signalés sans être refusés.
+2. **Cours individuels** (fait). Un cours est individuel par un choix explicite, pas parce qu'il n'a pas de capacité. Chaque élève a son heure de passage et sa durée. Deux passages qui se chevauchent, ou un passage hors du créneau, sont signalés sans être refusés.
 3. **Liste d'attente.**
    - La famille s'y inscrit depuis son dossier quand un cours est complet ; le secrétariat peut aussi y ajouter un élève.
    - L'ordre est une position explicite, que le secrétariat peut changer.

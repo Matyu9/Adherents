@@ -41,7 +41,8 @@ Deux noms qui ne diffèrent que par les accents ou la casse sont refusés à la 
 | `teacher_id` | pointe vers `teacher`, pas vers `person` : seul un professeur peut avoir un cours. Vide : professeur à trouver. |
 | `weekday`, `starts_at`, `ends_at` | jour (0 = lundi) et créneau, tous facultatifs ; un horaire demande un jour, et le début et la fin vont ensemble |
 | `room_id` | facultatif |
-| `capacity` | effectif maximum ; vide : pas de limite (cours individuel) |
+| `capacity` | effectif maximum ; vide : pas de limite |
+| `individual` | cours individuel : chaque élève a son heure de passage ([cours.md](cours.md#cours-individuels)) |
 | `marked_full` | fermé aux inscriptions à la main (le `cours_complet` des exports) |
 | `notes` | non recopiées au journal |
 
@@ -91,7 +92,7 @@ Le gestionnaire a les deux. La migration les ajoute aussi à un rôle Gestionnai
 
 ## Plus tard, sans changer ce qui précède
 
-- **Inscriptions** : une adhésion de la saison, un cours, l'heure de passage et la durée pour un cours individuel. Faites : un cours complet est grisé dans les dossiers, et le secrétariat inscrit, transfère ou note l'abandon d'un élève en cours de saison ([cours.md](cours.md)). L'heure de passage reste à faire.
+- **Inscriptions** : une adhésion de la saison, un cours, l'heure de passage et la durée pour un cours individuel. Faites : un cours complet est grisé dans les dossiers, et le secrétariat inscrit, transfère ou note l'abandon d'un élève en cours de saison ([cours.md](cours.md)). L'heure de passage d'un cours individuel aussi.
 - **Import** depuis le logiciel de gestion : les colonnes de l'export des cours (saison, site, discipline, niveau, jour, horaires, salle, professeur, cours complet, groupe) ont toutes leur place ici. La correspondance se fera quand les exports seront disponibles.
 - **Professeur remplaçant** : prévu, séance par séance, dans la [gestion des cours](plan.md#gestion-des-cours). **Accompagnateur** d'un cours : non repris pour l'instant.
 - **Un professeur ne voit que ses élèves** : quand les inscriptions existeront, à partir de `course.teacher_id`.

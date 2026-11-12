@@ -216,3 +216,103 @@ def flag_review(person, season, reason):
         assessment.review_reasons = reasons[-MAX_REVIEW_REASONS:]
     db.session.flush()
     return flagged
+
+
+# ---------------------------------------------------------------------------
+# Cours individuels : heure de passage et durée de chaque élève
+# ---------------------------------------------------------------------------
+
+MAX_SLOT_MINUTES = 240
+
+
+def _minutes(moment):
+    return moment.hour * 60 + moment.minute
+
+
+def _span(enrollment):
+    """(début, fin) du passage en minutes depuis minuit, ou None."""
+    if enrollment.slot_starts_at is None or not enrollment.slot_minutes:
+        return None
+    start = _minutes(enrollment.slot_starts_at)
+    return start, start + enrollment.slot_minutes
+
+
+def _course_span(course):
+    if course.starts_at is None:
+        return None
+    return _minutes(course.starts_at), _minutes(course.ends_at)
+
+
+def _hhmm(minutes):
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def slot_warnings(enrollment, others=None):
+    """Avertissements sur le passage d'un élève : hors du créneau du cours, chevauchement avec un autre élève du
+    même cours, ou avec un autre cours de l'élève le même jour. Rien n'est refusé."""
+    span = _span(enrollment)
+    if span is None:
+        return []
+    course, warnings = enrollment.course, []
+    if (frame := _course_span(course)) and (span[0] < frame[0] or span[1] > frame[1]):
+        warnings.append(f"Hors du créneau du cours ({_hhmm(frame[0])}-{_hhmm(frame[1])}).")
+    others = others if others is not None else [e for e in course.enrollments if e.active]
+    for other in others:
+        if other is enrollment or (o := _span(other)) is None:
+            continue
+        if span[0] < o[1] and o[0] < span[1]:
+            warnings.append(
+                f"Chevauche le passage de {other.membership.person.full_name} ({_hhmm(o[0])}-{_hhmm(o[1])})."
+            )
+    for mine in enrollment.membership.enrollments:
+        other_course = mine.course
+        if mine is enrollment or not mine.active or other_course.weekday != course.weekday or course.weekday is None:
+            continue
+        o = _span(mine) if other_course.individual else _course_span(other_course)
+        if o and span[0] < o[1] and o[0] < span[1]:
+            warnings.append(f"L'élève a aussi {other_course.title} à {_hhmm(o[0])}.")
+    return warnings
+
+
+def set_slot(enrollment, starts_at, minutes, user=None):
+    """Fixe l'heure de passage et la durée (les deux vides : on efface). Renvoie les avertissements."""
+    course = enrollment.course
+    if not course.individual:
+        raise CourseError("L'heure de passage ne concerne que les cours individuels.")
+    if not enrollment.active:
+        raise CourseError("Cette inscription est terminée.")
+    if minutes is not None and not 0 < minutes <= MAX_SLOT_MINUTES:
+        raise CourseError(f"La durée doit être comprise entre 1 et {MAX_SLOT_MINUTES} minutes.")
+    if starts_at is not None and minutes is None:
+        raise CourseError("Indiquez la durée du passage.")
+    if starts_at is not None and _minutes(starts_at) + minutes > 24 * 60:
+        raise CourseError("Le passage doit finir avant minuit.")
+    before = (enrollment.slot_starts_at, enrollment.slot_minutes)
+    enrollment.slot_starts_at, enrollment.slot_minutes = starts_at, minutes
+    db.session.flush()
+    if before != (starts_at, minutes):
+        person = enrollment.membership.person
+        label = f"{starts_at:%H:%M}, {minutes} min" if starts_at else (f"{minutes} min" if minutes else "effacé")
+        log("enrollment.slot", f"Passage de {person.full_name} en {course.title} : {label}", user=user, person=person)
+    return slot_warnings(enrollment)
+
+
+def planning(course):
+    """Planning d'un cours individuel : [(inscription, avertissements)] par heure de passage (sans heure à la fin),
+    et les plages libres du créneau [(début, fin)] en « HH:MM »."""
+    active = [e for e in course.enrollments if e.active]
+    rows = sorted(
+        active,
+        key=lambda e: (e.slot_starts_at is None, e.slot_starts_at or e.enrolled_on, *_by_name(e)),
+    )
+    result = [(e, slot_warnings(e, active)) for e in rows]
+    free = []
+    if frame := _course_span(course):
+        cursor = frame[0]
+        for start, end in sorted(s for e in active if (s := _span(e))):
+            if start > cursor:
+                free.append((cursor, min(start, frame[1])))
+            cursor = max(cursor, end)
+        if cursor < frame[1]:
+            free.append((cursor, frame[1]))
+    return result, [(_hhmm(a), _hhmm(b)) for a, b in free if b > a]

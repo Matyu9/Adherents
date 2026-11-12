@@ -158,7 +158,8 @@ La fiche d'une personne montre aussi l'historique de ce qui l'a concernée (jour
 - une **discipline**, un **niveau** (facultatif) et un **groupe** pour distinguer deux cours semblables (« groupe A », « ados ») ;
 - un **professeur**, ou « À trouver » ;
 - un **jour** et un **horaire**, une **salle** ;
-- un **effectif maximum**, laissé vide pour un cours individuel ;
+- un **effectif maximum**, ou rien pour ne pas limiter ;
+- la case **Cours individuel**, quand chaque élève passe à son heure dans le créneau du professeur ;
 - la case **Complet**, pour ne plus le proposer aux familles.
 
 **+ Nouveau cours** en crée un ; **Dupliquer** part d'un cours existant pour en créer un autre groupe. La colonne **Effectif** montre les inscrits sur le maximum : un cours plein est marqué **complet**.
@@ -183,6 +184,8 @@ En cours d'année, le secrétariat peut :
 - **Abandon** : l'élève quitte ce cours seulement ; il reste adhérent et garde ses autres cours. S'il quitte l'association, passez plutôt son adhésion en « Abandon » sur sa fiche.
 
 Un cours complet accepte quand même l'élève, avec un avertissement.
+
+**Cours individuel.** Sur la page du cours, chaque ligne a une heure de passage et une durée. Les élèves se rangent dans l'ordre de la journée et les plages libres s'affichent en haut. Un passage qui déborde du créneau, qui chevauche celui d'un autre élève ou un autre cours du même élève est signalé en rouge. Le professeur voit ces heures dans **Mes élèves**, la famille dans **Mon espace**.
 
 **La cotisation n'est jamais recalculée toute seule.** Si celle du foyer était déjà calculée, elle est marquée **à revoir** dans **Tarifs → Cotisations**, avec la liste des changements. Recalculez-la, ou indiquez qu'il n'y a rien à changer.
 

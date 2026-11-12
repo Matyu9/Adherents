@@ -686,23 +686,30 @@ def remind(now=None):
 
 
 def students_of(teacher, season):
-    """[(cours, [(élève, [responsables])])] : les élèves inscrits aux cours du professeur pendant la saison."""
+    """[(cours, [(élève, [responsables], inscription)])] : les élèves inscrits aux cours du professeur pendant la
+    saison, par heure de passage pour un cours individuel."""
     from .catalog import sorted_courses
 
     result = []
     for course in sorted_courses(c for c in teacher.courses if c.season_id == season.id):
-        students = sorted(
-            (e.membership.person for e in course.enrollments if e.status == Enrollment.ACTIVE),
-            key=lambda p: (fold(p.last_name), fold(p.first_name)),
+        enrollments = sorted(
+            (e for e in course.enrollments if e.status == Enrollment.ACTIVE),
+            key=lambda e: (
+                course.individual and e.slot_starts_at is None,
+                e.slot_starts_at if course.individual and e.slot_starts_at else datetime.min.time(),
+                fold(e.membership.person.last_name),
+                fold(e.membership.person.first_name),
+            ),
         )
         rows = []
-        for student in students:
+        for enrollment in enrollments:
+            student = enrollment.membership.person
             guardians = [
                 link.person
                 for h in student.household_links
                 for link in h.household.guardians
                 if h.role == HouseholdMember.DEPENDENT and link.person is not student
             ]
-            rows.append((student, list({p.id: p for p in guardians}.values())))
+            rows.append((student, list({p.id: p for p in guardians}.values()), enrollment))
         result.append((course, rows))
     return result

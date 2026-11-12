@@ -44,6 +44,7 @@ COURSE_FIELDS = (
     "ends_at",
     "room_id",
     "capacity",
+    "individual",
     "marked_full",
     "notes",
 )
@@ -96,8 +97,9 @@ class CourseForm(FlaskForm):
     capacity = IntegerField(
         "Effectif maximum",
         validators=[Optional(), NumberRange(min=1, max=500, message="Entre 1 et 500.")],
-        description="Vide : pas de limite, par exemple pour un cours individuel.",
+        description="Vide : pas de limite.",
     )
+    individual = BooleanField("Cours individuel : chaque élève a son heure de passage dans le créneau")
     marked_full = BooleanField("Complet : ne plus proposer ce cours aux inscriptions")
     notes = TextAreaField("Notes", validators=[Optional(), Length(max=5000)])
 
@@ -152,6 +154,7 @@ class CourseForm(FlaskForm):
             "ends_at": self.ends_at.data,
             "room_id": self.room_id.data,
             "capacity": self.capacity.data,
+            "individual": self.individual.data,
             "marked_full": self.marked_full.data,
             "notes": _blank(self.notes.data),
         }
@@ -430,6 +433,9 @@ def course(course_id):
     record = _course(course_id)
     active, gone = courses.roster(record)
     count = len(active)
+    slots, free = courses.planning(record) if record.individual else ([], [])
+    if record.individual:
+        active = [e for e, _ in slots]
     return render_template(
         "catalog/course.html",
         course=record,
@@ -441,6 +447,8 @@ def course(course_id):
         guardians={e.id: courses.guardians_of(e.membership.person) for e in active},
         recipients=courses.recipients(record),
         withdraw_form=WithdrawForm(),
+        slot_warnings={e.id: w for e, w in slots},
+        free=free,
     )
 
 
@@ -536,6 +544,31 @@ def transfer(enrollment_id):
     return render_template(
         "catalog/enroll_form.html", form=form, course=enrollment.course, membership=membership, enrollment=enrollment
     )
+
+
+class SlotForm(FlaskForm):
+    starts_at = TimeField("Heure de passage", validators=[Optional()])
+    minutes = IntegerField("Durée (min)", validators=[Optional()])
+
+
+@bp.route("/inscriptions/<int:enrollment_id>/passage", methods=["POST"])
+@require("enrollment.edit")
+def set_slot(enrollment_id):
+    enrollment = _enrollment(enrollment_id)
+    form = SlotForm()
+    if not form.validate_on_submit():
+        flash("Heure ou durée illisible.", "error")
+        return redirect(url_for(".course", course_id=enrollment.course_id))
+    try:
+        warnings = courses.set_slot(enrollment, form.starts_at.data, form.minutes.data)
+    except CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+        flash(f"Passage de {enrollment.membership.person.full_name} enregistré.", "success")
+        _flash_all(warnings)
+    return redirect(url_for(".course", course_id=enrollment.course_id) + f"#e{enrollment.id}")
 
 
 @bp.route("/inscriptions/<int:enrollment_id>/abandon", methods=["POST"])

@@ -22,16 +22,19 @@ def no_store(response):
 
 
 def _seasons_of(person):
-    """Adhésions de la personne, la plus récente d'abord, avec leurs cours actifs."""
+    """Adhésions de la personne, la plus récente d'abord, avec leurs inscriptions actives."""
     rows = []
     for membership in sorted(person.memberships, key=lambda m: m.season.starts_on, reverse=True):
-        courses = [e.course for e in membership.enrollments if e.status == Enrollment.ACTIVE]
+        enrollments = [e for e in membership.enrollments if e.status == Enrollment.ACTIVE]
         rows.append(
             (
                 membership,
                 sorted(
-                    courses,
-                    key=lambda c: (c.weekday if c.weekday is not None else 7, c.starts_at or c.created_at.time()),
+                    enrollments,
+                    key=lambda e: (
+                        e.course.weekday if e.course.weekday is not None else 7,
+                        e.slot_starts_at or e.course.starts_at or e.course.created_at.time(),
+                    ),
                 ),
             )
         )

@@ -231,7 +231,9 @@ ACCESS = {
     },
     "catalog.course": ROSTER,
     "catalog.course_csv": ROSTER,
-    **{f"catalog.{name}": ENROLL for name in ("enroll_student", "enroll_in_course", "transfer", "withdraw")},
+    **{
+        f"catalog.{name}": ENROLL for name in ("enroll_student", "enroll_in_course", "transfer", "withdraw", "set_slot")
+    },
     "directory.merge_person": DIR_MERGE,
     "directory.merge_household": DIR_MERGE,
     **{

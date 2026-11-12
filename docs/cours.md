@@ -2,7 +2,7 @@
 
 Le [catalogue](catalogue.md) décrit les cours d'une saison, et les [inscriptions](inscriptions.md) y placent les élèves au moment de la rentrée. Ce document décrit la vie d'un cours **pendant** la saison : qui le suit, qui arrive, qui part, qui change de groupe.
 
-Le travail se fait par étapes (voir la [feuille de route](plan.md#gestion-des-cours)). Ce document décrit ce qui est en place : **l'étape 1, effectifs et inscriptions en cours de saison**.
+Le travail se fait par étapes (voir la [feuille de route](plan.md#gestion-des-cours)). Ce document décrit ce qui est en place, étape par étape.
 
 ## Une inscription dans le temps
 
@@ -65,12 +65,33 @@ Une cotisation validée **garde son statut** et porte le signal. Le signal tombe
 
 Dans **Tarifs → Cotisations**, le filtre **À revoir** liste les foyers concernés.
 
+## Cours individuels
+
+Un cours est **individuel** par une case cochée sur le cours (`course.individual`), pas parce qu'il n'a pas d'effectif maximum : un atelier sans limite reste collectif. La migration `a0000008individuel` ne coche la case d'aucun cours existant. La case est recopiée avec le catalogue.
+
+Le créneau du cours (17 h à 19 h) est celui du professeur. Chaque élève y a :
+
+| Colonne | Remarque |
+|---|---|
+| `slot_starts_at` | heure de passage, facultative |
+| `slot_minutes` | durée en minutes (1 à 240). Elle peut être connue avant l'heure ; une heure sans durée est refusée. |
+
+Sur la page du cours, les élèves sont rangés par heure de passage, ceux sans heure à la fin, et les **plages libres** du créneau sont indiquées. Le secrétariat (`enrollment.edit`) saisit l'heure et la durée sur la ligne de l'élève. Trois cas sont **signalés sans être refusés**, comme les chevauchements du catalogue :
+
+- un passage qui déborde du créneau du cours ;
+- deux élèves qui se chevauchent (un passage qui finit à 17 h 30 et un qui commence à 17 h 30 ne se gênent pas) ;
+- un élève qui a un autre cours le même jour au même moment.
+
+Le professeur voit l'heure de passage dans **Mes élèves**, rangée dans l'ordre de la journée, et la famille dans **Mon espace**, à la place de l'horaire du créneau.
+
+**Plus tard :** la durée comme condition des règles de tarif (formule 30 ou 45 minutes).
+
 ## Droits
 
 | Droit | Donne accès à |
 |---|---|
 | `catalog.view` et `directory.view` | la page d'un cours et la liste de ses élèves |
-| `enrollment.edit` | inscrire, transférer, noter un abandon |
+| `enrollment.edit` | inscrire, transférer, noter un abandon, fixer l'heure de passage |
 | `fee.assess` | indiquer qu'une cotisation à revoir n'a rien à changer |
 
 La migration `a0000007effectifs` ajoute `enrollment.edit` à un rôle Gestionnaire déjà enregistré. Les inscriptions existantes y prennent la date de leur enregistrement, sans dépasser leur date de départ.

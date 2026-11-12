@@ -532,3 +532,27 @@ def test_enrollment_dates_and_review_on_the_real_schema(migrated):
     assert run_sql(migrated, "SELECT replaces_id FROM enrollment WHERE id = 2") == [[(None,)]]
     downgrade(MIGRATIONS, revision="a0000006types")
     assert run_sql(migrated, "SELECT permissions::text FROM role WHERE key = 'gestionnaire'") == [[('["fee.view"]',)]]
+
+
+def test_individual_courses_on_the_real_schema(migrated):
+    """Aucun cours ne devient individuel d'office ; heure de passage et durée sont contrôlées."""
+    upgrade(MIGRATIONS, revision="a0000007effectifs")
+    run_sql(
+        migrated,
+        *SEED,
+        *CATALOG,
+        "UPDATE course SET capacity = NULL",
+        "INSERT INTO membership (id, person_id, season_id, status, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'active', now(), now())",
+        "INSERT INTO enrollment (id, membership_id, course_id, status, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'active', now(), now())",
+    )
+    upgrade(MIGRATIONS)
+    assert run_sql(migrated, "SELECT individual FROM course") == [[(False,)]]
+    run_sql(migrated, "UPDATE enrollment SET slot_minutes = 30", "UPDATE enrollment SET slot_starts_at = '17:00'")
+    for statement in (
+        "UPDATE enrollment SET slot_minutes = 0",
+        "UPDATE enrollment SET slot_minutes = NULL",  # une heure sans durée
+    ):
+        assert_fails(migrated, statement)
+    downgrade(MIGRATIONS, revision="a0000007effectifs")

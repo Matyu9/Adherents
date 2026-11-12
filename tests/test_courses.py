@@ -575,3 +575,172 @@ def test_validation_d_un_dossier_marque_la_cotisation(school):
     enrollment = next(e for e in school["basile"].enrollments if e.course_id == school["piano"].id)
     assert enrollment.enrolled_on == date(2026, 10, 5)
     assert "Basile Martin inscrit(e) à Piano par un dossier validé" in assessment.review_reasons
+
+
+# ---------------------------------------------------------------------------
+# Étape 2 : cours individuels
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def lessons(school):
+    """Piano individuel le mercredi de 17 h à 19 h ; chorale collective le mercredi de 18 h à 19 h."""
+    from datetime import time
+
+    piano, choeur = school["piano"], school["choeur"]
+    piano.individual, piano.weekday, piano.starts_at, piano.ends_at = True, 2, time(17), time(19)
+    choeur.weekday, choeur.starts_at, choeur.ends_at = 2, time(18), time(19)
+    alice, _ = courses.enroll(school["alice"], piano, SEPT)
+    basile, _ = courses.enroll(school["basile"], piano, SEPT)
+    db.session.commit()
+    return {**school, "e_alice": alice, "e_basile": basile}
+
+
+def t(text):
+    from datetime import time
+
+    return time.fromisoformat(text)
+
+
+def test_passage_et_fin_calculee(lessons):
+    alice = lessons["e_alice"]
+    assert courses.set_slot(alice, t("17:30"), 30) == []
+    assert (alice.slot_starts_at, alice.slot_ends_at) == (t("17:30"), t("18:00"))
+    assert actions("enrollment.slot")[0].message == "Passage de Alice Martin en Piano : 17:30, 30 min"
+
+
+def test_duree_sans_heure_puis_effacer(lessons):
+    alice = lessons["e_alice"]
+    courses.set_slot(alice, None, 45)
+    assert (alice.slot_starts_at, alice.slot_minutes, alice.slot_ends_at) == (None, 45, None)
+    courses.set_slot(alice, None, None)
+    assert alice.slot_minutes is None
+    assert actions("enrollment.slot")[-1].message.endswith(": effacé")
+
+
+@pytest.mark.parametrize(
+    "case, message",
+    [
+        ("cours collectif", "que les cours individuels"),
+        ("heure sans durée", "Indiquez la durée"),
+        ("durée nulle", "entre 1 et 240"),
+        ("trop long", "entre 1 et 240"),
+        ("après minuit", "avant minuit"),
+        ("terminée", "terminée"),
+    ],
+)
+def test_passage_refuse(lessons, case, message):
+    enrollment, start, minutes = lessons["e_alice"], t("17:00"), 30
+    if case == "cours collectif":
+        enrollment, _ = courses.enroll(lessons["alice"], lessons["choeur"], SEPT)
+    elif case == "heure sans durée":
+        minutes = None
+    elif case == "durée nulle":
+        minutes = 0
+    elif case == "trop long":
+        minutes = 300
+    elif case == "après minuit":
+        start, minutes = t("23:45"), 30
+    elif case == "terminée":
+        courses.withdraw(enrollment, NOV)
+    with pytest.raises(CourseError, match=message):
+        courses.set_slot(enrollment, start, minutes)
+
+
+def test_avertissements_de_passage(lessons):
+    alice, basile = lessons["e_alice"], lessons["e_basile"]
+    courses.set_slot(basile, t("17:00"), 30)
+    # Bord à bord : 17:30 après un passage qui finit à 17:30, pas de chevauchement.
+    assert courses.set_slot(alice, t("17:30"), 30) == []
+    assert courses.set_slot(alice, t("17:15"), 30) == ["Chevauche le passage de Basile Martin (17:00-17:30)."]
+    assert courses.set_slot(alice, t("18:45"), 30) == ["Hors du créneau du cours (17:00-19:00)."]
+    assert courses.set_slot(alice, t("16:30"), 30) == ["Hors du créneau du cours (17:00-19:00)."]
+    # Alice chante aussi à 18 h le même jour.
+    courses.enroll(lessons["alice"], lessons["choeur"], SEPT)
+    assert courses.set_slot(alice, t("18:00"), 30) == ["L'élève a aussi Chœur à 18:00."]
+
+
+def test_planning_et_plages_libres(lessons):
+    alice, basile = lessons["e_alice"], lessons["e_basile"]
+    courses.set_slot(alice, t("18:00"), 30)
+    chloe, _ = courses.enroll(lessons["chloe"], lessons["piano"], SEPT)  # sans heure : à la fin
+    courses.set_slot(basile, t("17:00"), 45)
+    rows, free = courses.planning(lessons["piano"])
+    assert [e for e, _ in rows] == [basile, alice, chloe]
+    assert free == [("17:45", "18:00"), ("18:30", "19:00")]
+
+
+def test_planning_sans_horaire_de_cours(lessons):
+    lessons["piano"].starts_at = lessons["piano"].ends_at = None
+    courses.set_slot(lessons["e_alice"], t("17:00"), 30)
+    rows, free = courses.planning(lessons["piano"])
+    assert free == [] and rows[0][1] == []
+
+
+def test_cours_individuel_recopie(school):
+    from app.services import catalog
+
+    school["piano"].individual = True
+    db.session.delete(school["flute_next"])
+    db.session.flush()
+    catalog.copy_season(school["season"], school["other"])
+    copied = db.session.scalar(db.select(Course).filter_by(season_id=school["other"].id, individual=True))
+    assert copied.discipline.name == "Piano"
+
+
+def test_page_d_un_cours_individuel(manager, lessons):
+    courses.set_slot(lessons["e_basile"], t("17:00"), 30)
+    db.session.commit()
+    piano = lessons["piano"]
+    html = page(manager.get(f"/catalogue/cours/{piano.id}"))
+    assert "cours individuel" in html and "17:00-17:30" in html and "Plages libres : 17:30-19:00" in html
+    assert html.index("MARTIN Basile") < html.index("MARTIN Alice")
+    response = manager.post(
+        f"/catalogue/inscriptions/{lessons['e_alice'].id}/passage", data={"starts_at": "17:15", "minutes": "30"}
+    )
+    assert response.location.endswith(f"/catalogue/cours/{piano.id}#e{lessons['e_alice'].id}")
+    html = page(manager.get(f"/catalogue/cours/{piano.id}"))
+    assert "Chevauche le passage de Basile Martin" in html
+    html = page(
+        manager.post(
+            f"/catalogue/inscriptions/{lessons['e_alice'].id}/passage",
+            data={"starts_at": "17:15", "minutes": ""},
+            follow_redirects=True,
+        )
+    )
+    assert "Indiquez la durée" in html
+    html = page(
+        manager.post(
+            f"/catalogue/inscriptions/{lessons['e_alice'].id}/passage", data={"starts_at": "xx"}, follow_redirects=True
+        )
+    )
+    assert "illisible" in html
+
+
+def test_case_cours_individuel_au_formulaire(manager, school):
+    piano = school["piano"]
+    data = {"discipline_id": piano.discipline_id, "individual": "y"}
+    assert manager.post(f"/catalogue/cours/{piano.id}/modifier", data=data).status_code == 302
+    assert db.session.get(Course, piano.id).individual is True
+
+
+def test_heure_de_passage_chez_le_professeur_et_la_famille(client, lessons):
+    from app.models import Teacher
+    from app.services import registration
+
+    piano = lessons["piano"]
+    prof = person("Paul", "Prof")
+    prof.teacher = Teacher(status="CDI")
+    db.session.flush()
+    piano.teacher = prof.teacher
+    courses.set_slot(lessons["e_basile"], t("18:00"), 30)
+    courses.set_slot(lessons["e_alice"], t("17:00"), 30)
+    db.session.commit()
+    ((course_row, students),) = registration.students_of(prof.teacher, lessons["season"])
+    assert [s.first_name for s, _, _ in students] == ["Alice", "Basile"]
+    account = make_account(Role.ADHERENT, email="anne@asso.test")
+    lessons["anne"].account = account
+    db.session.commit()
+    login(client, account)
+    html = page(client.get("/mon-espace"))
+    assert "Mercredi 17:00-17:30" in html and "Mercredi 18:00-18:30" in html

@@ -3,7 +3,7 @@
 import hashlib
 import hmac
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from authlib.oauth2.rfc6749 import ClientMixin
 from flask_login import UserMixin
@@ -768,7 +768,9 @@ class Course(TimestampMixin, db.Model):
     weekday = db.Column(db.SmallInteger)  # 0 = lundi
     starts_at = db.Column(db.Time)
     ends_at = db.Column(db.Time)
-    capacity = db.Column(db.Integer)  # effectif maximum ; vide : pas de limite (cours individuel)
+    capacity = db.Column(db.Integer)  # effectif maximum ; vide : pas de limite
+    # Cours individuel : chaque élève a son heure de passage et sa durée dans le créneau. Voir docs/cours.md.
+    individual = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     # Fermé aux inscriptions à la main. Les inscriptions (phase 6) le rendront complet aussi une fois l'effectif atteint.
     marked_full = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     notes = db.Column(db.Text)
@@ -962,6 +964,8 @@ class Enrollment(TimestampMixin, db.Model):
         db.CheckConstraint("status IN ('active', 'withdrawn')", name="ck_enrollment_status"),
         db.CheckConstraint("withdrawn_on >= enrolled_on", name="ck_enrollment_dates"),
         db.CheckConstraint("replaces_id <> id", name="ck_enrollment_replaces"),
+        db.CheckConstraint("slot_minutes > 0", name="ck_enrollment_slot_minutes"),
+        db.CheckConstraint("slot_starts_at IS NULL OR slot_minutes IS NOT NULL", name="ck_enrollment_slot"),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -975,6 +979,9 @@ class Enrollment(TimestampMixin, db.Model):
     dossier_id = db.Column(db.ForeignKey("dossier.id", ondelete="SET NULL"), index=True)
     # Transfert : l'inscription quittée pour celle-ci (même saison). Voir docs/cours.md.
     replaces_id = db.Column(db.ForeignKey("enrollment.id", ondelete="SET NULL"), index=True)
+    # Cours individuel : heure de passage et durée (minutes). La durée peut être connue avant l'heure.
+    slot_starts_at = db.Column(db.Time)
+    slot_minutes = db.Column(db.SmallInteger)
 
     membership = db.relationship(
         "Membership", backref=db.backref("enrollments", cascade="all, delete-orphan", passive_deletes=True)
@@ -986,6 +993,17 @@ class Enrollment(TimestampMixin, db.Model):
     @property
     def active(self):
         return self.status == self.ACTIVE
+
+    @property
+    def slot_ends_at(self):
+        if self.slot_starts_at is None or not self.slot_minutes:
+            return None
+        start = datetime.combine(date.min, self.slot_starts_at)
+        return (start + timedelta(minutes=self.slot_minutes)).time()
+
+    def attends_on(self, day):
+        """Suit le cours ce jour-là : entré au plus tard ce jour, pas encore parti."""
+        return self.enrolled_on <= day and (self.withdrawn_on is None or day < self.withdrawn_on)
 
     @property
     def status_label(self):

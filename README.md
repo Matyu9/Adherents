@@ -153,6 +153,8 @@ L'appli contient des données de mineurs et des coordonnées bancaires. Ses prin
 
 Aucune vraie donnée d'adhérent ne doit entrer dans le dépôt : `data/` et `.env` sont ignorés par Git.
 
+Pour signaler une faille, en privé : voir [SECURITY.md](SECURITY.md).
+
 ## Organisation du code
 
 Flask, PostgreSQL, Jinja et HTMX, sans étape de build : Pico et HTMX sont copiés dans le dépôt.

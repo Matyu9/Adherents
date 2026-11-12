@@ -65,7 +65,7 @@ Le client de test (`conftest.py`) oublie l'utilisateur en cache et annule toute 
 
 Les règles sont dans `pyproject.toml`. Le formatage d'origine de tout le code est un commit à part, listé dans `.git-blame-ignore-revs` : `git config blame.ignoreRevsFile .git-blame-ignore-revs` le fait ignorer par `git blame`.
 
-**Intégration continue** (`.github/workflows/ci.yml`), à chaque push sur `main` et à chaque pull request : Ruff, les tests sans navigateur sous Python 3.12 (celui de l'image Docker) et 3.14, les tests dans un navigateur, et `pip-audit`. Dependabot propose les mises à jour chaque semaine.
+**Intégration continue** (`.github/workflows/ci.yml`), à chaque push sur `main` et à chaque pull request : Ruff, les tests sans navigateur sous Python 3.12 (celui de l'image Docker) et 3.14, les tests dans un navigateur, et `pip-audit`. Dependabot propose les mises à jour chaque semaine. Un second workflow (`codeql.yml`) cherche les failles dans le code Python. Les actions sont épinglées par empreinte de commit, avec la version en commentaire : Dependabot met les deux à jour.
 
 ## Essayer avec l'Inventaire en local
 

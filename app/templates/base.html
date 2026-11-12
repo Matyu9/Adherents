@@ -55,7 +55,7 @@
       {{ navlink("catalog.index", "Catalogue", "layers", ["catalog"]) }}
       {{ navlink("lessons.planning", "Planning", "calendar") }}
       {% endif %}
-      {% if can(current_user, "lesson.manage") %}{{ navlink("lessons.calendar", "Calendrier", "clock") }}{% endif %}
+      {% if can(current_user, "lesson.manage") %}{{ navlink("lessons.calendar", "Calendrier", "clock") }}{{ navlink("lessons.absences", "Absences", "user-check") }}{% endif %}
       {% if can(current_user, "registration.view") %}{{ navlink("campaigns.index", "Campagnes", "calendar", ["campaigns"]) }}{% endif %}
       {% if can(current_user, "fee.view") %}{{ navlink("fees.index", "Tarifs", "tag", ["fees"]) }}{% endif %}
       {% if current_user.is_admin or can(current_user, "account.manage") or can(current_user, "group.manage") or can(current_user, "client.manage") or can(current_user, "settings.manage") or can(current_user, "activity.view") %}

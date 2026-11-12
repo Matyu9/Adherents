@@ -914,6 +914,35 @@ class Lesson(db.Model):
         return f"<Lesson {self.course_id} {self.day}>"
 
 
+class Attendance(db.Model):
+    """Présence d'un élève à une séance. Pas de motif en texte libre : il révélerait vite des données de santé.
+    Voir docs/cours.md."""
+
+    PRESENT = "present"
+    ABSENT = "absent"
+    EXCUSED = "excused"
+    STATUSES = {PRESENT: "Présent", ABSENT: "Absent", EXCUSED: "Excusé"}
+    __table_args__ = (
+        db.UniqueConstraint("lesson_id", "enrollment_id"),
+        db.CheckConstraint("status IN ('present', 'absent', 'excused')", name="ck_attendance_status"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    lesson_id = db.Column(db.ForeignKey("lesson.id", ondelete="CASCADE"), nullable=False, index=True)
+    enrollment_id = db.Column(db.ForeignKey("enrollment.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = db.Column(db.String(10), nullable=False)
+    recorded_by_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"))
+    recorded_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    lesson = db.relationship("Lesson", backref=db.backref("attendance", passive_deletes=True))
+    enrollment = db.relationship("Enrollment", backref=db.backref("attendance", passive_deletes=True))
+    recorded_by = db.relationship("Account")
+
+    @property
+    def label(self):
+        return self.STATUSES[self.status]
+
+
 class RoomCalendarJob(db.Model):
     """Envoi en attente vers l'agenda d'une salle : créer ou mettre à jour l'événement d'une séance (`put`), ou le
     retirer (`delete`). Réessayé par `flask run-tasks` jusqu'à réussite. Voir docs/cours.md."""

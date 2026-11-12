@@ -55,6 +55,18 @@
   {% if plan.skipped %}<p class="small muted">Sans jour ni horaire, donc sans séance : {% for c in plan.skipped %}{{ c.title }}{{ ", " if not loop.last }}{% endfor %}.</p>{% endif %}
 </section>
 
+<section class="card settings-block" id="presences">
+  <h2>Présences</h2>
+  <p class="small muted">Le professeur fait l'appel à partir du jour de la séance et peut le corriger pendant 7 jours ; ensuite, seul le secrétariat le peut. <a href="{{ url_for('lessons.absences', saison=season.id) }}">Voir les absences répétées</a>.</p>
+  <form method="post" action="{{ url_for('lessons.save_attendance_settings') }}" novalidate>
+    {{ presence.hidden_tag() }}
+    <input type="hidden" name="saison" value="{{ season.id }}">
+    <label class="form-check"><input type="checkbox" name="family" value="1"{% if family_attendance %} checked{% endif %}> Les familles voient les présences de leurs enfants dans Mon espace</label>
+    {{ field(presence.threshold) }}<small class="muted">{{ presence.threshold.description }}</small>
+    <button type="submit" class="secondary">Enregistrer</button>
+  </form>
+</section>
+
 <section class="card settings-block" id="reglages">
   <h2>Modifications par les professeurs</h2>
   <p class="small muted">Un professeur déplace, annule ou ajoute ses séances lui-même : le changement s'applique tout de suite, les familles et le secrétariat sont prévenus, et le secrétariat peut revenir en arrière.</p>

@@ -249,9 +249,19 @@ ACCESS = {
     },
     **{
         f"lessons.{name}": LESSONS
-        for name in ("calendar", "add_break", "delete_break", "generate", "save_delay", "revert", "substitute")
+        for name in (
+            "calendar",
+            "add_break",
+            "delete_break",
+            "generate",
+            "save_delay",
+            "revert",
+            "substitute",
+            "absences",
+            "save_attendance_settings",
+        )
     },
-    **{f"lessons.{name}": LOGGED_IN for name in ("course", "edit", "add", "cancel", "mine", "agenda_page")},
+    **{f"lessons.{name}": LOGGED_IN for name in ("course", "edit", "add", "cancel", "mine", "agenda_page", "roll")},
     "lessons.planning": CAT_VIEW,
     "lessons.feed": PUBLIC,
     "directory.merge_person": DIR_MERGE,
@@ -628,6 +638,12 @@ def _lessons(season, course):
     first, second = course.lessons[:2]
     first.reason, first.edited, first.previous = "Motif <script>", True, {"extra": True}
     second.status, second.reason = "cancelled", "Grève <script>"
+    from app.models import Attendance
+    from app.services import options
+
+    options.put(options.ABSENCE_THRESHOLD, 1)
+    enrollment = next(e for e in course.enrollments)
+    db.session.add(Attendance(lesson=first, enrollment=enrollment, status="absent"))
 
 
 INLINE = re.compile(
@@ -706,6 +722,8 @@ def test_crawl_every_link(app, rich, who):
     assert any(p.startswith("/seances/planning") for p in seen) == (who in (A, G))
     assert any(p.endswith("/modifier") and p.startswith("/seances/") for p in seen) == (who in (A, G))
     assert "/seances/agenda" in seen
+    assert any(p.endswith("/appel") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/seances/absences") for p in seen) == (who in (A, G))
     assert any(p.startswith("/catalogue/copier") for p in seen) == (who in (A, G))
     assert ("/campagnes" in seen) == (who in (A, G))
     assert any(p.startswith("/campagnes/dossiers/") for p in seen) == (who in (A, G))

@@ -53,7 +53,7 @@ Adhérents a deux missions :
 | Campagnes d'inscription | Fait | [inscriptions.md](inscriptions.md) |
 | Espace adhérent | Fait | Foyer, cours, dossiers, matériel prêté |
 | Tarifs et cotisations | Fait | [tarifs.md](tarifs.md) |
-| Gestion des cours | En cours : effectifs, inscriptions en cours de saison, cours individuels, liste d'attente, séances, plannings, agendas et salles Google Workspace faits | [cours.md](cours.md), et ci-dessous |
+| Gestion des cours | Fait ; agendas des salles à essayer sur un vrai Workspace | [cours.md](cours.md), et ci-dessous |
 | Import depuis un logiciel de gestion | À faire | Voir ci-dessous |
 | Règlements | À faire | Voir ci-dessous |
 | Bascule | À faire | Voir ci-dessous |
@@ -98,7 +98,7 @@ La vie d'un cours pendant la saison, une fois le catalogue construit. Chaque ét
      - Pour lister les salles, le compte de service reçoit un rôle d'administration personnalisé limité à la lecture des ressources d'agenda. Pas de délégation sur tout le domaine : une fuite de la clé ne donne accès qu'aux salles.
      - L'écran montre les salles dont l'agenda n'est pas encore partagé avec le compte de service.
    - Le lien avec Google est un module à part, derrière une interface « agenda de salle » : sans configuration, rien ne change, et d'autres serveurs d'agenda pourront s'y brancher.
-6. **Présences.**
+6. **Présences** (fait).
    - Le professeur fait l'appel sur ses séances, depuis son téléphone : présent, absent ou excusé.
    - Pas de motif d'absence en texte libre : il révélerait vite des données de santé.
    - Le professeur peut corriger l'appel pendant 7 jours, ensuite seul le secrétariat le peut.

@@ -52,10 +52,12 @@ Si, une fois connecté, **Mon espace** n'apparaît pas dans le menu, votre compt
 
 - l'**adresse** et les **téléphones** du foyer ;
 - le **prélèvement** : vos coordonnées bancaires, masquées (seuls les quatre derniers chiffres de l'IBAN), et si un mandat est signé ;
-- chaque **membre du foyer**, avec ses adhésions saison par saison et ses **cours** (jour, horaire, salle, professeur) ;
+- chaque **membre du foyer**, avec ses adhésions saison par saison et ses **cours** (jour, horaire ou heure de passage, salle, professeur), les cours où il est en **liste d'attente**, et ses **présences** si l'association les montre ;
 - le **matériel prêté** à chacun, s'il est suivi dans l'Inventaire ;
 - vos **dossiers d'inscription** et leur statut ;
 - les **engagements** donnés (droit à l'image, règlement intérieur…), datés.
+
+**Les cours dans votre agenda** : **Ajouter les cours à mon agenda** crée une adresse à coller dans Google Agenda, Apple ou Outlook. Les déplacements et annulations y apparaissent, avec quelques heures de décalage : un changement de dernière minute vous est aussi envoyé par message.
 
 **Plusieurs foyers ?** Un parent présent dans deux familles (famille recomposée) voit les deux.
 
@@ -124,6 +126,8 @@ Vous ne voyez que vos élèves, et rien d'autre de l'annuaire. Un professeur qui
 - **Toutes les séances → + Ajouter une séance** : un rattrapage.
 
 Le changement s'applique tout de suite : les familles reçoivent un message, et le secrétariat est prévenu. Une séance déjà commencée ne se modifie plus, et l'association peut fixer un délai avant la séance.
+
+**Faire l'appel** : depuis **Mes séances**, le jour de la séance. Chaque élève est « présent » d'office : touchez **Absent** ou **Excusé** (absence prévenue) pour ceux qui manquent, puis **Enregistrer l'appel**. Vous pouvez le corriger pendant 7 jours ; ensuite, adressez-vous au secrétariat. N'écrivez jamais de motif : il n'y a pas de case pour cela, exprès.
 
 **Mon agenda** : une adresse à ajouter à votre agenda (Google Agenda : *Autres agendas → + → À partir de l'URL*), avec vos séances à jour. Elle n'est affichée qu'une fois : gardez-la pour vous.
 
@@ -214,6 +218,8 @@ Un cours complet accepte quand même l'élève, avec un avertissement.
 **Séances d'un cours** (page du cours → **Séances**) : déplacer, annuler, ajouter, nommer un **remplaçant** pour une séance, ou **revenir en arrière** sur un changement fait par un professeur. Les familles sont prévenues à chaque fois.
 
 **Salles de l'organisation** (si l'association relie son Google Workspace) : **Catalogue → Disciplines, niveaux et lieux → Salles de l'organisation** reprend les salles de l'organisation, avec un aperçu avant d'écrire. Les séances sont ensuite réservées dans l'agenda de chaque salle, et une réunion déjà posée sur une salle apparaît quand on déplace une séance.
+
+**Présences** : le nombre d'appels faits s'affiche dans les séances d'un cours ; le secrétariat corrige un appel à tout moment. **Menu → Absences** liste les élèves qui atteignent le seuil fixé dans le calendrier (aucun tant qu'il n'est pas fixé). Le calendrier règle aussi si les familles voient les présences de leurs enfants (oui par défaut).
 
 **Menu → Planning** : l'emploi du temps par salle, par professeur ou par site, en semaine type ou semaine par semaine.
 
@@ -370,6 +376,8 @@ Le même écran supprime les **anciens dossiers d'inscription** des campagnes tr
 | Déplacer, annuler, ajouter une séance | | ✓ (ses cours) | ✓ | ✓ |
 | Calendrier, génération des séances, remplaçants, retour en arrière | | | ✓ | ✓ |
 | Agenda à s'abonner | ✓ | ✓ | ✓ | ✓ |
+| Faire l'appel | | ✓ (7 jours) | ✓ | ✓ |
+| Voir les présences de ses enfants | ✓ (si l'association le permet) | | | |
 | Campagnes : créer, relire, valider, fichier de report | | | ✓ | ✓ |
 | Fichier de report avec les IBAN, coordonnées bancaires | | | | ✓ |
 | Professeurs et contrats | | | | ✓ |

@@ -6,7 +6,9 @@
   {% if membership.status != active %}<span class="badge">abandon</span>{% endif %}{% if membership.category %} · {{ membership.category }}{% endif %}{% if membership.school_class %} · {{ membership.school_class }}{% endif %}</p>
 {% if courses %}
 <ul class="plain-list">
-  {% for e in courses %}{% set c = e.course %}<li>{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if e.slot_starts_at %} {{ e.slot_starts_at.strftime("%H:%M") }}-{{ e.slot_ends_at.strftime("%H:%M") }}{% elif c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}{% if c.room %} · {{ c.room.label }}{% endif %}</small>{% endif %}{% if c.teacher %} <small class="muted">avec {{ c.teacher.person.full_name }}</small>{% endif %}</li>{% endfor %}
+  {% for e in courses %}{% set c = e.course %}<li>{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if e.slot_starts_at %} {{ e.slot_starts_at.strftime("%H:%M") }}-{{ e.slot_ends_at.strftime("%H:%M") }}{% elif c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}{% if c.room %} · {{ c.room.label }}{% endif %}</small>{% endif %}{% if c.teacher %} <small class="muted">avec {{ c.teacher.person.full_name }}</small>{% endif %}
+    {%- if attendance_visible and e.attendance %}{% set missed = e.attendance | rejectattr("status", "equalto", "present") | sort(attribute="lesson.day") | list %}
+    <br><small>{{ e.attendance | length - missed | length }} présence{{ "s" if e.attendance | length - missed | length > 1 }}{% if missed %}, {{ missed | length }} absence{{ "s" if missed | length > 1 }} : {% for a in missed %}{{ a.lesson.day | date_fr }} ({{ a.label | lower }}){{ ", " if not loop.last }}{% endfor %}{% endif %}</small>{% endif %}</li>{% endfor %}
 </ul>
 {% endif %}
 {% for w in membership.waitlist if w.status == "waiting" %}<p class="small">{{ w.course.title }} <span class="badge">liste d'attente</span></p>{% endfor %}

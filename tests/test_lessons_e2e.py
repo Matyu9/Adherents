@@ -10,7 +10,7 @@ import pytest
 pytest.importorskip("playwright.sync_api")
 
 from app.extensions import db  # noqa: E402
-from app.models import Course, Discipline, Room, Season, Site  # noqa: E402
+from app.models import Course, Discipline, Lesson, Membership, Person, Room, Season, Site  # noqa: E402
 
 from .test_annuaire_e2e import shot  # noqa: E402
 from .test_e2e import _app, browser, server, session  # noqa: E402,F401
@@ -74,4 +74,36 @@ def test_calendar_lessons_and_planning(session, scheme):
         "text=Créer mon adresse d'agenda"
     ).count() else page.click("text=Créer une nouvelle adresse")
     assert ".ics" in page.locator("input[readonly]").input_value()
+    assert not browser_page.problems, browser_page.problems
+
+
+def test_roll_call_on_a_phone(session):
+    """L'appel sur un écran de téléphone : un bouton par statut et par élève, sans JavaScript."""
+    _, course_id = _course()
+    with _app["app"].app_context():
+        from app.services import courses, lessons
+
+        course = db.session.get(Course, course_id)
+        lessons.generate(course.season, apply=True)
+        if not course.enrollments:
+            for first in ("Nina", "Omar"):
+                membership = Membership(person=Person(first_name=first, last_name="Appel"), season=course.season)
+                db.session.add(membership)
+                db.session.flush()
+                courses.enroll(membership, course, course.season.starts_on)
+        lesson = db.session.scalar(
+            db.select(Lesson).where(Lesson.course_id == course_id, Lesson.day <= date.today()).order_by(Lesson.day)
+        )
+        db.session.commit()
+        lesson_id = lesson.id
+    browser_page = session(color_scheme="light", viewport={"width": 390, "height": 844})
+    page = browser_page.login()
+    page.goto(f"/seances/{lesson_id}/appel")
+    shot(page, "seances-appel-telephone")
+    page.locator("fieldset", has_text="APPEL Omar").locator("text=Absent").click()
+    page.click("main form[method=post] button[type=submit]")
+    page.wait_for_selector("text=Appel enregistré")
+    page.goto(f"/seances/{lesson_id}/appel")
+    assert page.locator("fieldset", has_text="APPEL Omar").locator("input[value=absent]").is_checked()
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")  # pas de défilement horizontal
     assert not browser_page.problems, browser_page.problems

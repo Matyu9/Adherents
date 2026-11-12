@@ -198,6 +198,23 @@ Le bouton **Envoyer les séances à venir** met en file toutes les séances à v
 
 **Mise en place côté Google** : voir [installation.md](installation.md#agendas-des-salles-google-workspace).
 
+## Présences
+
+Table `attendance` : une séance, une inscription, un statut (`present`, `absent`, `excused`), qui l'a noté et quand. Une ligne par élève et par séance. **Pas de motif en texte libre** : il révélerait vite des données de santé. « Excusé » dit seulement que l'absence était prévenue.
+
+**L'appel** (`/seances/<id>/appel`, depuis **Mes séances** ou les séances d'un cours) :
+
+- la feuille liste les élèves qui suivent le cours **le jour de la séance** : un élève arrivé ou parti en cours de saison n'y figure qu'à ses dates ;
+- un bouton par statut et par élève, « présent » coché d'office, sans JavaScript, pensé pour le téléphone ;
+- le professeur du cours et le remplaçant de la séance font l'appel **à partir du jour de la séance**, et le corrigent pendant **7 jours** ; ensuite, la feuille est en lecture seule pour eux, et seul le secrétariat (`lesson.manage`) la corrige ;
+- pas d'appel sur une séance annulée ; une séance dont l'appel est fait n'est jamais supprimée par la génération : elle est annulée.
+
+**Absences répétées** (Enseignement → **Absences**, `lesson.manage`) : les élèves qui ont au moins N absences non excusées sur la saison, par cours. Le seuil se règle dans le calendrier et n'a **pas de valeur par défaut** : sans seuil, personne n'est signalé.
+
+**Les familles** voient dans **Mon espace**, pour chaque cours de leurs enfants, le nombre de présences et la date de chaque absence (absent ou excusé). Ce réglage (`attendance_family_visible`) est **actif par défaut** ; l'association peut le couper dans le calendrier.
+
+**Conservation** : l'anonymisation d'une fiche efface ses présences.
+
 ## Droits
 
 | Droit | Donne accès à |
@@ -205,10 +222,11 @@ Le bouton **Envoyer les séances à venir** met en file toutes les séances à v
 | `catalog.view` et `directory.view` | la page d'un cours et la liste de ses élèves |
 | `enrollment.edit` | inscrire, transférer, noter un abandon, fixer l'heure de passage, gérer la liste d'attente ; reçoit les avis de place libre |
 | `fee.assess` | indiquer qu'une cotisation à revoir n'a rien à changer |
-| `lesson.manage` | calendrier de la saison, génération, séances de tous les cours, retour en arrière, remplaçants ; reçoit les avis des changements faits par les professeurs |
+| `lesson.manage` | calendrier de la saison, génération, séances de tous les cours, retour en arrière, remplaçants, appel sans délai, absences répétées, réglages des présences ; reçoit les avis des changements faits par les professeurs |
 | `catalog.view` | les plannings |
 | `catalog.edit` | les salles de l'organisation, l'envoi des séances à venir aux agendas des salles |
-| (professeur du cours) | ses séances : déplacer, annuler, ajouter |
+| (professeur du cours) | ses séances : déplacer, annuler, ajouter ; l'appel pendant 7 jours |
+| (remplaçant d'une séance) | l'appel de cette séance pendant 7 jours |
 | (tout compte) | son agenda à s'abonner |
 
 Les migrations `a0000007effectifs` et `a0000010seances` ajoutent `enrollment.edit` et `lesson.manage` à un rôle Gestionnaire déjà enregistré. Les inscriptions existantes y prennent la date de leur enregistrement, sans dépasser leur date de départ.

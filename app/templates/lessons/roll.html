@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Appel{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>Appel : {{ lesson.course.title }}</h1>
+  <p class="muted">{{ lesson.day | date_fr }}, {{ lesson.starts_at.strftime("%H:%M") }}-{{ lesson.ends_at.strftime("%H:%M") }}{% if lesson.room %} · {{ lesson.room.label }}{% endif %}{% if lesson.substitute %} · remplacé par {{ lesson.substitute.person.full_name }}{% endif %}</p>
+  {% if not allowed %}<p class="flash flash-warning">{{ reason }}</p>{% endif %}
+  {% if rows %}
+  <form method="post">
+    {{ csrf() }}
+    <div class="roll">
+      {% for e, status in rows %}{% set student = e.membership.person %}
+      <fieldset class="roll-row">
+        <legend>{{ student.sort_name }}{% if e.slot_starts_at %} <small class="muted">{{ e.slot_starts_at.strftime("%H:%M") }}</small>{% endif %}</legend>
+        {% for key, label in statuses.items() %}
+        <label><input type="radio" name="e{{ e.id }}" value="{{ key }}"{% if (status or "present") == key %} checked{% endif %}{% if not allowed %} disabled{% endif %}> {{ label }}</label>
+        {% endfor %}
+      </fieldset>
+      {% endfor %}
+    </div>
+    <p class="small muted">« Excusé » : l'absence était prévenue. Pas de motif à écrire ici.</p>
+    {% if allowed %}<button type="submit">Enregistrer l'appel</button>{% endif %}
+  </form>
+  {% else %}<p class="empty">Aucun élève ne suit ce cours ce jour-là.</p>{% endif %}
+</article>
+{% endblock %}

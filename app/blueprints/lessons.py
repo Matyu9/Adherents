@@ -13,6 +13,7 @@ from ..extensions import db
 from ..models import Course, Lesson, Room, Season, SeasonBreak, Site, Teacher
 from ..permissions import can, require
 from ..services import agenda, catalog, directory, options
+from ..services import attendance as attendance_service
 from ..services import lessons as service
 from ..services.lessons import LessonError
 
@@ -73,6 +74,7 @@ def calendar():
             flash("Dates des cours enregistrées.", "success")
             return redirect(url_for(".calendar", saison=season.id))
     delay = DelayForm(hours=options.positive_int(options.TEACHER_DELAY))
+    presence = AttendanceSettingsForm(threshold=attendance_service.threshold())
     return render_template(
         "lessons/calendar.html",
         season=season,
@@ -80,6 +82,8 @@ def calendar():
         window=window,
         break_form=BreakForm(),
         delay=delay,
+        presence=presence,
+        family_attendance=attendance_service.family_visible(),
         plan=service.generate(season),
         lesson_count=db.session.scalar(
             db.select(db.func.count(Lesson.id)).join(Course).where(Course.season_id == season.id)
@@ -178,6 +182,7 @@ def course(course_id):
         manager=service.is_manager(current_user),
         today=date.today(),
         teachers=catalog.teachers_for(record.season) if service.is_manager(current_user) else [],
+        summary=attendance_service.summary,
     )
 
 
@@ -334,6 +339,81 @@ def substitute(lesson_id):
 
 
 # ---------------------------------------------------------------------------
+# Présences
+# ---------------------------------------------------------------------------
+
+
+@bp.route("/<int:lesson_id>/appel", methods=["GET", "POST"])
+@login_required
+def roll(lesson_id):
+    lesson = _lesson(lesson_id)
+    if not service.can_view(current_user, lesson):
+        abort(403)
+    allowed, reason = attendance_service.may_record(current_user, lesson)
+    rows = attendance_service.sheet(lesson)
+    if request.method == "POST":  # jeton CSRF vérifié par CSRFProtect, comme partout
+        if not allowed:
+            flash(reason, "error")
+            return redirect(url_for(".roll", lesson_id=lesson.id))
+        statuses = {e.id: request.form.get(f"e{e.id}") for e, _ in rows if request.form.get(f"e{e.id}")}
+        try:
+            attendance_service.record(lesson, statuses, current_user)
+        except attendance_service.AttendanceError as exc:
+            db.session.rollback()
+            flash(str(exc), "error")
+        else:
+            db.session.commit()
+            missing = len(rows) - len(statuses)
+            flash("Appel enregistré." + (f" {missing} élève(s) sans réponse." if missing else ""), "success")
+            if service.is_manager(current_user):
+                return redirect(url_for(".course", course_id=lesson.course_id))
+            return redirect(url_for(".mine"))
+    return render_template(
+        "lessons/roll.html",
+        lesson=lesson,
+        rows=rows,
+        allowed=allowed,
+        reason=reason,
+        statuses=attendance_service.Attendance.STATUSES,
+    )
+
+
+@bp.route("/absences")
+@require("lesson.manage")
+def absences():
+    season, seasons = _season()
+    return render_template(
+        "lessons/absences.html",
+        season=season,
+        seasons=seasons,
+        rows=attendance_service.repeated_absences(season) if season else [],
+        threshold=attendance_service.threshold(),
+    )
+
+
+class AttendanceSettingsForm(FlaskForm):
+    threshold = IntegerField(
+        "Signaler un élève à partir de … absences non excusées",
+        validators=[Optional(), NumberRange(min=1, max=100, message="Entre 1 et 100.")],
+        description="Vide : aucun élève n'est signalé.",
+    )
+
+
+@bp.route("/presences/reglages", methods=["POST"])
+@require("lesson.manage")
+def save_attendance_settings():
+    form = AttendanceSettingsForm()
+    if form.validate_on_submit():
+        options.put(options.ABSENCE_THRESHOLD, form.threshold.data)
+        options.put(options.FAMILY_ATTENDANCE, "1" if request.form.get("family") == "1" else "0")
+        db.session.commit()
+        flash("Réglages des présences enregistrés.", "success")
+    else:
+        _flash_all([e for errors in form.errors.values() for e in errors], "error")
+    return redirect(url_for(".calendar", saison=request.form.get("saison", type=int)) + "#presences")
+
+
+# ---------------------------------------------------------------------------
 # Mes séances (professeurs)
 # ---------------------------------------------------------------------------
 
@@ -354,6 +434,8 @@ def mine():
         upcoming=[lesson for lesson in rows if lesson.day > today],
         limit=service.teacher_limit(),
         now=datetime.now(),
+        may_record=lambda lesson: attendance_service.may_record(current_user, lesson)[0],
+        summary=attendance_service.summary,
     )
 
 

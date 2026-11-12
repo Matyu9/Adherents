@@ -17,6 +17,7 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 - **Plannings** par salle, professeur ou site, en semaine type ou semaine réelle.
 - **Agenda à s'abonner** (.ics) pour chaque compte : séances du professeur, ou des enfants, sans nom d'élève, à adresse secrète régénérable. Nouveau réglage `TIMEZONE`.
 - **Agendas des salles (Google Workspace, facultatif)** : lecture de l'occupation des salles avant de déplacer une séance, réservation de chaque séance dans l'agenda de sa salle (file d'envoi réessayée, sans doublon, sans nom d'élève), écran **Salles de l'organisation** qui reprend bâtiments et salles avec un aperçu. Compte de service avec un rôle d'administration limité, sans délégation sur tout le domaine. Places d'une salle, et effectif d'un cours qui les dépasse signalé. Nouveaux réglages `GOOGLE_SERVICE_ACCOUNT_FILE` et `GOOGLE_WORKSPACE_CUSTOMER`. Migration `a0000011salles`.
+- **Présences** : l'appel fait par le professeur ou le remplaçant depuis Mes séances (présent, absent, excusé, sans motif écrit), corrigeable 7 jours puis par le secrétariat ; feuille limitée aux élèves inscrits ce jour-là ; absences répétées à partir d'un seuil sans valeur par défaut ; présences visibles des familles dans Mon espace (réglage actif par défaut) ; effacées à l'anonymisation. Migration `a0000012presences`.
 - **Feuille de route** : la gestion des cours, en six étapes (effectifs, cours individuels, liste d'attente, séances et agendas, agendas des salles Google Workspace, présences).
 
 ### Changé : les types de discipline se composent

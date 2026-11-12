@@ -13,12 +13,13 @@
 </div>
 {% if lessons %}
 <div class="overflow-auto"><table class="striped responsive">
-  <thead><tr><th>Séance</th><th>Salle</th><th>État</th>{% if edit %}<th></th>{% endif %}</tr></thead>
+  <thead><tr><th>Séance</th><th>Salle</th><th>État</th><th>Appel</th>{% if edit %}<th></th>{% endif %}</tr></thead>
   <tbody>
   {% for l in lessons %}
   <tr id="s{{ l.id }}"{% if l.day < today %} class="muted"{% endif %}>
     <td data-label="Séance">{{ when(l) }}</td>
     <td data-label="Salle"><small>{{ l.room.label if l.room else "—" }}</small></td>
+    <td data-label="Appel">{% if not l.cancelled and l.day <= today %}{% set done, expected = summary(l) %}<a href="{{ url_for('lessons.roll', lesson_id=l.id) }}">{{ done }} / {{ expected }}</a>{% else %}—{% endif %}</td>
     <td data-label="État">{{ state(l) }}{% if l.changed_by and manager %}<br><small class="muted">par {{ l.changed_by.full_name }}{% if l.changed_at %} le {{ l.changed_at | date_fr }}{% endif %}</small>{% endif %}</td>
     {% if edit %}
     <td data-label="" class="actions">

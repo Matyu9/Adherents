@@ -642,3 +642,31 @@ def test_room_calendars_on_the_real_schema(migrated):
         assert_fails(migrated, statement)
     downgrade(MIGRATIONS, revision="a0000010seances")
     assert run_sql(migrated, "SELECT to_regclass('room_calendar_job') IS NULL") == [[(True,)]]
+
+
+def test_attendance_on_the_real_schema(migrated):
+    upgrade(MIGRATIONS)
+    run_sql(
+        migrated,
+        *SEED,
+        *CATALOG,
+        "INSERT INTO membership (id, person_id, season_id, status, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'active', now(), now())",
+        "INSERT INTO enrollment (id, membership_id, course_id, status, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'active', now(), now())",
+        "INSERT INTO lesson (id, course_id, day, starts_at, ends_at, status, created_at) "
+        "VALUES (1, 1, '2026-10-07', '17:00', '18:00', 'planned', now())",
+        "INSERT INTO attendance (lesson_id, enrollment_id, status, recorded_by_id, recorded_at) "
+        "VALUES (1, 1, 'absent', 1, now())",
+    )
+    for statement in (
+        "INSERT INTO attendance (lesson_id, enrollment_id, status, recorded_at) VALUES (1, 1, 'present', now())",
+        "UPDATE attendance SET status = 'malade'",  # pas de motif
+    ):
+        assert_fails(migrated, statement)
+    run_sql(migrated, "DELETE FROM account WHERE id = 1")
+    assert run_sql(migrated, "SELECT recorded_by_id FROM attendance") == [[(None,)]]
+    run_sql(migrated, "DELETE FROM lesson WHERE id = 1")
+    assert run_sql(migrated, "SELECT count(*) FROM attendance") == [[(0,)]]
+    downgrade(MIGRATIONS, revision="a0000011salles")
+    assert run_sql(migrated, "SELECT to_regclass('attendance') IS NULL") == [[(True,)]]

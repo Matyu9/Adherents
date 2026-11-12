@@ -24,6 +24,7 @@
       <a href="{{ url_for('lessons.edit', lesson_id=l.id, retour='mes-seances') }}">Déplacer</a>
       {{ cancel_form(l, "mes-seances") }}
       {% endif %}
+      {% if may_record(l) %}{% set done, expected = summary(l) %}<a href="{{ url_for('lessons.roll', lesson_id=l.id) }}"{% if not done %} role="button" class="small"{% endif %}>{{ "Corriger l'appel" if done else "Faire l'appel" }}</a>{% endif %}
       {% if own %}<a href="{{ url_for('lessons.course', course_id=l.course_id) }}">Toutes les séances</a>{% endif %}
     </td>
   </tr>

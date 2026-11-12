@@ -10,7 +10,7 @@ from flask_login import current_user, login_required
 
 from ..extensions import db
 from ..models import Dossier, Enrollment, Membership
-from ..services import directory, inventory, registration
+from ..services import attendance, directory, inventory, registration
 
 bp = Blueprint("member", __name__, url_prefix="/mon-espace")
 
@@ -76,4 +76,5 @@ def index():
         loans=loans,
         inventory_on=inventory.enabled(),
         active=Membership.ACTIVE,
+        attendance_visible=attendance.family_visible(),
     )

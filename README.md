@@ -8,7 +8,7 @@ Elle est née dans une association de musique, mais rien n'y est propre à la mu
 
 Elle a deux missions :
 
-1. **Gérer les adhérents.** Elle fait d'abord le lien entre le logiciel de gestion de l'association et les familles, surtout au moment des inscriptions, puis elle le remplacera : catalogue des cours, cotisations et règlements.
+1. **Gérer les adhérents.** Annuaire, catalogue des cours, inscriptions, cotisations, puis règlements. Une association qui a déjà un logiciel de gestion peut commencer par s'en servir comme d'une interface avec les familles, puis le remplacer.
 2. **Connecter les personnes.** Elle est le fournisseur d'identité (OpenID Connect) de l'association. Chaque appli s'y branche sans code spécifique, à commencer par l'Inventaire, qui suit le matériel prêté.
 
 ```
@@ -64,21 +64,28 @@ Chaque écran est décrit dans le [guide d'utilisation](docs/guide-utilisateur.m
 
 Le projet est en développement : aucune installation ne sert encore de vrais adhérents.
 
-| Partie | État |
-|---|---|
-| Socle, comptes, double authentification | Fait |
-| Serveur OIDC et déconnexion des applis | Fait |
-| Branchement de l'Inventaire | Fait |
-| Annuaire, IBAN et mandats SEPA | Fait |
-| Catalogue des cours | Fait |
-| Campagnes d'inscription, conservation des données | Fait |
-| Espace adhérent | Fait |
-| Tarifs et cotisations | Fait |
-| Import depuis le logiciel de gestion | En attente de ses exports |
-| Règlements (prélèvements, paiement en ligne) | À faire |
-| Bascule : l'appli remplace le logiciel de gestion | À faire |
+### Ce qui est fait
 
-Les choix de conception et le détail de ce qui reste sont dans la [feuille de route](docs/plan.md). Les changements sont consignés dans le [journal des versions](CHANGELOG.md).
+| Partie | Contenu |
+|---|---|
+| Socle | Interface, droits par rôle, journal, notifications, emails, état de l'installation |
+| Comptes | Invitations, mot de passe oublié, groupes, sessions révocables, double authentification |
+| Serveur OIDC | Authorization Code avec PKCE, consentement, rotation des clés |
+| Déconnexion | Les applis sont prévenues quand une session se ferme (Back-Channel Logout) |
+| Branchement de l'Inventaire | Rattachement des comptes, parcours testé avec le vrai Inventaire |
+| Annuaire | Personnes, foyers, saisons et adhésions, IBAN chiffrés et mandats SEPA |
+| Catalogue | Types de discipline, disciplines, niveaux, lieux, cours de chaque saison |
+| Campagnes d'inscription | Dossiers des familles, revue et validation, relances, conservation des données |
+| Espace adhérent | Foyer, cours, dossiers, matériel prêté |
+| Tarifs et cotisations | Grille par saison, règles, calcul proposé puis validé, simulateur |
+
+### Ce qui reste
+
+1. **Import depuis un logiciel de gestion** : personnes, foyers, adhésions et cours, avec essai à blanc et rapport de contrôle ; comptes créés déjà rattachés à leur fiche et invitation en masse.
+2. **Règlements** : saisie manuelle par le secrétariat, prélèvements SEPA (échéancier, fichier pour la banque, rejets), paiement en ligne, soldes par foyer et relances des impayés.
+3. **Bascule** : pour une association qui remplace son logiciel de gestion, un dernier import, la comparaison des soldes, puis l'appli devient la référence.
+
+Les choix de conception, les pièges repérés et la liste à suivre avant une mise en production sont dans la [feuille de route](docs/plan.md). Les changements sont consignés dans le [journal des versions](CHANGELOG.md).
 
 ## Démarrer en développement
 

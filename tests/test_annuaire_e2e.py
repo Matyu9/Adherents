@@ -10,6 +10,8 @@ import pytest
 
 pytest.importorskip("playwright.sync_api")
 
+from playwright.sync_api import expect  # noqa: E402
+
 from app.extensions import db  # noqa: E402
 from app.models import Activity, BankAccount, Person  # noqa: E402
 
@@ -100,7 +102,8 @@ def test_a_household_from_start_to_iban(session):
 
     page.goto(f"/annuaire/personnes/{person_id}")
     page.click("text=+ Ajouter une adhésion")
-    assert not page.is_visible("#withdrawn_on")  # date d'abandon masquée tant que l'adhésion est active
+    page.wait_for_url("**/adhesions/nouvelle")
+    expect(page.locator("#withdrawn_on")).to_be_hidden()  # masquée tant que l'adhésion est active (attend le script)
     page.select_option("#status", "withdrawn")
     assert page.is_visible("#withdrawn_on")
     page.select_option("#status", "active")

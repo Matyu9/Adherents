@@ -1,57 +1,105 @@
 {% extends "base.html" %}
-{% block title %}Planning{% endblock %}
+{% block title %}{{ "Mon planning" if personal else "Planning" }}{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/planning-grid.css') }}">{% endblock %}
+{% macro keep(extra={}) -%}
+{%- set args = {"mode": mode, "date": day.isoformat()} -%}
+{%- if not personal %}{% set _ = args.update({"vue": view, "id": (target.person_id if view == "prof" else target.id) if target else none, "saison": season.id if season else none}) %}{% endif -%}
+{%- set _ = args.update(extra) -%}
+{{ url_for(endpoint, **args) }}
+{%- endmacro %}
+{% macro event_body(e, compact=false) %}
+<span class="pl-time">{{ e.starts_at.strftime("%H:%M") }}{% if not compact %}–{{ e.ends_at.strftime("%H:%M") }}{% endif %}</span>
+<strong class="pl-title">{{ e.title }}</strong>
+{% if not compact %}{% for line in e.details %}<span class="pl-detail">{{ line }}</span>{% endfor %}{% endif %}
+{% if e.cancelled %}<span class="pl-flag">Annulée{% if e.note and not compact %} : {{ e.note }}{% endif %}</span>{% elif e.edited and not compact %}<span class="pl-flag">Modifiée</span>{% endif %}
+{% endmacro %}
 {% block content %}
-<div class="page-head">
+<div class="page-head pl-head">
   <div>
-    <h1>Planning{% if target %} : {{ target.label if view == "salle" else (target.person.full_name if view == "prof" else target.name) }}{% endif %}</h1>
-    <p class="muted">{% if kind == "type" %}Semaine type {{ season.label if season }}, d'après les créneaux des cours.{% else %}Semaine du {{ monday | date_fr }}, avec les séances réelles.{% endif %}</p>
+    <p class="pl-kicker">{{ "Mon planning" if personal else "Planning de l'association" }}</p>
+    <h1>{{ title }}</h1>
+  </div>
+  <div class="pl-toolbar">
+    <nav class="pl-switch" aria-label="Affichage">
+      <a href="{{ keep({'mode': 'semaine'}) }}"{% if mode == "semaine" %} aria-current="page"{% endif %}>Semaine</a>
+      <a href="{{ keep({'mode': 'mois'}) }}"{% if mode == "mois" %} aria-current="page"{% endif %}>Mois</a>
+      {% if not personal %}<a href="{{ keep({'mode': 'type'}) }}"{% if mode == "type" %} aria-current="page"{% endif %}>Semaine type</a>{% endif %}
+    </nav>
+    {% if mode != "type" %}
+    <nav class="pl-nav" aria-label="Période">
+      <a href="{{ keep({'date': previous.isoformat()}) }}" aria-label="{{ 'Mois' if mode == 'mois' else 'Semaine' }} précédent{{ '' if mode == 'mois' else 'e' }}">‹</a>
+      <a href="{{ keep({'date': today.isoformat()}) }}">Aujourd'hui</a>
+      <a href="{{ keep({'date': following.isoformat()}) }}" aria-label="{{ 'Mois' if mode == 'mois' else 'Semaine' }} suivant{{ '' if mode == 'mois' else 'e' }}">›</a>
+    </nav>
+    {% endif %}
   </div>
 </div>
+
+{% if not personal %}
 <form method="get" class="filters">
-  <select name="type" aria-label="Semaine" data-autosubmit>
-    <option value="reelle" {{ "selected" if kind == "reelle" }}>Semaine réelle</option>
-    <option value="type" {{ "selected" if kind == "type" }}>Semaine type</option>
-  </select>
-  <select name="vue" aria-label="Vue" data-autosubmit>
+  <input type="hidden" name="mode" value="{{ mode }}">
+  <input type="hidden" name="date" value="{{ day.isoformat() }}">
+  {% if season %}<input type="hidden" name="saison" value="{{ season.id }}">{% endif %}
+  <select name="vue" aria-label="Regrouper par" data-autosubmit>
     <option value="salle" {{ "selected" if view == "salle" }}>Par salle</option>
     <option value="prof" {{ "selected" if view == "prof" }}>Par professeur</option>
     <option value="site" {{ "selected" if view == "site" }}>Par site</option>
   </select>
   <select name="id" aria-label="Choix" data-autosubmit>
-    <option value="">Tout</option>
+    <option value="">{{ {"salle": "Toutes les salles", "prof": "Tous les professeurs", "site": "Tous les sites"}[view] }}</option>
     {% if view == "salle" %}{% for r in rooms %}<option value="{{ r.id }}" {{ "selected" if target and target.id == r.id }}>{{ r.label }}</option>{% endfor %}
     {% elif view == "prof" %}{% for t in teachers %}<option value="{{ t.person_id }}" {{ "selected" if target and target.person_id == t.person_id }}>{{ t.person.sort_name }}</option>{% endfor %}
     {% else %}{% for s in sites %}<option value="{{ s.id }}" {{ "selected" if target and target.id == s.id }}>{{ s.name }}</option>{% endfor %}{% endif %}
   </select>
-  {% if kind == "reelle" %}<input type="date" name="semaine" value="{{ monday.isoformat() }}" aria-label="Semaine du" data-autosubmit>{% endif %}
-  {% if season %}<input type="hidden" name="saison" value="{{ season.id }}">{% endif %}
   <noscript><button type="submit">Voir</button></noscript>
 </form>
-{% if kind == "reelle" %}
-<p class="small"><a href="{{ url_for('lessons.planning', vue=view, id=target.id if view != 'prof' and target else (target.person_id if target else none), semaine=previous.isoformat()) }}">← Semaine précédente</a> · <a href="{{ url_for('lessons.planning', vue=view, id=target.id if view != 'prof' and target else (target.person_id if target else none), semaine=following.isoformat()) }}">Semaine suivante →</a></p>
-<div class="planning">
-  {% for day, items in rows.items() %}
-  <section class="card">
-    <h2>{{ day_label(day) | capitalize }}</h2>
-    {% for l in items %}
-    <p class="small{{ ' muted' if l.cancelled }}"><strong>{{ l.starts_at.strftime("%H:%M") }}-{{ l.ends_at.strftime("%H:%M") }}</strong> {{ l.course.title }}
-      {% if l.room and view != "salle" %}<br>{{ l.room.label }}{% endif %}{% if l.teacher and view != "prof" %}<br>{{ l.teacher.person.full_name }}{% endif %}
-      {% if l.cancelled %} <span class="badge health-warn">annulée</span>{% elif l.edited %} <span class="badge">modifiée</span>{% endif %}</p>
-    {% else %}<p class="small muted">—</p>{% endfor %}
-  </section>
-  {% endfor %}
+{% endif %}
+
+{% if mode == "mois" %}
+<div class="pl-scroll">
+  <div class="pl-month">
+    {% for name in ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"] %}<div class="pl-month-head">{{ name }}</div>{% endfor %}
+    {% for week in layout %}{% for cell in week %}
+    <div class="pl-cell{{ ' is-outside' if cell.outside }}{{ ' is-past' if cell.past }}{{ ' is-today' if cell.today }}">
+      <a class="pl-daynum" href="{{ keep({'mode': 'semaine', 'date': cell.date.isoformat()}) }}" aria-label="Semaine du {{ cell.date | date_fr }}">{{ cell.date.day }}</a>
+      {% for e in cell.events[:4] %}
+      {% if e.link %}<a href="{{ e.link }}"{% else %}<span{% endif %} class="pl-pill course-{{ e.color }}{{ ' is-past' if e.past }}{{ ' is-cancelled' if e.cancelled }}" title="{{ e.starts_at.strftime('%H:%M') }}–{{ e.ends_at.strftime('%H:%M') }} {{ e.title }}{% for line in e.details %} · {{ line }}{% endfor %}">
+        <span class="pl-dot"></span><span class="pl-time">{{ e.starts_at.strftime("%H:%M") }}</span> <span class="pl-title">{{ e.title }}</span>
+      {% if e.link %}</a>{% else %}</span>{% endif %}
+      {% endfor %}
+      {% if cell.events | length > 4 %}<a class="pl-more" href="{{ keep({'mode': 'semaine', 'date': cell.date.isoformat()}) }}">+ {{ cell.events | length - 4 }} autre{{ "s" if cell.events | length > 5 }}</a>{% endif %}
+    </div>
+    {% endfor %}{% endfor %}
+  </div>
 </div>
 {% else %}
-<div class="planning">
-  {% for d, items in days.items() %}
-  <section class="card">
-    <h2>{{ weekdays[d] }}</h2>
-    {% for c in items %}
-    <p class="small">{% if c.starts_at %}<strong>{{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}</strong> {% endif %}{{ c.title }}
-      {% if c.room and view != "salle" %}<br>{{ c.room.label }}{% endif %}{% if c.teacher and view != "prof" %}<br>{{ c.teacher.person.full_name }}{% endif %}</p>
-    {% else %}<p class="small muted">—</p>{% endfor %}
-  </section>
-  {% endfor %}
+<div class="pl-scroll">
+  <div class="pl-week pl-days-{{ layout.days | length }}">
+    <div class="pl-corner"></div>
+    {% for d in layout.days %}
+    <div class="pl-dayhead{{ ' is-today' if d.today }}{{ ' is-past' if d.past }}">
+      {% if d.date %}<span>{{ d.short }}</span> <strong>{{ d.date.day }}</strong>{% else %}<strong>{{ d.name }}</strong>{% endif %}
+    </div>
+    {% endfor %}
+    <div class="pl-gutter pl-rows-{{ layout.rows }}">
+      {% for row, label in layout.hours %}<span class="pl-r-{{ row }} pl-s-4">{{ label }}</span>{% endfor %}
+    </div>
+    {% for d in layout.days %}
+    <div class="pl-day pl-rows-{{ layout.rows }} pl-lanes-{{ d.lanes }}{{ ' is-today' if d.today }}{{ ' is-past' if d.past }}">
+      {% if layout.now_row and d.today %}<div class="pl-now pl-r-{{ layout.now_row }} pl-s-1" aria-hidden="true"></div>{% endif %}
+      {% for e in d.events %}
+      {% if e.link %}<a href="{{ e.link }}"{% else %}<div{% endif %} class="pl-event {{ e.classes }}">{{ event_body(e, e.span <= 2) }}{% if e.link %}</a>{% else %}</div>{% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
 </div>
 {% endif %}
+
+{% if legend %}
+<ul class="pl-legend" aria-label="Légende">
+  {% for title, color in legend %}<li class="course-{{ color }}"><span class="pl-dot"></span>{{ title }}</li>{% endfor %}
+</ul>
+{% elif not legend and not personal %}<p class="muted small">Aucune séance sur cette période.</p>
+{% elif personal and not legend %}<p class="muted small">Aucune séance sur cette période.{% if not current_user.person %} Votre compte n'est relié à aucune fiche de l'annuaire.{% endif %}</p>{% endif %}
 {% endblock %}

@@ -784,6 +784,19 @@ class Course(TimestampMixin, db.Model):
     """
 
     WEEKDAYS = ("Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche")
+    # Couleurs des plannings : des noms, rendus par des classes CSS (thèmes clair et sombre), jamais un style en ligne.
+    COLORS = {
+        "rouge": "Rouge",
+        "orange": "Orange",
+        "jaune": "Jaune",
+        "vert": "Vert",
+        "sarcelle": "Sarcelle",
+        "bleu": "Bleu",
+        "indigo": "Indigo",
+        "violet": "Violet",
+        "rose": "Rose",
+        "brun": "Brun",
+    }
     __table_args__ = (
         db.CheckConstraint("weekday BETWEEN 0 AND 6", name="ck_course_weekday"),
         db.CheckConstraint("(starts_at IS NULL) = (ends_at IS NULL)", name="ck_course_times_together"),
@@ -804,6 +817,7 @@ class Course(TimestampMixin, db.Model):
     starts_at = db.Column(db.Time)
     ends_at = db.Column(db.Time)
     capacity = db.Column(db.Integer)  # effectif maximum ; vide : pas de limite
+    color = db.Column(db.String(12))  # une clé de COLORS ; vide : choisie d'après la discipline
     # Cours individuel : chaque élève a son heure de passage et sa durée dans le créneau. Voir docs/cours.md.
     individual = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     # Fermé aux inscriptions à la main. Les inscriptions (phase 6) le rendront complet aussi une fois l'effectif atteint.
@@ -822,6 +836,15 @@ class Course(TimestampMixin, db.Model):
     @property
     def weekday_name(self):
         return self.WEEKDAYS[self.weekday] if self.weekday is not None else None
+
+    @property
+    def color_key(self):
+        """La couleur choisie, sinon une couleur stable tirée de la discipline (ses cours se ressemblent)."""
+        if self.color in self.COLORS:
+            return self.color
+        keys = list(self.COLORS)
+        discipline_id = self.discipline_id or (self.discipline.id if self.discipline is not None else 0)
+        return keys[(discipline_id or 0) % len(keys)]
 
     @property
     def title(self):

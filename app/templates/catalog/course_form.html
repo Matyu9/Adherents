@@ -17,6 +17,7 @@
     <div class="grid"><div>{{ field(form.weekday) }}</div><div>{{ field(form.starts_at) }}</div><div>{{ field(form.ends_at) }}</div></div>
     <div class="grid"><div>{{ field(form.room_id) }}</div><div>{{ field(form.capacity) }}<small class="muted">{{ form.capacity.description }}</small></div></div>
     <label class="form-check">{{ form.individual() }} {{ form.individual.label.text }}</label>
+    {{ field(form.color) }}
     <label class="form-check">{{ form.marked_full() }} {{ form.marked_full.label.text }}</label>
     {{ field(form.notes, rows=3) }}
     <button type="submit">Enregistrer</button>

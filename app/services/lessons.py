@@ -596,6 +596,29 @@ def typical_week(season, room=None, teacher=None, site=None):
     return days
 
 
+def personal_lessons(account, start, end):
+    """[(séance, début, fin, pour qui)] d'un compte entre deux dates : ses séances de professeur (pour qui :
+    « remplacement » s'il remplace, sinon None), puis celles des élèves qu'il suit (pour qui : l'inscription), avec
+    l'heure de passage d'un cours individuel."""
+    from .registration import guarded_households
+
+    found = []
+    person = account.person
+    if person is not None and person.teacher is not None:
+        for lesson in upcoming_for(person.teacher, start, end):
+            who = "remplacement" if lesson.substitute == person.teacher else None
+            found.append((lesson, lesson.starts_at, lesson.ends_at, who))
+    people = {person.id} if person is not None else set()
+    for household in guarded_households(account):
+        people |= {link.person_id for link in household.dependents}
+    for enrollment in attending_enrollments(people):
+        for lesson in enrollment.course.lessons:
+            if start <= lesson.day <= end and enrollment.attends_on(lesson.day):
+                begin, finish = student_times(enrollment, lesson)
+                found.append((lesson, begin, finish, enrollment))
+    return sorted(found, key=lambda r: (r[0].day, r[1], r[0].id))
+
+
 def attending_enrollments(person_ids):
     """Inscriptions actives ou passées de ces personnes (pour leurs agendas)."""
     from ..models import Membership

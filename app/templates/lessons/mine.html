@@ -7,7 +7,7 @@
     <h1>Mes séances</h1>
     <p class="muted">Vos cours et vos remplacements, de la semaine passée aux huit prochaines.{% if limit %} Vous pouvez modifier une séance jusqu'à {{ (limit.total_seconds() // 3600) | int }} heure(s) avant son début.{% endif %}</p>
   </div>
-  <div class="actions"><a href="{{ url_for('lessons.agenda_page') }}" role="button" class="secondary">Mon agenda</a></div>
+  <div class="actions"><a href="{{ url_for('lessons.my_planning') }}" role="button" class="secondary">Mon planning</a><a href="{{ url_for('lessons.agenda_page') }}" role="button" class="secondary">Mon agenda</a></div>
 </div>
 {% macro rows(items, editable) %}
 <div class="overflow-auto"><table class="striped responsive">

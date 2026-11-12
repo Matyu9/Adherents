@@ -331,6 +331,7 @@ def copy_season(source, target):
                 ends_at=old.ends_at,
                 capacity=old.capacity,
                 individual=old.individual,
+                color=old.color,
                 marked_full=False,
                 notes=old.notes,
             )

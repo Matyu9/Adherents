@@ -66,9 +66,21 @@ def test_calendar_lessons_and_planning(session, scheme):
     page.wait_for_url(f"**/seances/cours/{course_id}")
     assert "Séance déplacée" in page.content() and "modifiée" in page.content()
 
-    page.goto(f"/seances/planning?type=type&saison={season_id}")
+    page.goto(f"/seances/planning?mode=type&saison={season_id}")
     assert "Danse e2e" in page.content()
-    shot(page, f"seances-planning-{scheme}")
+    shot(page, f"seances-planning-type-{scheme}")
+    page.goto("/seances/planning")
+    assert page.locator(".pl-event").count() >= 1 and page.locator(".pl-dayhead.is-today").count() == 1
+    shot(page, f"seances-planning-semaine-{scheme}")
+    page.goto("/seances/planning?mode=mois")
+    assert page.locator(".pl-pill").count() >= 4
+    shot(page, f"seances-planning-mois-{scheme}")
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto("/seances/planning")
+    # Sur un téléphone, la grille défile dans son cadre : la page elle-même ne défile pas de côté.
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    shot(page, f"seances-planning-telephone-{scheme}")
+    page.set_viewport_size({"width": 1280, "height": 720})
     page.goto("/seances/agenda")
     page.click("text=Créer mon adresse d'agenda") if page.locator(
         "text=Créer mon adresse d'agenda"

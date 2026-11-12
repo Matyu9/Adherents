@@ -632,15 +632,17 @@ def test_secretariat_revient_et_nomme_un_remplacant(manager_client, generated):
 
 
 def test_plannings(manager_client, generated):
-    html = page(manager_client.get("/seances/planning?semaine=2026-10-14&vue=salle&id=" + str(generated["b"].id)))
-    assert "Mercredi 14 octobre" in html and "Solfège" in html and "Flûte" not in html
-    html = page(manager_client.get(f"/seances/planning?vue=prof&id={generated['paul'].person_id}&semaine=2026-10-14"))
+    html = page(manager_client.get("/seances/planning?date=2026-10-14&vue=salle&id=" + str(generated["b"].id)))
+    assert "Semaine du 12 au 18 octobre 2026" in html and "Solfège" in html and "Flûte" not in html
+    html = page(manager_client.get(f"/seances/planning?vue=prof&id={generated['paul'].person_id}&date=2026-10-14"))
     assert "Flûte" in html and "Piano" not in html
-    html = page(manager_client.get(f"/seances/planning?vue=site&id={generated['a'].site_id}&semaine=2026-10-14"))
+    html = page(manager_client.get(f"/seances/planning?vue=site&id={generated['a'].site_id}&date=2026-10-14"))
     assert "Flûte" in html and "Piano" in html
-    html = page(manager_client.get(f"/seances/planning?type=type&saison={generated['season'].id}"))
-    assert "Semaine type" in html and "Flûte" in html
-    assert page(manager_client.get("/seances/planning?semaine=pas-une-date"))
+    html = page(manager_client.get(f"/seances/planning?mode=type&saison={generated['season'].id}"))
+    assert "<h1>Semaine type</h1>" in html and "Flûte" in html
+    html = page(manager_client.get("/seances/planning?mode=mois&date=2026-10-14"))
+    assert "<h1>Octobre 2026</h1>" in html and html.count("pl-pill") == 12
+    assert page(manager_client.get("/seances/planning?date=pas-une-date&mode=inconnu"))
 
 
 def test_ecran_agenda_et_flux(client, generated):

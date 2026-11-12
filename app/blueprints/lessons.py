@@ -12,7 +12,7 @@ from wtforms.validators import DataRequired, Length, NumberRange, Optional
 from ..extensions import db
 from ..models import Course, Lesson, Room, Season, SeasonBreak, Site, Teacher
 from ..permissions import can, require
-from ..services import agenda, catalog, directory, options
+from ..services import agenda, catalog, directory, options, planning
 from ..services import attendance as attendance_service
 from ..services import lessons as service
 from ..services.lessons import LessonError
@@ -444,52 +444,152 @@ def mine():
 # ---------------------------------------------------------------------------
 
 
-@bp.route("/planning")
+def _reference_day():
+    try:
+        return date.fromisoformat(request.args.get("date", ""))
+    except ValueError:
+        return date.today()
+
+
+def _mode():
+    mode = request.args.get("mode")
+    return mode if mode in ("semaine", "mois", "type") else "semaine"
+
+
+def _range(mode, day):
+    if mode == "mois":
+        return planning.month_bounds(day.year, day.month)
+    return service.week_of(day)
+
+
+def _render_planning(events, mode, day, personal, **context):
+    """Commun au planning de l'association et à « Mon planning »."""
+    now = datetime.now()
+    monday, _ = service.week_of(day)
+    if mode == "mois":
+        layout = planning.month_layout(day.year, day.month, events, now)
+        title = planning.month_title(day.year, day.month)
+        year, month = planning.shift_month(day.year, day.month, -1)
+        previous = date(year, month, 1)
+        year, month = planning.shift_month(day.year, day.month, 1)
+        following = date(year, month, 1)
+    else:
+        layout = planning.week_layout(events, monday, now, typical=mode == "type")
+        title = "Semaine type" if mode == "type" else planning.week_title(monday)
+        previous, following = monday - timedelta(days=7), monday + timedelta(days=7)
+    return render_template(
+        "lessons/planning.html",
+        mode=mode,
+        layout=layout,
+        title=title,
+        day=day,
+        previous=previous,
+        following=following,
+        today=date.today(),
+        personal=personal,
+        legend=planning.legend(events),
+        endpoint="lessons.my_planning" if personal else "lessons.planning",
+        **context,
+    )
+
+
+def _lesson_link(lesson):
+    return (
+        url_for(".course", course_id=lesson.course_id) + f"#s{lesson.id}"
+        if service.can_view(current_user, lesson)
+        else None
+    )
+
+
+@bp.route("/planning", endpoint="planning")
 @require("catalog.view")
-def planning():
+def planning_view():
     season, seasons = _season()
     view = request.args.get("vue") if request.args.get("vue") in ("salle", "prof", "site") else "salle"
     target_id = request.args.get("id", type=int)
-    target = None
-    if target_id:
-        target = db.session.get({"salle": Room, "prof": Teacher, "site": Site}[view], target_id)
-    try:
-        week = date.fromisoformat(request.args.get("semaine", ""))
-    except ValueError:
-        week = date.today()
-    monday, sunday = service.week_of(week)
-    kind = "type" if request.args.get("type") == "type" else "reelle"
+    target = db.session.get({"salle": Room, "prof": Teacher, "site": Site}[view], target_id) if target_id else None
     filters = {
         "room": target if view == "salle" else None,
         "teacher": target if view == "prof" else None,
         "site": target if view == "site" else None,
     }
-    if kind == "type":
-        days = service.typical_week(season, **filters) if season else {d: [] for d in range(7)}
-        rows = None
+    mode, day = _mode(), _reference_day()
+    now = datetime.now()
+
+    def details(room, teacher, substitute=None):
+        lines = []
+        if room is not None and view != "salle":
+            lines.append(room.label)
+        if substitute is not None:
+            lines.append(f"Remplacé par {substitute.person.full_name}")
+        elif teacher is not None and view != "prof":
+            lines.append(teacher.person.full_name)
+        return lines
+
+    if mode == "type":
+        days = service.typical_week(season, **filters) if season else {}
+        roster = can(current_user, "directory.view")
+        events = [
+            planning.from_course(
+                course,
+                link=url_for("catalog.course", course_id=course.id) if roster else None,
+                details=details(course.room, course.teacher),
+            )
+            for courses in days.values()
+            for course in courses
+            if course.starts_at is not None
+        ]
     else:
-        days = None
-        rows = {monday + timedelta(days=d): [] for d in range(7)}
-        for lesson in service.week_lessons(monday, sunday, **filters):
-            rows[lesson.day].append(lesson)
-    return render_template(
-        "lessons/planning.html",
+        start, end = _range(mode, day)
+        events = [
+            planning.from_lesson(
+                lesson,
+                now,
+                link=_lesson_link(lesson),
+                details=details(lesson.room, lesson.course.teacher, lesson.substitute),
+            )
+            for lesson in service.week_lessons(start, end, **filters)
+        ]
+    return _render_planning(
+        events,
+        mode,
+        day,
+        personal=False,
         season=season,
         seasons=seasons,
         view=view,
         target=target,
-        kind=kind,
-        days=days,
-        rows=rows,
-        monday=monday,
-        previous=monday - timedelta(days=7),
-        following=monday + timedelta(days=7),
         rooms=catalog.rooms(),
         sites=catalog.sites(),
         teachers=catalog.teachers_for(season) if season else [],
-        weekdays=Course.WEEKDAYS,
-        day_label=service.day_label,
     )
+
+
+@bp.route("/mon-planning")
+@login_required
+def my_planning():
+    """Les séances du compte : celles qu'il donne ou remplace, et celles des élèves dont il est responsable."""
+    mode = _mode() if _mode() != "type" else "semaine"
+    day = _reference_day()
+    start, end = _range(mode, day)
+    now = datetime.now()
+    events = []
+    for lesson, begin, finish, who in service.personal_lessons(current_user, start, end):
+        if who is None or who == "remplacement":
+            lines = [lesson.room.label if lesson.room else None, "Remplacement" if who else None]
+            title = lesson.course.title
+        else:
+            lines = [
+                lesson.room.label if lesson.room else None,
+                lesson.teacher.person.full_name if lesson.teacher else None,
+            ]
+            title = f"{who.membership.person.first_name} · {lesson.course.title}"
+        events.append(
+            planning.from_lesson(
+                lesson, now, link=_lesson_link(lesson), details=lines, starts_at=begin, ends_at=finish, title=title
+            )
+        )
+    return _render_planning(events, mode, day, personal=True)
 
 
 # ---------------------------------------------------------------------------

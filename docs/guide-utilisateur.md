@@ -119,6 +119,8 @@ Pour la saison en cours, ou une autre choisie en haut à droite, la page liste *
 
 Vous ne voyez que vos élèves, et rien d'autre de l'annuaire. Un professeur qui est aussi parent retrouve son foyer dans **Mon espace**.
 
+**Menu → Mon planning** : vos séances en semaine ou en mois, comme un agenda.
+
 **Menu → Mes séances** : vos séances d'aujourd'hui, des huit semaines à venir et de la semaine passée, y compris celles où vous remplacez un collègue.
 
 - **Déplacer** : choisissez la date et l'horaire, puis **Voir les salles libres à ce créneau**, et la salle. Ce qui gêne (salle prise, élève qui a un autre cours…) est signalé.
@@ -221,7 +223,7 @@ Un cours complet accepte quand même l'élève, avec un avertissement.
 
 **Présences** : le nombre d'appels faits s'affiche dans les séances d'un cours ; le secrétariat corrige un appel à tout moment. **Menu → Absences** liste les élèves qui atteignent le seuil fixé dans le calendrier (aucun tant qu'il n'est pas fixé). Le calendrier règle aussi si les familles voient les présences de leurs enfants (oui par défaut).
 
-**Menu → Planning** : l'emploi du temps par salle, par professeur ou par site, en semaine type ou semaine par semaine.
+**Menu → Planning** : l'emploi du temps de l'association, en **Semaine** (grille horaire), **Mois** ou **Semaine type**, pour tout ou pour une salle, un professeur ou un site. Les flèches changent de semaine ou de mois, **Aujourd'hui** y revient. Les séances passées sont grisées, les annulées barrées. La couleur d'un cours se choisit dans sa fiche ; sinon, elle dépend de la discipline.
 
 ### Préparer une nouvelle saison
 

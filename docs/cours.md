@@ -147,7 +147,17 @@ Le changement s'applique tout de suite :
 
 ## Plannings
 
-**Enseignement → Planning** (droit `catalog.view`) : par salle, par professeur ou par site, la **semaine type** (créneaux des cours de la saison) ou une **semaine réelle** (séances, avec annulations et modifications), de semaine en semaine.
+**Enseignement → Planning** (droit `catalog.view`) : toutes les séances, ou celles d'une salle, d'un professeur ou d'un site, en trois affichages :
+
+- **Semaine** : une grille horaire, un quart d'heure par ligne, de la première à la dernière séance (9 h - 18 h au moins), le dimanche seulement s'il a des séances. Deux séances qui se chevauchent le même jour se partagent la largeur. Le jour courant est marqué, avec un trait à l'heure qu'il est.
+- **Mois** : un calendrier du lundi au dimanche, quatre séances par jour au plus (« + 2 autres » mène à la semaine).
+- **Semaine type** : les créneaux des cours de la saison, sans dates.
+
+Une séance **passée** reste affichée, grisée ; une séance **annulée** est barrée et hachurée, avec son motif ; une séance modifiée est marquée. Chaque séance mène à la liste des séances de son cours (pour qui peut la voir).
+
+**Couleur d'un cours** (`course.color`, migration `a0000013couleurs`) : une couleur choisie dans le formulaire du cours parmi dix, sinon tirée de la discipline (ses cours se ressemblent). Elle est recopiée avec le catalogue. Les couleurs sont des classes CSS définies pour les thèmes clair et sombre ; la grille est placée par les classes de `static/css/planning-grid.css` (fichier généré), car la politique de sécurité du contenu interdit les styles en ligne.
+
+**Mon planning** (menu, pour toute personne reliée à sa fiche) : les mêmes vues semaine et mois, avec les séances qu'on donne ou remplace et celles des élèves dont on est responsable, avec leur prénom et leur heure de passage. Le prénom n'apparaît que dans l'appli, jamais dans l'agenda à s'abonner.
 
 ## Agenda à s'abonner
 

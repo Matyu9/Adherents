@@ -57,6 +57,7 @@ COURSE_FIELDS = (
     "room_id",
     "capacity",
     "individual",
+    "color",
     "marked_full",
     "notes",
 )
@@ -112,12 +113,19 @@ class CourseForm(FlaskForm):
         description="Vide : pas de limite.",
     )
     individual = BooleanField("Cours individuel : chaque élève a son heure de passage dans le créneau")
+    color = SelectField(
+        "Couleur dans les plannings",
+        choices=[("", "Automatique, d'après la discipline"), *Course.COLORS.items()],
+        default="",
+    )
     marked_full = BooleanField("Complet : ne plus proposer ce cours aux inscriptions")
     notes = TextAreaField("Notes", validators=[Optional(), Length(max=5000)])
 
     def __init__(self, *args, season, course=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._season = season
+        if self.color.data is None:  # cours sans couleur : WTForms garde None, qui n'est pas un choix
+            self.color.data = ""
         keep_discipline = course.discipline if course else None
         self.discipline_id.choices = [("", "—")] + [
             (str(d.id), d.name + (" (archivée)" if d.archived else ""))
@@ -167,6 +175,7 @@ class CourseForm(FlaskForm):
             "room_id": self.room_id.data,
             "capacity": self.capacity.data,
             "individual": self.individual.data,
+            "color": self.color.data or None,
             "marked_full": self.marked_full.data,
             "notes": _blank(self.notes.data),
         }

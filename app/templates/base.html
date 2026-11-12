@@ -14,6 +14,7 @@
   <title>{% block title %}Espace adhérents{% endblock %} · {{ asso_name }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/pico.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% block styles %}{% endblock %}
   {#- Le thème sombre tient dans un seul fichier : chargé selon l'appareil, toujours, ou jamais selon le choix de chacun. -#}
   {% if theme != "light" %}<link rel="stylesheet" href="{{ url_for('static', filename='css/dark.css') }}"{% if theme != "dark" %} media="(prefers-color-scheme: dark)"{% endif %}>{% endif %}
   <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}" defer></script>
@@ -34,7 +35,7 @@
       <p class="nav-title">Au quotidien</p>
       {{ navlink("dashboard.index", "Tableau de bord", "home") }}
       {{ navlink("notifications.index", "Notifications", "bell", ["notifications"]) }}
-      {% if current_user.person %}{{ navlink("member.index", "Mon espace", "home") }}{% endif %}
+      {% if current_user.person %}{{ navlink("member.index", "Mon espace", "home") }}{{ navlink("lessons.my_planning", "Mon planning", "calendar") }}{% endif %}
       {{ navlink("enrollment.index", "Inscriptions", "clipboard") }}
       {% if current_user.person and current_user.person.teacher %}{{ navlink("enrollment.my_students", "Mes élèves", "music") }}{{ navlink("lessons.mine", "Mes séances", "calendar") }}{% endif %}
       {% if can(current_user, "directory.view") or can(current_user, "teacher.manage") or can(current_user, "directory.anonymize") %}

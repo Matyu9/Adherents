@@ -261,7 +261,10 @@ ACCESS = {
             "save_attendance_settings",
         )
     },
-    **{f"lessons.{name}": LOGGED_IN for name in ("course", "edit", "add", "cancel", "mine", "agenda_page", "roll")},
+    **{
+        f"lessons.{name}": LOGGED_IN
+        for name in ("course", "edit", "add", "cancel", "mine", "agenda_page", "roll", "my_planning")
+    },
     "lessons.planning": CAT_VIEW,
     "lessons.feed": PUBLIC,
     "directory.merge_person": DIR_MERGE,
@@ -693,7 +696,7 @@ def test_crawl_every_link(app, rich, who):
             problems.append(f"{path} : une donnée n'a pas été échappée")
         for link in LINK.findall(html):
             target = urlsplit(urljoin(path, link.replace("&amp;", "&")))
-            if "semaine=" in target.query:  # le planning va de semaine en semaine sans fin
+            if "date=" in target.query and "/seances/" in target.path:  # le planning va de semaine en semaine sans fin
                 continue
             if not target.netloc and target.scheme not in ("data", "mailto", "tel"):  # data : QR code intégré
                 queue.append(target.path + (f"?{target.query}" if target.query else ""))

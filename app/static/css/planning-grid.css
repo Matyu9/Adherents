@@ -1,0 +1,303 @@
+/* Grille des plannings : placement des séances par classes (la CSP interdit les styles en ligne).
+   Fichier généré : une ligne par quart d'heure, 24 h au plus. Voir app/services/planning.py. */
+.pl-rows-1 { grid-template-rows: repeat(1, var(--pl-slot)); }
+.pl-rows-2 { grid-template-rows: repeat(2, var(--pl-slot)); }
+.pl-rows-3 { grid-template-rows: repeat(3, var(--pl-slot)); }
+.pl-rows-4 { grid-template-rows: repeat(4, var(--pl-slot)); }
+.pl-rows-5 { grid-template-rows: repeat(5, var(--pl-slot)); }
+.pl-rows-6 { grid-template-rows: repeat(6, var(--pl-slot)); }
+.pl-rows-7 { grid-template-rows: repeat(7, var(--pl-slot)); }
+.pl-rows-8 { grid-template-rows: repeat(8, var(--pl-slot)); }
+.pl-rows-9 { grid-template-rows: repeat(9, var(--pl-slot)); }
+.pl-rows-10 { grid-template-rows: repeat(10, var(--pl-slot)); }
+.pl-rows-11 { grid-template-rows: repeat(11, var(--pl-slot)); }
+.pl-rows-12 { grid-template-rows: repeat(12, var(--pl-slot)); }
+.pl-rows-13 { grid-template-rows: repeat(13, var(--pl-slot)); }
+.pl-rows-14 { grid-template-rows: repeat(14, var(--pl-slot)); }
+.pl-rows-15 { grid-template-rows: repeat(15, var(--pl-slot)); }
+.pl-rows-16 { grid-template-rows: repeat(16, var(--pl-slot)); }
+.pl-rows-17 { grid-template-rows: repeat(17, var(--pl-slot)); }
+.pl-rows-18 { grid-template-rows: repeat(18, var(--pl-slot)); }
+.pl-rows-19 { grid-template-rows: repeat(19, var(--pl-slot)); }
+.pl-rows-20 { grid-template-rows: repeat(20, var(--pl-slot)); }
+.pl-rows-21 { grid-template-rows: repeat(21, var(--pl-slot)); }
+.pl-rows-22 { grid-template-rows: repeat(22, var(--pl-slot)); }
+.pl-rows-23 { grid-template-rows: repeat(23, var(--pl-slot)); }
+.pl-rows-24 { grid-template-rows: repeat(24, var(--pl-slot)); }
+.pl-rows-25 { grid-template-rows: repeat(25, var(--pl-slot)); }
+.pl-rows-26 { grid-template-rows: repeat(26, var(--pl-slot)); }
+.pl-rows-27 { grid-template-rows: repeat(27, var(--pl-slot)); }
+.pl-rows-28 { grid-template-rows: repeat(28, var(--pl-slot)); }
+.pl-rows-29 { grid-template-rows: repeat(29, var(--pl-slot)); }
+.pl-rows-30 { grid-template-rows: repeat(30, var(--pl-slot)); }
+.pl-rows-31 { grid-template-rows: repeat(31, var(--pl-slot)); }
+.pl-rows-32 { grid-template-rows: repeat(32, var(--pl-slot)); }
+.pl-rows-33 { grid-template-rows: repeat(33, var(--pl-slot)); }
+.pl-rows-34 { grid-template-rows: repeat(34, var(--pl-slot)); }
+.pl-rows-35 { grid-template-rows: repeat(35, var(--pl-slot)); }
+.pl-rows-36 { grid-template-rows: repeat(36, var(--pl-slot)); }
+.pl-rows-37 { grid-template-rows: repeat(37, var(--pl-slot)); }
+.pl-rows-38 { grid-template-rows: repeat(38, var(--pl-slot)); }
+.pl-rows-39 { grid-template-rows: repeat(39, var(--pl-slot)); }
+.pl-rows-40 { grid-template-rows: repeat(40, var(--pl-slot)); }
+.pl-rows-41 { grid-template-rows: repeat(41, var(--pl-slot)); }
+.pl-rows-42 { grid-template-rows: repeat(42, var(--pl-slot)); }
+.pl-rows-43 { grid-template-rows: repeat(43, var(--pl-slot)); }
+.pl-rows-44 { grid-template-rows: repeat(44, var(--pl-slot)); }
+.pl-rows-45 { grid-template-rows: repeat(45, var(--pl-slot)); }
+.pl-rows-46 { grid-template-rows: repeat(46, var(--pl-slot)); }
+.pl-rows-47 { grid-template-rows: repeat(47, var(--pl-slot)); }
+.pl-rows-48 { grid-template-rows: repeat(48, var(--pl-slot)); }
+.pl-rows-49 { grid-template-rows: repeat(49, var(--pl-slot)); }
+.pl-rows-50 { grid-template-rows: repeat(50, var(--pl-slot)); }
+.pl-rows-51 { grid-template-rows: repeat(51, var(--pl-slot)); }
+.pl-rows-52 { grid-template-rows: repeat(52, var(--pl-slot)); }
+.pl-rows-53 { grid-template-rows: repeat(53, var(--pl-slot)); }
+.pl-rows-54 { grid-template-rows: repeat(54, var(--pl-slot)); }
+.pl-rows-55 { grid-template-rows: repeat(55, var(--pl-slot)); }
+.pl-rows-56 { grid-template-rows: repeat(56, var(--pl-slot)); }
+.pl-rows-57 { grid-template-rows: repeat(57, var(--pl-slot)); }
+.pl-rows-58 { grid-template-rows: repeat(58, var(--pl-slot)); }
+.pl-rows-59 { grid-template-rows: repeat(59, var(--pl-slot)); }
+.pl-rows-60 { grid-template-rows: repeat(60, var(--pl-slot)); }
+.pl-rows-61 { grid-template-rows: repeat(61, var(--pl-slot)); }
+.pl-rows-62 { grid-template-rows: repeat(62, var(--pl-slot)); }
+.pl-rows-63 { grid-template-rows: repeat(63, var(--pl-slot)); }
+.pl-rows-64 { grid-template-rows: repeat(64, var(--pl-slot)); }
+.pl-rows-65 { grid-template-rows: repeat(65, var(--pl-slot)); }
+.pl-rows-66 { grid-template-rows: repeat(66, var(--pl-slot)); }
+.pl-rows-67 { grid-template-rows: repeat(67, var(--pl-slot)); }
+.pl-rows-68 { grid-template-rows: repeat(68, var(--pl-slot)); }
+.pl-rows-69 { grid-template-rows: repeat(69, var(--pl-slot)); }
+.pl-rows-70 { grid-template-rows: repeat(70, var(--pl-slot)); }
+.pl-rows-71 { grid-template-rows: repeat(71, var(--pl-slot)); }
+.pl-rows-72 { grid-template-rows: repeat(72, var(--pl-slot)); }
+.pl-rows-73 { grid-template-rows: repeat(73, var(--pl-slot)); }
+.pl-rows-74 { grid-template-rows: repeat(74, var(--pl-slot)); }
+.pl-rows-75 { grid-template-rows: repeat(75, var(--pl-slot)); }
+.pl-rows-76 { grid-template-rows: repeat(76, var(--pl-slot)); }
+.pl-rows-77 { grid-template-rows: repeat(77, var(--pl-slot)); }
+.pl-rows-78 { grid-template-rows: repeat(78, var(--pl-slot)); }
+.pl-rows-79 { grid-template-rows: repeat(79, var(--pl-slot)); }
+.pl-rows-80 { grid-template-rows: repeat(80, var(--pl-slot)); }
+.pl-rows-81 { grid-template-rows: repeat(81, var(--pl-slot)); }
+.pl-rows-82 { grid-template-rows: repeat(82, var(--pl-slot)); }
+.pl-rows-83 { grid-template-rows: repeat(83, var(--pl-slot)); }
+.pl-rows-84 { grid-template-rows: repeat(84, var(--pl-slot)); }
+.pl-rows-85 { grid-template-rows: repeat(85, var(--pl-slot)); }
+.pl-rows-86 { grid-template-rows: repeat(86, var(--pl-slot)); }
+.pl-rows-87 { grid-template-rows: repeat(87, var(--pl-slot)); }
+.pl-rows-88 { grid-template-rows: repeat(88, var(--pl-slot)); }
+.pl-rows-89 { grid-template-rows: repeat(89, var(--pl-slot)); }
+.pl-rows-90 { grid-template-rows: repeat(90, var(--pl-slot)); }
+.pl-rows-91 { grid-template-rows: repeat(91, var(--pl-slot)); }
+.pl-rows-92 { grid-template-rows: repeat(92, var(--pl-slot)); }
+.pl-rows-93 { grid-template-rows: repeat(93, var(--pl-slot)); }
+.pl-rows-94 { grid-template-rows: repeat(94, var(--pl-slot)); }
+.pl-rows-95 { grid-template-rows: repeat(95, var(--pl-slot)); }
+.pl-rows-96 { grid-template-rows: repeat(96, var(--pl-slot)); }
+.pl-r-1 { grid-row-start: 1; }
+.pl-r-2 { grid-row-start: 2; }
+.pl-r-3 { grid-row-start: 3; }
+.pl-r-4 { grid-row-start: 4; }
+.pl-r-5 { grid-row-start: 5; }
+.pl-r-6 { grid-row-start: 6; }
+.pl-r-7 { grid-row-start: 7; }
+.pl-r-8 { grid-row-start: 8; }
+.pl-r-9 { grid-row-start: 9; }
+.pl-r-10 { grid-row-start: 10; }
+.pl-r-11 { grid-row-start: 11; }
+.pl-r-12 { grid-row-start: 12; }
+.pl-r-13 { grid-row-start: 13; }
+.pl-r-14 { grid-row-start: 14; }
+.pl-r-15 { grid-row-start: 15; }
+.pl-r-16 { grid-row-start: 16; }
+.pl-r-17 { grid-row-start: 17; }
+.pl-r-18 { grid-row-start: 18; }
+.pl-r-19 { grid-row-start: 19; }
+.pl-r-20 { grid-row-start: 20; }
+.pl-r-21 { grid-row-start: 21; }
+.pl-r-22 { grid-row-start: 22; }
+.pl-r-23 { grid-row-start: 23; }
+.pl-r-24 { grid-row-start: 24; }
+.pl-r-25 { grid-row-start: 25; }
+.pl-r-26 { grid-row-start: 26; }
+.pl-r-27 { grid-row-start: 27; }
+.pl-r-28 { grid-row-start: 28; }
+.pl-r-29 { grid-row-start: 29; }
+.pl-r-30 { grid-row-start: 30; }
+.pl-r-31 { grid-row-start: 31; }
+.pl-r-32 { grid-row-start: 32; }
+.pl-r-33 { grid-row-start: 33; }
+.pl-r-34 { grid-row-start: 34; }
+.pl-r-35 { grid-row-start: 35; }
+.pl-r-36 { grid-row-start: 36; }
+.pl-r-37 { grid-row-start: 37; }
+.pl-r-38 { grid-row-start: 38; }
+.pl-r-39 { grid-row-start: 39; }
+.pl-r-40 { grid-row-start: 40; }
+.pl-r-41 { grid-row-start: 41; }
+.pl-r-42 { grid-row-start: 42; }
+.pl-r-43 { grid-row-start: 43; }
+.pl-r-44 { grid-row-start: 44; }
+.pl-r-45 { grid-row-start: 45; }
+.pl-r-46 { grid-row-start: 46; }
+.pl-r-47 { grid-row-start: 47; }
+.pl-r-48 { grid-row-start: 48; }
+.pl-r-49 { grid-row-start: 49; }
+.pl-r-50 { grid-row-start: 50; }
+.pl-r-51 { grid-row-start: 51; }
+.pl-r-52 { grid-row-start: 52; }
+.pl-r-53 { grid-row-start: 53; }
+.pl-r-54 { grid-row-start: 54; }
+.pl-r-55 { grid-row-start: 55; }
+.pl-r-56 { grid-row-start: 56; }
+.pl-r-57 { grid-row-start: 57; }
+.pl-r-58 { grid-row-start: 58; }
+.pl-r-59 { grid-row-start: 59; }
+.pl-r-60 { grid-row-start: 60; }
+.pl-r-61 { grid-row-start: 61; }
+.pl-r-62 { grid-row-start: 62; }
+.pl-r-63 { grid-row-start: 63; }
+.pl-r-64 { grid-row-start: 64; }
+.pl-r-65 { grid-row-start: 65; }
+.pl-r-66 { grid-row-start: 66; }
+.pl-r-67 { grid-row-start: 67; }
+.pl-r-68 { grid-row-start: 68; }
+.pl-r-69 { grid-row-start: 69; }
+.pl-r-70 { grid-row-start: 70; }
+.pl-r-71 { grid-row-start: 71; }
+.pl-r-72 { grid-row-start: 72; }
+.pl-r-73 { grid-row-start: 73; }
+.pl-r-74 { grid-row-start: 74; }
+.pl-r-75 { grid-row-start: 75; }
+.pl-r-76 { grid-row-start: 76; }
+.pl-r-77 { grid-row-start: 77; }
+.pl-r-78 { grid-row-start: 78; }
+.pl-r-79 { grid-row-start: 79; }
+.pl-r-80 { grid-row-start: 80; }
+.pl-r-81 { grid-row-start: 81; }
+.pl-r-82 { grid-row-start: 82; }
+.pl-r-83 { grid-row-start: 83; }
+.pl-r-84 { grid-row-start: 84; }
+.pl-r-85 { grid-row-start: 85; }
+.pl-r-86 { grid-row-start: 86; }
+.pl-r-87 { grid-row-start: 87; }
+.pl-r-88 { grid-row-start: 88; }
+.pl-r-89 { grid-row-start: 89; }
+.pl-r-90 { grid-row-start: 90; }
+.pl-r-91 { grid-row-start: 91; }
+.pl-r-92 { grid-row-start: 92; }
+.pl-r-93 { grid-row-start: 93; }
+.pl-r-94 { grid-row-start: 94; }
+.pl-r-95 { grid-row-start: 95; }
+.pl-r-96 { grid-row-start: 96; }
+.pl-r-97 { grid-row-start: 97; }
+.pl-s-1 { grid-row-end: span 1; }
+.pl-s-2 { grid-row-end: span 2; }
+.pl-s-3 { grid-row-end: span 3; }
+.pl-s-4 { grid-row-end: span 4; }
+.pl-s-5 { grid-row-end: span 5; }
+.pl-s-6 { grid-row-end: span 6; }
+.pl-s-7 { grid-row-end: span 7; }
+.pl-s-8 { grid-row-end: span 8; }
+.pl-s-9 { grid-row-end: span 9; }
+.pl-s-10 { grid-row-end: span 10; }
+.pl-s-11 { grid-row-end: span 11; }
+.pl-s-12 { grid-row-end: span 12; }
+.pl-s-13 { grid-row-end: span 13; }
+.pl-s-14 { grid-row-end: span 14; }
+.pl-s-15 { grid-row-end: span 15; }
+.pl-s-16 { grid-row-end: span 16; }
+.pl-s-17 { grid-row-end: span 17; }
+.pl-s-18 { grid-row-end: span 18; }
+.pl-s-19 { grid-row-end: span 19; }
+.pl-s-20 { grid-row-end: span 20; }
+.pl-s-21 { grid-row-end: span 21; }
+.pl-s-22 { grid-row-end: span 22; }
+.pl-s-23 { grid-row-end: span 23; }
+.pl-s-24 { grid-row-end: span 24; }
+.pl-s-25 { grid-row-end: span 25; }
+.pl-s-26 { grid-row-end: span 26; }
+.pl-s-27 { grid-row-end: span 27; }
+.pl-s-28 { grid-row-end: span 28; }
+.pl-s-29 { grid-row-end: span 29; }
+.pl-s-30 { grid-row-end: span 30; }
+.pl-s-31 { grid-row-end: span 31; }
+.pl-s-32 { grid-row-end: span 32; }
+.pl-s-33 { grid-row-end: span 33; }
+.pl-s-34 { grid-row-end: span 34; }
+.pl-s-35 { grid-row-end: span 35; }
+.pl-s-36 { grid-row-end: span 36; }
+.pl-s-37 { grid-row-end: span 37; }
+.pl-s-38 { grid-row-end: span 38; }
+.pl-s-39 { grid-row-end: span 39; }
+.pl-s-40 { grid-row-end: span 40; }
+.pl-s-41 { grid-row-end: span 41; }
+.pl-s-42 { grid-row-end: span 42; }
+.pl-s-43 { grid-row-end: span 43; }
+.pl-s-44 { grid-row-end: span 44; }
+.pl-s-45 { grid-row-end: span 45; }
+.pl-s-46 { grid-row-end: span 46; }
+.pl-s-47 { grid-row-end: span 47; }
+.pl-s-48 { grid-row-end: span 48; }
+.pl-s-49 { grid-row-end: span 49; }
+.pl-s-50 { grid-row-end: span 50; }
+.pl-s-51 { grid-row-end: span 51; }
+.pl-s-52 { grid-row-end: span 52; }
+.pl-s-53 { grid-row-end: span 53; }
+.pl-s-54 { grid-row-end: span 54; }
+.pl-s-55 { grid-row-end: span 55; }
+.pl-s-56 { grid-row-end: span 56; }
+.pl-s-57 { grid-row-end: span 57; }
+.pl-s-58 { grid-row-end: span 58; }
+.pl-s-59 { grid-row-end: span 59; }
+.pl-s-60 { grid-row-end: span 60; }
+.pl-s-61 { grid-row-end: span 61; }
+.pl-s-62 { grid-row-end: span 62; }
+.pl-s-63 { grid-row-end: span 63; }
+.pl-s-64 { grid-row-end: span 64; }
+.pl-s-65 { grid-row-end: span 65; }
+.pl-s-66 { grid-row-end: span 66; }
+.pl-s-67 { grid-row-end: span 67; }
+.pl-s-68 { grid-row-end: span 68; }
+.pl-s-69 { grid-row-end: span 69; }
+.pl-s-70 { grid-row-end: span 70; }
+.pl-s-71 { grid-row-end: span 71; }
+.pl-s-72 { grid-row-end: span 72; }
+.pl-s-73 { grid-row-end: span 73; }
+.pl-s-74 { grid-row-end: span 74; }
+.pl-s-75 { grid-row-end: span 75; }
+.pl-s-76 { grid-row-end: span 76; }
+.pl-s-77 { grid-row-end: span 77; }
+.pl-s-78 { grid-row-end: span 78; }
+.pl-s-79 { grid-row-end: span 79; }
+.pl-s-80 { grid-row-end: span 80; }
+.pl-s-81 { grid-row-end: span 81; }
+.pl-s-82 { grid-row-end: span 82; }
+.pl-s-83 { grid-row-end: span 83; }
+.pl-s-84 { grid-row-end: span 84; }
+.pl-s-85 { grid-row-end: span 85; }
+.pl-s-86 { grid-row-end: span 86; }
+.pl-s-87 { grid-row-end: span 87; }
+.pl-s-88 { grid-row-end: span 88; }
+.pl-s-89 { grid-row-end: span 89; }
+.pl-s-90 { grid-row-end: span 90; }
+.pl-s-91 { grid-row-end: span 91; }
+.pl-s-92 { grid-row-end: span 92; }
+.pl-s-93 { grid-row-end: span 93; }
+.pl-s-94 { grid-row-end: span 94; }
+.pl-s-95 { grid-row-end: span 95; }
+.pl-s-96 { grid-row-end: span 96; }
+.pl-lanes-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.pl-l-1 { grid-column: 1; }
+.pl-lanes-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pl-l-2 { grid-column: 2; }
+.pl-lanes-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pl-l-3 { grid-column: 3; }
+.pl-lanes-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.pl-l-4 { grid-column: 4; }
+.pl-lanes-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.pl-l-5 { grid-column: 5; }
+.pl-lanes-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.pl-l-6 { grid-column: 6; }

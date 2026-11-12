@@ -55,25 +55,17 @@ def account_for(raw):
 
 
 def events(account, today=None):
-    """[(uid, séance, début, fin, titre)] : séances du professeur, puis celles des élèves suivis par le compte."""
-    from .registration import guarded_households
-
+    """[(uid, séance, début, fin, titre)] : séances du professeur, puis celles des élèves suivis par le compte.
+    Aucun nom d'élève : le titre est celui du cours."""
     today = today or datetime.now().date()
     start, end = today - timedelta(days=PAST_DAYS), today + timedelta(days=400)
     found = []
-    person = account.person
-    if person is not None and person.teacher is not None:
-        for lesson in lesson_service.upcoming_for(person.teacher, start, end):
-            title = lesson.course.title + (" (remplacement)" if lesson.substitute == person.teacher else "")
-            found.append((f"lesson-{lesson.id}", lesson, lesson.starts_at, lesson.ends_at, title))
-    people = {person.id} if person is not None else set()
-    for household in guarded_households(account):
-        people |= {link.person_id for link in household.dependents}
-    for enrollment in lesson_service.attending_enrollments(people):
-        for lesson in enrollment.course.lessons:
-            if start <= lesson.day <= end and enrollment.attends_on(lesson.day):
-                begin, finish = lesson_service.student_times(enrollment, lesson)
-                found.append((f"lesson-{lesson.id}-{enrollment.id}", lesson, begin, finish, lesson.course.title))
+    for lesson, begin, finish, who in lesson_service.personal_lessons(account, start, end):
+        if who is None or who == "remplacement":
+            title = lesson.course.title + (" (remplacement)" if who else "")
+            found.append((f"lesson-{lesson.id}", lesson, begin, finish, title))
+        else:
+            found.append((f"lesson-{lesson.id}-{who.id}", lesson, begin, finish, lesson.course.title))
     return sorted(found, key=lambda e: (e[1].day, e[2], e[0]))
 
 

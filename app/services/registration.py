@@ -496,6 +496,8 @@ def validate(dossier, actor, now=None):
         _set_phone(person, g.get("phone"), "portable")
         guardians.append(person)
 
+    from .courses import CourseError, add_to_waitlist  # import ici : courses dépend de ce module
+
     counts, added = enrolled_counts(season), []
     for s in enrolled_students(dossier):
         if s.get("guardian") is not None:
@@ -532,6 +534,14 @@ def validate(dossier, actor, now=None):
             membership.enrollments.append(Enrollment(course=course, dossier=dossier, enrolled_on=now.date()))
             counts[course_id] = counts.get(course_id, 0) + 1
             added.append((person, course))
+        for course_id in s.get("waitlist", []):
+            course = db.session.get(Course, course_id)
+            if course is None or course.season_id != season.id:
+                continue
+            try:
+                add_to_waitlist(membership, course, dossier=dossier)
+            except CourseError as exc:  # déjà inscrit ou déjà en attente : rien à faire
+                warnings.append(str(exc))
         for consent in dossier.campaign.consents:
             if consent.scope == CampaignConsent.STUDENT and str(consent.id) in s.get("consents", {}):
                 _record_consent(dossier, consent, s["consents"][str(consent.id)], season, person=person)
@@ -555,7 +565,7 @@ def validate(dossier, actor, now=None):
             db.session.add(account)
             if others := [a for a in bank.same_iban(iban) if a.household_id != household.id]:
                 warnings.append(f"Cet IBAN est aussi celui de {len(others)} autre(s) foyer(s).")
-    from .courses import flag_review  # import ici : courses dépend de ce module
+    from .courses import flag_review
 
     for person, course in added:  # une cotisation déjà calculée (second dossier du foyer) est à revoir
         flag_review(person, season, f"{person.full_name} inscrit(e) à {course.title} par un dossier validé")

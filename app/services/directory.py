@@ -13,7 +13,6 @@ from ..models import (
     BankAccount,
     Consent,
     Dossier,
-    Enrollment,
     FeePick,
     Household,
     HouseholdMember,
@@ -395,17 +394,16 @@ def merge_persons(keep, drop, take=()):
             summary.append(f"adhésion {membership.season.label} en double : celle de la fiche gardée reste")
             kept = seasons_kept[membership.season_id]
             courses = {e.course_id for e in kept.enrollments}
-            for enrollment in list(membership.enrollments):  # ses cours passent sur l'adhésion gardée
+            # Ses cours et ses listes d'attente passent sur l'adhésion gardée, tels quels (dates, heure de passage).
+            for enrollment in list(membership.enrollments):
                 if enrollment.course_id not in courses:
                     membership.enrollments.remove(enrollment)
-                    kept.enrollments.append(
-                        Enrollment(
-                            course_id=enrollment.course_id,
-                            status=enrollment.status,
-                            withdrawn_on=enrollment.withdrawn_on,
-                            dossier_id=enrollment.dossier_id,
-                        )
-                    )
+                    kept.enrollments.append(enrollment)
+            waiting = {w.course_id for w in kept.waitlist}
+            for entry in list(membership.waitlist):
+                if entry.course_id not in waiting:
+                    membership.waitlist.remove(entry)
+                    kept.waitlist.append(entry)
         else:
             membership.person = keep
     db.session.execute(db.update(Consent).where(Consent.person_id == drop.id).values(person_id=keep.id))

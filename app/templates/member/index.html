@@ -9,6 +9,7 @@
   {% for e in courses %}{% set c = e.course %}<li>{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if e.slot_starts_at %} {{ e.slot_starts_at.strftime("%H:%M") }}-{{ e.slot_ends_at.strftime("%H:%M") }}{% elif c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}{% if c.room %} · {{ c.room.label }}{% endif %}</small>{% endif %}{% if c.teacher %} <small class="muted">avec {{ c.teacher.person.full_name }}</small>{% endif %}</li>{% endfor %}
 </ul>
 {% endif %}
+{% for w in membership.waitlist if w.status == "waiting" %}<p class="small">{{ w.course.title }} <span class="badge">liste d'attente</span></p>{% endfor %}
 {% else %}<p class="small muted">Pas d'adhésion enregistrée.</p>{% endfor %}
 {% endmacro %}
 {% macro loaned(person) %}

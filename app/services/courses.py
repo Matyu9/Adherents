@@ -4,10 +4,10 @@ Chaque changement d'inscription marque la cotisation des foyers de l'élève « 
 Voir docs/cours.md. Les services ne font pas de commit.
 """
 
-from datetime import date
+from datetime import date, datetime
 
 from ..extensions import db, fold
-from ..models import Assessment, Course, Enrollment, HouseholdMember, Membership, Person
+from ..models import Assessment, Course, Enrollment, HouseholdMember, Membership, Person, WaitlistEntry
 from .activity import log
 from .catalog import describe, sorted_courses
 from .registration import enrolled_counts
@@ -146,6 +146,9 @@ def enroll(membership, course, on=None, replaces=None, user=None):
         enrollment = Enrollment(membership=membership, course=course, enrolled_on=on, replaces=replaces)
         db.session.add(enrollment)
     db.session.flush()
+    for entry in membership.waitlist:
+        if entry.course_id == course.id and entry.waiting:
+            entry.status, entry.closed_at = WaitlistEntry.ENROLLED, datetime.now()
     if replaces is None:
         person = membership.person
         log("enrollment.create", f"{person.full_name} inscrit(e) à {describe(course)}", user=user, person=person)
@@ -161,6 +164,7 @@ def withdraw(enrollment, on=None, user=None, quiet=False):
     _check_date(on, enrollment.membership, after=enrollment.enrolled_on)
     enrollment.status, enrollment.withdrawn_on = Enrollment.WITHDRAWN, on
     db.session.flush()
+    announce_free_place(enrollment.course)
     if not quiet:
         person, course = enrollment.membership.person, enrollment.course
         log("enrollment.withdraw", f"{person.full_name} quitte {describe(course)}", user=user, person=person)
@@ -316,3 +320,97 @@ def planning(course):
         if cursor < frame[1]:
             free.append((cursor, frame[1]))
     return result, [(_hhmm(a), _hhmm(b)) for a, b in free if b > a]
+
+
+# ---------------------------------------------------------------------------
+# Liste d'attente
+# ---------------------------------------------------------------------------
+
+
+def waitlist(course):
+    """Entrées en attente du cours, dans l'ordre."""
+    return sorted((w for w in course.waitlist if w.waiting), key=lambda w: (w.position, w.id))
+
+
+def add_to_waitlist(membership, course, dossier=None, user=None):
+    """Met l'élève en attente, à la fin de la liste. Une entrée close (inscrit, retiré) est rouverte."""
+    if course.season_id != membership.season_id:
+        raise CourseError("Le cours et l'adhésion ne sont pas de la même saison.")
+    if membership.status != Membership.ACTIVE:
+        raise CourseError(f"L'adhésion {membership.season.label} de {membership.person.full_name} est abandonnée.")
+    if any(e.course_id == course.id and e.active for e in membership.enrollments):
+        raise CourseError(f"{membership.person.full_name} est déjà inscrit(e) à ce cours.")
+    entry = next((w for w in membership.waitlist if w.course_id == course.id), None)
+    if entry is not None and entry.waiting:
+        raise CourseError(f"{membership.person.full_name} est déjà en attente pour ce cours.")
+    last = max((w.position for w in waitlist(course)), default=0)
+    if entry is None:
+        entry = WaitlistEntry(course=course, membership=membership)
+        db.session.add(entry)
+    entry.status, entry.position, entry.closed_at = WaitlistEntry.WAITING, last + 1, None
+    entry.created_at, entry.dossier = datetime.now(), dossier
+    db.session.flush()
+    person = membership.person
+    log("waitlist.add", f"{person.full_name} en attente pour {describe(course)}", user=user, person=person)
+    return entry
+
+
+def remove_from_waitlist(entry, user=None):
+    if not entry.waiting:
+        raise CourseError("Cette personne n'est plus en attente.")
+    entry.status, entry.closed_at = WaitlistEntry.REMOVED, datetime.now()
+    db.session.flush()
+    person = entry.membership.person
+    log(
+        "waitlist.remove",
+        f"{person.full_name} retiré(e) de l'attente pour {describe(entry.course)}",
+        user=user,
+        person=person,
+    )
+
+
+def move_in_waitlist(entry, offset):
+    """Monte (offset -1) ou descend (+1) d'un rang, en échangeant avec la voisine. Les rangs sont renumérotés."""
+    rows = waitlist(entry.course)
+    if entry not in rows:
+        raise CourseError("Cette personne n'est plus en attente.")
+    index = rows.index(entry)
+    target = index + offset
+    if 0 <= target < len(rows):
+        rows[index], rows[target] = rows[target], rows[index]
+    for rank, row in enumerate(rows, start=1):
+        row.position = rank
+    db.session.flush()
+
+
+def enroll_from_waitlist(entry, on=None, user=None):
+    """Inscrit la personne en attente. Renvoie (inscription, avertissements)."""
+    if not entry.waiting:
+        raise CourseError("Cette personne n'est plus en attente.")
+    return enroll(entry.membership, entry.course, on, user=user)
+
+
+def announce_free_place(course):
+    """Une place libre et des élèves en attente : le secrétariat est prévenu (une fois par effectif). Rien n'est
+    inscrit d'office. Renvoie True si une notification a été créée."""
+    from flask import url_for
+
+    from . import notify
+
+    waiting = waitlist(course)
+    count = enrolled_counts(course.season).get(course.id, 0)
+    if not waiting or course.is_full(count):
+        return False
+    try:
+        link = url_for("catalog.course", course_id=course.id) + "#attente"
+    except RuntimeError:  # hors requête (commande, tâche) : pas de lien
+        link = None
+    message = (
+        f"Une place s'est libérée en {course.title} ({course.season.label}) : "
+        f"{len(waiting)} personne(s) en attente, à commencer par {waiting[0].membership.person.full_name}."
+    )
+    return bool(
+        notify.notify(
+            notify.holders("enrollment.edit"), message, link, dedup_key=f"waitlist:{course.id}:{count}:{date.today()}"
+        )
+    )

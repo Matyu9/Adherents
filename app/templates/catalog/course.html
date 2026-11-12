@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "directory/_macros.html" import csrf %}
+{% from "directory/_macros.html" import csrf, post_button %}
 {% block title %}{{ course.title }}{% endblock %}
 {% block content %}
 {% set edit = can(current_user, "enrollment.edit") %}
@@ -71,6 +71,48 @@
 </table></div>
 {% else %}
 <p class="empty">Aucun élève inscrit.</p>
+{% endif %}
+
+<h2 id="attente">Liste d'attente{% if waiting %} <small class="muted">({{ waiting | length }})</small>{% endif %}</h2>
+{% if waiting %}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Rang</th><th>Élève</th><th>Depuis le</th><th>Responsables</th>{% if edit %}<th></th>{% endif %}</tr></thead>
+  <tbody>
+  {% for w in waiting %}{% set student = w.membership.person %}
+  <tr>
+    <td data-label="Rang">{{ loop.index }}</td>
+    <td data-label="Élève"><a href="{{ url_for('directory.person', person_id=student.id) }}">{{ student.sort_name }}</a>{% if w.dossier %} <small class="muted">par son dossier</small>{% endif %}</td>
+    <td data-label="Depuis le"><small>{{ w.created_at | date_fr }}</small></td>
+    <td data-label="Responsables"><small>{% for g in waiting_guardians[w.id] %}{{ g.full_name }}{% for p in g.phones[:1] %} · <a href="tel:{{ p.number }}">{{ p.number | phone }}</a>{% endfor %}{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}</small></td>
+    {% if edit %}
+    <td data-label="" class="actions">
+      {% if not loop.first %}{{ post_button(url_for('catalog.move_waitlist', entry_id=w.id, direction='monter'), "↑", "link-button") }}{% endif %}
+      {% if not loop.last %}{{ post_button(url_for('catalog.move_waitlist', entry_id=w.id, direction='descendre'), "↓", "link-button") }}{% endif %}
+      <details>
+        <summary>Inscrire</summary>
+        <form method="post" action="{{ url_for('catalog.enroll_from_waitlist', entry_id=w.id) }}" class="inline-form">
+          {{ csrf() }}
+          <input type="date" name="on" value="{{ withdraw_form.on._value() }}" aria-label="Premier cours le" required>
+          <button type="submit" class="small">Inscrire</button>
+        </form>
+      </details>
+      {{ post_button(url_for('catalog.remove_from_waitlist', entry_id=w.id), "Retirer", "link-button", "Retirer " ~ student.full_name ~ " de la liste d'attente ?") }}
+    </td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}<p class="muted">Personne en attente.</p>{% endif %}
+{% if edit and waitlist_candidates %}
+<form method="post" action="{{ url_for('catalog.add_to_waitlist', course_id=course.id) }}" class="inline-form">
+  {{ csrf() }}
+  <select name="membership_id" aria-label="Élève à mettre en attente" required>
+    <option value="">Mettre un élève en attente…</option>
+    {% for m in waitlist_candidates %}<option value="{{ m.id }}">{{ m.person.sort_name }}</option>{% endfor %}
+  </select>
+  <button type="submit" class="secondary small">Ajouter</button>
+</form>
 {% endif %}
 
 {% if gone %}

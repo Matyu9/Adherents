@@ -18,12 +18,14 @@
     <fieldset>
       <legend>Cours</legend>
       {% if form.courses.errors %}<small class="error">{{ form.courses.errors | join(" ") }}</small>{% endif %}
+      {% if form.waitlist.errors %}<small class="error">{{ form.waitlist.errors | join(" ") }}</small>{% endif %}
       {% for c in courses %}
       {% set disabled = c.id in full and c.id not in (student.courses or []) %}
       <label><input type="checkbox" name="courses" value="{{ c.id }}"{% if c.id in (form.courses.data or []) %} checked{% endif %}{% if disabled %} disabled{% endif %}>
         {{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}</small>{% endif %}
         {% if c.teacher %} <small class="muted">avec {{ c.teacher.person.full_name }}</small>{% endif %}
         {% if disabled %} <span class="badge">complet</span>{% endif %}</label>
+      {% if disabled %}<label class="small waitlist-choice"><input type="checkbox" name="waitlist" value="{{ c.id }}"{% if c.id in (form.waitlist.data or []) %} checked{% endif %}> M'inscrire sur la liste d'attente de ce cours</label>{% endif %}
       {% else %}<p class="muted">Aucun cours n'est encore proposé pour cette saison.</p>{% endfor %}
     </fieldset>
     {{ field(form.wishes, rows=2) }}

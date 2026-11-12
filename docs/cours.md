@@ -86,12 +86,23 @@ Le professeur voit l'heure de passage dans **Mes élèves**, rangée dans l'ordr
 
 **Plus tard :** la durée comme condition des règles de tarif (formule 30 ou 45 minutes).
 
+## Liste d'attente
+
+Table `waitlist_entry` : un cours, une adhésion de la même saison, une **position** explicite, un statut (`waiting` en attente, `enrolled` inscrit, `removed` retiré), la date d'entrée et de clôture, et le dossier qui l'a demandée, s'il y en a un. Une entrée par élève et par cours : revenir en attente rouvre l'entrée, en fin de liste. Rien n'est supprimé par l'appli. Un cours qui a une liste d'attente ne se supprime pas.
+
+- **Depuis le dossier :** sous un cours complet, la famille coche « M'inscrire sur la liste d'attente de ce cours ». L'entrée est créée à la validation, quand l'adhésion existe.
+- **Depuis la page du cours :** le secrétariat ajoute un élève de la saison, change l'ordre (↑ ↓, les rangs sont renumérotés), retire une personne ou l'inscrit à une date choisie.
+- **Une place se libère** (abandon, transfert, effectif maximum relevé, cours rouvert) : les comptes qui ont `enrollment.edit` reçoivent une notification avec le premier de la liste. **Rien n'est inscrit d'office.** Le même effectif ne prévient qu'une fois par jour.
+- Inscrire directement un élève en attente clôt son entrée.
+- La famille voit dans **Mon espace** les cours où ses enfants attendent.
+- La fusion de deux fiches garde les inscriptions (avec leurs dates et heures de passage) et les listes d'attente de la fiche abandonnée.
+
 ## Droits
 
 | Droit | Donne accès à |
 |---|---|
 | `catalog.view` et `directory.view` | la page d'un cours et la liste de ses élèves |
-| `enrollment.edit` | inscrire, transférer, noter un abandon, fixer l'heure de passage |
+| `enrollment.edit` | inscrire, transférer, noter un abandon, fixer l'heure de passage, gérer la liste d'attente ; reçoit les avis de place libre |
 | `fee.assess` | indiquer qu'une cotisation à revoir n'a rien à changer |
 
 La migration `a0000007effectifs` ajoute `enrollment.edit` à un rôle Gestionnaire déjà enregistré. Les inscriptions existantes y prennent la date de leur enregistrement, sans dépasser leur date de départ.

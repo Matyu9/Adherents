@@ -42,6 +42,7 @@
     <li>{% if c %}{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}{% endif %}</small>{% endif %}
       <small class="muted">{{ counts.get(cid, 0) }}{{ " / " ~ c.capacity if c.capacity }} inscrit(s)</small>{% if c.is_full(counts.get(cid, 0)) %} <span class="badge health-warn">complet</span>{% endif %}{% else %}<span class="error">cours retiré</span>{% endif %}</li>
     {% endfor %}
+    {% for cid in s.waitlist or [] %}{% set c = courses.get(cid) %}{% if c %}<li>{{ c.title }} <span class="badge">liste d'attente</span></li>{% endif %}{% endfor %}
   </ul>
   {% if s.wishes %}<p class="notes">Souhaits : {{ s.wishes }}</p>{% endif %}
   {% for consent in dossier.campaign.consents if consent.scope == "student" %}

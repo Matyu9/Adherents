@@ -350,6 +350,13 @@ class StudentForm(FlaskForm):
     courses = SelectMultipleField(
         "Cours", coerce=int, widget=ListWidget(prefix_label=False), option_widget=CheckboxInput(), validate_choice=False
     )
+    waitlist = SelectMultipleField(
+        "Liste d'attente",
+        coerce=int,
+        widget=ListWidget(prefix_label=False),
+        option_widget=CheckboxInput(),
+        validate_choice=False,
+    )
     wishes = TextAreaField("Souhaits, contraintes d'horaire", validators=[Optional(), Length(max=2000)])
 
     def __init__(self, *args, is_guardian=False, full=(), offered=(), already=(), **kwargs):
@@ -371,10 +378,13 @@ class StudentForm(FlaskForm):
             ok = False
         if full := chosen & self._full - self._already:
             self.courses.errors.append(
-                "Un cours choisi est complet : choisissez-en un autre, ou indiquez votre souhait plus bas."
+                "Un cours choisi est complet : choisissez-en un autre, ou demandez la liste d'attente."
                 if len(full) == 1
                 else "Des cours choisis sont complets."
             )
+            ok = False
+        if set(self.waitlist.data or []) - (self._full & self._offered):
+            self.waitlist.errors.append("La liste d'attente ne concerne que les cours complets.")
             ok = False
         return ok
 
@@ -410,6 +420,7 @@ def student(dossier, student_key):
             getattr(form, f).data = s.get(f) or ""
         form.birth_date.data = datetime.fromisoformat(s["birth_date"]).date() if s.get("birth_date") else None
         form.courses.data = s.get("courses", [])
+        form.waitlist.data = s.get("waitlist", [])
     if form.validate_on_submit():
         s["enrolled"] = form.enrolled.data
         if not is_guardian:
@@ -417,6 +428,7 @@ def student(dossier, student_key):
             s["birth_date"] = form.birth_date.data.isoformat() if form.birth_date.data else None
         s.update({f: _blank(getattr(form, f).data) for f in ("category", "school_level", "school_class", "wishes")})
         s["courses"] = list(form.courses.data or [])
+        s["waitlist"] = [c for c in form.waitlist.data or [] if c not in s["courses"]]
         s["consents"] = {str(c.id): request.form.get(f"consent-{c.id}") == "y" for c in _student_consents(dossier)}
         registration.save(dossier, data)
         db.session.commit()

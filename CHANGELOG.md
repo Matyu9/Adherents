@@ -11,6 +11,8 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 - **Cotisation « à revoir »** : un changement d'inscription marque la cotisation déjà calculée de chaque foyer de l'élève, avec un motif, sans la recalculer. Filtre « À revoir » dans Tarifs → Cotisations, et bouton « rien à changer ».
 - **Migration `a0000007effectifs`** : date d'entrée de chaque inscription (reprise de sa date d'enregistrement), lien de transfert, motifs « à revoir ». Voir [docs/cours.md](docs/cours.md).
 - **Cours individuels** : case « Cours individuel » sur un cours ; heure de passage et durée de chaque élève, plages libres du créneau, passages qui débordent ou se chevauchent signalés. Visibles dans Mes élèves et Mon espace. Migration `a0000008individuel`.
+- **Liste d'attente** d'un cours complet : demandée par la famille dans son dossier ou ajoutée par le secrétariat, ordre réglable, inscription en un clic ; notification au secrétariat quand une place se libère, sans inscription automatique. Migration `a0000009attente`.
+- **Fusion de deux fiches** : les inscriptions passent sur la fiche gardée avec leurs dates (elles étaient recréées sans).
 - **Feuille de route** : la gestion des cours, en six étapes (effectifs, cours individuels, liste d'attente, séances et agendas, agendas des salles Google Workspace, présences).
 
 ### Changé : les types de discipline se composent

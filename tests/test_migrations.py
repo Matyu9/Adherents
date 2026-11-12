@@ -556,3 +556,27 @@ def test_individual_courses_on_the_real_schema(migrated):
     ):
         assert_fails(migrated, statement)
     downgrade(MIGRATIONS, revision="a0000007effectifs")
+
+
+def test_waitlist_on_the_real_schema(migrated):
+    upgrade(MIGRATIONS)
+    run_sql(
+        migrated,
+        *SEED,
+        *CATALOG,
+        "INSERT INTO membership (id, person_id, season_id, status, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'active', now(), now())",
+        "INSERT INTO waitlist_entry (id, course_id, membership_id, position, status, created_at) "
+        "VALUES (1, 1, 1, 1, 'waiting', now())",
+    )
+    for statement in (
+        "INSERT INTO waitlist_entry (course_id, membership_id, position, status, created_at) "
+        "VALUES (1, 1, 2, 'waiting', now())",  # une entrée par élève et par cours
+        "UPDATE waitlist_entry SET status = 'perdu'",
+        "DELETE FROM course WHERE id = 1",  # il a une liste d'attente
+    ):
+        assert_fails(migrated, statement)
+    run_sql(migrated, "DELETE FROM membership WHERE id = 1")
+    assert run_sql(migrated, "SELECT count(*) FROM waitlist_entry") == [[(0,)]]
+    downgrade(MIGRATIONS, revision="a0000008individuel")
+    assert run_sql(migrated, "SELECT to_regclass('waitlist_entry') IS NULL") == [[(True,)]]

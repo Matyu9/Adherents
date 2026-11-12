@@ -185,6 +185,8 @@ En cours d'année, le secrétariat peut :
 
 Un cours complet accepte quand même l'élève, avec un avertissement.
 
+**Liste d'attente.** Quand un cours est complet, la famille peut demander la liste d'attente dans son dossier, et le secrétariat peut y ajouter un élève depuis la page du cours. L'ordre se change avec ↑ et ↓. Quand une place se libère, vous recevez une notification : rien n'est fait d'office, c'est vous qui inscrivez la personne (**Inscrire**, avec la date de son premier cours) ou qui la retirez.
+
 **Cours individuel.** Sur la page du cours, chaque ligne a une heure de passage et une durée. Les élèves se rangent dans l'ordre de la journée et les plages libres s'affichent en haut. Un passage qui déborde du créneau, qui chevauche celui d'un autre élève ou un autre cours du même élève est signalé en rouge. Le professeur voit ces heures dans **Mes élèves**, la famille dans **Mon espace**.
 
 **La cotisation n'est jamais recalculée toute seule.** Si celle du foyer était déjà calculée, elle est marquée **à revoir** dans **Tarifs → Cotisations**, avec la liste des changements. Recalculez-la, ou indiquez qu'il n'y a rien à changer.

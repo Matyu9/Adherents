@@ -232,7 +232,18 @@ ACCESS = {
     "catalog.course": ROSTER,
     "catalog.course_csv": ROSTER,
     **{
-        f"catalog.{name}": ENROLL for name in ("enroll_student", "enroll_in_course", "transfer", "withdraw", "set_slot")
+        f"catalog.{name}": ENROLL
+        for name in (
+            "enroll_student",
+            "enroll_in_course",
+            "transfer",
+            "withdraw",
+            "set_slot",
+            "add_to_waitlist",
+            "move_waitlist",
+            "remove_from_waitlist",
+            "enroll_from_waitlist",
+        )
     },
     "directory.merge_person": DIR_MERGE,
     "directory.merge_household": DIR_MERGE,
@@ -309,6 +320,8 @@ ARGUMENTS = {
     "pick_id": 999,
     "regie_id": 999,
     "enrollment_id": 999,
+    "entry_id": 999,
+    "direction": "monter",
 }
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
 SENDS_TO_LOGIN = {"auth.logout", "auth.two_factor", "auth.token_link", "oidc.end_session", "enrollment.access"}
@@ -587,6 +600,7 @@ def _transfer(season, membership):
     enrollment = next(e for e in membership.enrollments if e.course_id == first.id)
     courses.transfer(enrollment, second, enrollment.enrolled_on)
     courses.flag_review(membership.person, season, "Motif <script>")
+    courses.add_to_waitlist(membership, first)
 
 
 INLINE = re.compile(

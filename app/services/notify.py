@@ -19,6 +19,20 @@ def notify(accounts, message, link=None, dedup_key=None):
     return created
 
 
+def holders(action):
+    """Comptes actifs dont le rôle donne le droit `action` (administrateurs compris)."""
+    from ..permissions import permissions_of
+
+    rights = {}
+    found = []
+    for account in db.session.scalars(db.select(Account).where(Account.active.is_(True))):
+        if account.role not in rights:
+            rights[account.role] = action in permissions_of(account.role)
+        if rights[account.role]:
+            found.append(account)
+    return found
+
+
 def admins():
     return db.session.scalars(db.select(Account).where(Account.role == Role.ADMIN, Account.active.is_(True))).all()
 

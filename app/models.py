@@ -1010,6 +1010,40 @@ class Enrollment(TimestampMixin, db.Model):
         return self.STATUSES[self.status]
 
 
+class WaitlistEntry(db.Model):
+    """Place sur la liste d'attente d'un cours. L'ordre est une position explicite, que le secrétariat change.
+    Une entrée n'est jamais supprimée par l'appli : elle passe à « inscrit » ou « retiré ». Voir docs/cours.md."""
+
+    WAITING = "waiting"
+    ENROLLED = "enrolled"
+    REMOVED = "removed"
+    STATUSES = {WAITING: "En attente", ENROLLED: "Inscrit", REMOVED: "Retiré"}
+    __table_args__ = (
+        db.UniqueConstraint("course_id", "membership_id"),
+        db.CheckConstraint("status IN ('waiting', 'enrolled', 'removed')", name="ck_waitlist_status"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    # Un cours qui a une liste d'attente ne se supprime pas.
+    course_id = db.Column(db.ForeignKey("course.id", ondelete="RESTRICT"), nullable=False, index=True)
+    membership_id = db.Column(db.ForeignKey("membership.id", ondelete="CASCADE"), nullable=False, index=True)
+    position = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(10), nullable=False, default=WAITING)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    closed_at = db.Column(db.DateTime)
+    dossier_id = db.Column(db.ForeignKey("dossier.id", ondelete="SET NULL"), index=True)
+
+    course = db.relationship("Course", backref=db.backref("waitlist", passive_deletes=True))
+    membership = db.relationship(
+        "Membership", backref=db.backref("waitlist", cascade="all, delete-orphan", passive_deletes=True)
+    )
+    dossier = db.relationship("Dossier")
+
+    @property
+    def waiting(self):
+        return self.status == self.WAITING
+
+
 class Consent(db.Model):
     """Consentement donné (ou refusé) pour une saison, daté, avec le texte tel qu'il était affiché."""
 

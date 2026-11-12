@@ -23,7 +23,19 @@ from wtforms.widgets import CheckboxInput, ListWidget
 
 from ..extensions import db, fold
 from ..filters import date_fr
-from ..models import Course, Discipline, DisciplineType, Enrollment, Level, Membership, Room, Season, Site, Teacher
+from ..models import (
+    Course,
+    Discipline,
+    DisciplineType,
+    Enrollment,
+    Level,
+    Membership,
+    Room,
+    Season,
+    Site,
+    Teacher,
+    WaitlistEntry,
+)
 from ..permissions import can, require
 from ..services import catalog, courses, directory, registration
 from ..services.activity import diff, log
@@ -360,6 +372,8 @@ def edit_course(course_id):
     if form.validate_on_submit():
         if changes := _save_course(course, form, season):
             log("course.update", f"Cours modifié : {catalog.describe(course)}", changes=changes)
+            if "capacity" in changes or "marked_full" in changes:
+                courses.announce_free_place(course)
         db.session.commit()
         flash("Cours enregistré.", "success")
         return redirect(url_for(".index", saison=season.id))
@@ -377,6 +391,9 @@ def delete_course(course_id):
             "Fermez-le aux inscriptions s'il ne doit plus être proposé.",
             "error",
         )
+        return redirect(url_for(".index", saison=season_id))
+    if course.waitlist:
+        flash("Ce cours a une liste d'attente : il ne peut pas être supprimé.", "error")
         return redirect(url_for(".index", saison=season_id))
     log("course.delete", f"Cours supprimé : {catalog.describe(course)}")
     db.session.delete(course)
@@ -445,9 +462,14 @@ def course(course_id):
         count=count,
         full=record.is_full(count),
         guardians={e.id: courses.guardians_of(e.membership.person) for e in active},
+        waiting_guardians={w.id: courses.guardians_of(w.membership.person) for w in courses.waitlist(record)},
         recipients=courses.recipients(record),
         withdraw_form=WithdrawForm(),
         slot_warnings={e.id: w for e, w in slots},
+        waiting=courses.waitlist(record),
+        waitlist_candidates=[
+            m for m in courses.candidates(record) if not any(w.course_id == record.id and w.waiting for w in m.waitlist)
+        ],
         free=free,
     )
 
@@ -589,6 +611,82 @@ def withdraw(enrollment_id):
         db.session.commit()
         flash(f"Abandon de {person.full_name} noté. Son adhésion reste active.", "success")
     return _back_to(enrollment, person)
+
+
+def _entry(entry_id):
+    return db.session.get(WaitlistEntry, entry_id) or abort(404)
+
+
+def _to_waitlist(course):
+    return redirect(url_for(".course", course_id=course.id) + "#attente")
+
+
+@bp.route("/cours/<int:course_id>/attente", methods=["POST"])
+@require("enrollment.edit")
+def add_to_waitlist(course_id):
+    record = _course(course_id)
+    membership = db.session.get(Membership, request.form.get("membership_id", type=int) or 0)
+    if membership is None:
+        flash("Choisissez l'élève.", "error")
+        return _to_waitlist(record)
+    try:
+        courses.add_to_waitlist(membership, record)
+    except CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+        flash(f"{membership.person.full_name} est en liste d'attente.", "success")
+    return _to_waitlist(record)
+
+
+@bp.route("/attente/<int:entry_id>/<any(monter, descendre):direction>", methods=["POST"])
+@require("enrollment.edit")
+def move_waitlist(entry_id, direction):
+    entry = _entry(entry_id)
+    try:
+        courses.move_in_waitlist(entry, -1 if direction == "monter" else 1)
+    except CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+    return _to_waitlist(entry.course)
+
+
+@bp.route("/attente/<int:entry_id>/retirer", methods=["POST"])
+@require("enrollment.edit")
+def remove_from_waitlist(entry_id):
+    entry = _entry(entry_id)
+    try:
+        courses.remove_from_waitlist(entry)
+    except CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+        flash(f"{entry.membership.person.full_name} est retiré(e) de la liste d'attente.", "success")
+    return _to_waitlist(entry.course)
+
+
+@bp.route("/attente/<int:entry_id>/inscrire", methods=["POST"])
+@require("enrollment.edit")
+def enroll_from_waitlist(entry_id):
+    entry = _entry(entry_id)
+    form = _DatedForm()
+    if not form.validate_on_submit():
+        flash("Indiquez une date valide.", "error")
+        return _to_waitlist(entry.course)
+    try:
+        _, warnings = courses.enroll_from_waitlist(entry, form.on.data)
+    except CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+        flash(f"{entry.membership.person.full_name} est inscrit(e) au cours.", "success")
+        _flash_all(warnings)
+    return redirect(url_for(".course", course_id=entry.course_id))
 
 
 # ---------------------------------------------------------------------------

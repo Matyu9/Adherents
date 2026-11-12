@@ -744,3 +744,250 @@ def test_heure_de_passage_chez_le_professeur_et_la_famille(client, lessons):
     login(client, account)
     html = page(client.get("/mon-espace"))
     assert "Mercredi 17:00-17:30" in html and "Mercredi 18:00-18:30" in html
+
+
+# ---------------------------------------------------------------------------
+# Étape 3 : liste d'attente
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def full(school):
+    """Flûte (2 places) complète avec Alice et Basile ; un gestionnaire pour recevoir les notifications."""
+    courses.enroll(school["alice"], school["flute"], SEPT)
+    basile, _ = courses.enroll(school["basile"], school["flute"], SEPT)
+    manager_account = make_account(Role.GESTIONNAIRE, email="gestion@asso.test")
+    db.session.commit()
+    return {**school, "e_basile": basile, "manager": manager_account}
+
+
+def notifications(account):
+    from app.models import Notification
+
+    return db.session.scalars(db.select(Notification).filter_by(account_id=account.id)).all()
+
+
+def test_attente_dans_l_ordre(full):
+    from app.models import WaitlistEntry
+
+    chloe = courses.add_to_waitlist(full["chloe"], full["flute"])
+    other = adherent(home("Autre"), full["season"], "Zoé")
+    zoe = courses.add_to_waitlist(other, full["flute"])
+    assert courses.waitlist(full["flute"]) == [chloe, zoe]
+    assert (chloe.position, zoe.position, chloe.status) == (1, 2, WaitlistEntry.WAITING)
+    courses.move_in_waitlist(zoe, -1)
+    assert courses.waitlist(full["flute"]) == [zoe, chloe]
+    courses.move_in_waitlist(zoe, -1)  # déjà premier : rien ne bouge
+    assert courses.waitlist(full["flute"]) == [zoe, chloe]
+    assert [a.message for a in actions("waitlist.add")][0] == "Chloé Petit en attente pour Flûte (2026-2027)"
+
+
+@pytest.mark.parametrize(
+    "case, message",
+    [
+        ("déjà en attente", "déjà en attente"),
+        ("déjà inscrite", "déjà inscrit"),
+        ("autre saison", "même saison"),
+        ("abandon", "abandonnée"),
+    ],
+)
+def test_attente_refusee(full, case, message):
+    membership, target = full["chloe"], full["flute"]
+    if case == "déjà en attente":
+        courses.add_to_waitlist(membership, target)
+    elif case == "déjà inscrite":
+        membership = full["alice"]
+    elif case == "autre saison":
+        target = full["flute_next"]
+    elif case == "abandon":
+        membership.status = Membership.WITHDRAWN
+    with pytest.raises(CourseError, match=message):
+        courses.add_to_waitlist(membership, target)
+
+
+def test_retirer_puis_revenir_en_fin_de_liste(full):
+    from app.models import WaitlistEntry
+
+    chloe = courses.add_to_waitlist(full["chloe"], full["flute"])
+    zoe = courses.add_to_waitlist(adherent(home("Autre"), full["season"], "Zoé"), full["flute"])
+    courses.remove_from_waitlist(chloe)
+    assert chloe.status == WaitlistEntry.REMOVED and courses.waitlist(full["flute"]) == [zoe]
+    with pytest.raises(CourseError, match="plus en attente"):
+        courses.remove_from_waitlist(chloe)
+    again = courses.add_to_waitlist(full["chloe"], full["flute"])
+    assert again is chloe and courses.waitlist(full["flute"]) == [zoe, chloe]
+
+
+def test_place_liberee_previent_le_secretariat_une_fois(full):
+    courses.add_to_waitlist(full["chloe"], full["flute"])
+    courses.withdraw(full["e_basile"], NOV)
+    (note,) = notifications(full["manager"])
+    assert (
+        "Une place s'est libérée en Flûte (2026-2027) : 1 personne(s) en attente, à commencer par Chloé Petit"
+        in note.message
+    )
+    assert notifications(make_account(Role.ADHERENT, email="x@asso.test")) == []
+    # Rien n'est inscrit d'office, et le même effectif ne prévient pas deux fois le même jour.
+    assert courses.waitlist(full["flute"])[0].waiting
+    assert courses.announce_free_place(full["flute"]) is False
+
+
+def test_pas_de_notification_sans_attente_ou_si_toujours_complet(full):
+    full["flute"].marked_full = True
+    courses.add_to_waitlist(full["chloe"], full["flute"])
+    courses.withdraw(full["e_basile"], NOV)
+    assert notifications(full["manager"]) == []
+    full["flute"].marked_full = False
+    full["flute"].capacity = 5
+    db.session.flush()
+    assert courses.announce_free_place(full["flute"]) is True
+
+
+def test_inscrire_depuis_l_attente(full):
+    from app.models import WaitlistEntry
+
+    full["flute"].capacity = 3
+    entry = courses.add_to_waitlist(full["chloe"], full["flute"])
+    enrollment, warnings = courses.enroll_from_waitlist(entry, NOV)
+    assert (enrollment.enrolled_on, warnings, entry.status) == (NOV, [], WaitlistEntry.ENROLLED)
+    assert entry.closed_at is not None and courses.waitlist(full["flute"]) == []
+    with pytest.raises(CourseError, match="plus en attente"):
+        courses.enroll_from_waitlist(entry, NOV)
+
+
+def test_inscription_directe_ferme_l_attente(full):
+    from app.models import WaitlistEntry
+
+    entry = courses.add_to_waitlist(full["chloe"], full["flute"])
+    courses.enroll(full["chloe"], full["flute"], NOV)
+    assert entry.status == WaitlistEntry.ENROLLED
+
+
+def test_cours_avec_attente_non_supprimable(manager, full):
+    courses.add_to_waitlist(full["chloe"], full["piano"])
+    db.session.commit()
+    html = page(manager.post(f"/catalogue/cours/{full['piano'].id}/supprimer", follow_redirects=True))
+    assert "liste d&#39;attente" in html and db.session.get(Course, full["piano"].id) is not None
+
+
+def test_ecrans_de_la_liste_d_attente(manager, full):
+    flute = full["flute"]
+    html = page(manager.get(f"/catalogue/cours/{flute.id}"))
+    assert "Personne en attente." in html and "PETIT Chloé" in html  # proposée à l'ajout
+    manager.post(f"/catalogue/cours/{flute.id}/attente", data={"membership_id": full["chloe"].id})
+    other = adherent(home("Autre"), full["season"], "Zoé")
+    db.session.commit()
+    manager.post(f"/catalogue/cours/{flute.id}/attente", data={"membership_id": other.id})
+    html = page(manager.get(f"/catalogue/cours/{flute.id}"))
+    assert 'Liste d\'attente <small class="muted">(2)</small>' in html
+    assert html.index("PETIT Chloé") < html.index("MARTIN Zoé")
+    second = courses.waitlist(db.session.get(Course, flute.id))[1]
+    manager.post(f"/catalogue/attente/{second.id}/monter")
+    html = page(manager.get(f"/catalogue/cours/{flute.id}"))
+    assert html.index("MARTIN Zoé") < html.index("PETIT Chloé")
+    response = manager.post(f"/catalogue/attente/{second.id}/inscrire", data={"on": "2026-11-02"})
+    assert response.location.endswith(f"/catalogue/cours/{flute.id}")
+    assert any(e.course_id == flute.id and e.active for e in db.session.get(Membership, other.id).enrollments)
+    first = courses.waitlist(db.session.get(Course, flute.id))[0]
+    manager.post(f"/catalogue/attente/{first.id}/retirer")
+    assert courses.waitlist(db.session.get(Course, flute.id)) == []
+    html = page(manager.post(f"/catalogue/cours/{flute.id}/attente", data={}, follow_redirects=True))
+    assert "Choisissez l&#39;élève" in html
+    html = page(manager.post(f"/catalogue/attente/{first.id}/retirer", follow_redirects=True))
+    assert "plus en attente" in html
+
+
+def test_capacite_relevee_previent(manager, full):
+    courses.add_to_waitlist(full["chloe"], full["flute"])
+    db.session.commit()
+    flute = full["flute"]
+    manager.post(f"/catalogue/cours/{flute.id}/modifier", data={"discipline_id": flute.discipline_id, "capacity": "3"})
+    (note,) = notifications(full["manager"])
+    assert note.link.endswith(f"/catalogue/cours/{flute.id}#attente")
+
+
+def test_attente_choisie_dans_le_dossier(full):
+    """La famille coche la liste d'attente d'un cours complet ; la validation crée l'entrée, liée au dossier."""
+    from datetime import datetime
+
+    from app.models import Campaign, Dossier
+    from app.services import registration
+
+    s = full["season"]
+    campaign = Campaign(season=s, title="Inscriptions", opens_at=datetime(2026, 6, 1), closes_at=datetime(2026, 12, 1))
+    db.session.add(campaign)
+    dossier = registration.dossier_for(campaign, full["seule"], None)
+    student = next(st for st in dossier.data["students"] if st.get("person_id") == full["chloe"].person_id)
+    student.update({"enrolled": True, "courses": [full["piano"].id], "waitlist": [full["flute"].id]})
+    dossier.data = {**dossier.data}
+    dossier.status = Dossier.SUBMITTED
+    db.session.flush()
+    registration.validate(dossier, None, now=datetime(2026, 10, 5, 10))
+    (entry,) = courses.waitlist(full["flute"])
+    assert entry.membership == full["chloe"] and entry.dossier == dossier
+
+
+def test_formulaire_du_dossier_et_attente(client, full):
+    """Écran de la famille : la case « liste d'attente » n'est acceptée que pour un cours complet."""
+    from datetime import datetime, timedelta
+
+    from app.models import Campaign
+
+    s = full["season"]
+    campaign = Campaign(
+        season=s,
+        title="Inscriptions",
+        opens_at=datetime.now() - timedelta(days=1),
+        closes_at=datetime.now() + timedelta(days=10),
+    )
+    db.session.add(campaign)
+    account = make_account(Role.ADHERENT, email="chloe@asso.test")
+    full["chloe"].person.account = account
+    db.session.commit()
+    login(client, account)
+    from app.services import registration
+
+    dossier = registration.dossier_for(campaign, full["seule"], account)
+    db.session.commit()
+    key = dossier.data["students"][0]["key"]
+    url = f"/inscription/dossier/{dossier.uuid}/eleves/{key}"
+    html = page(client.get(url))
+    assert "M'inscrire sur la liste d'attente de ce cours" in html  # texte du gabarit, non échappé
+    data = {"enrolled": "y", "category": "Adulte", "courses": [full["piano"].id], "waitlist": [full["piano"].id]}
+    assert "ne concerne que les cours complets" in page(client.post(url, data=data))
+    data["waitlist"] = [full["flute"].id]
+    assert client.post(url, data=data).status_code == 302
+    db.session.expire_all()
+    from app.models import Dossier
+
+    saved = db.session.get(Dossier, dossier.id).data["students"][0]
+    assert saved["waitlist"] == [full["flute"].id]
+
+
+def test_attente_visible_dans_mon_espace(client, full):
+    courses.add_to_waitlist(full["chloe"], full["flute"])
+    account = make_account(Role.ADHERENT, email="chloe@asso.test")
+    full["chloe"].person.account = account
+    db.session.commit()
+    login(client, account)
+    html = page(client.get("/mon-espace"))
+    assert 'Flûte <span class="badge">liste d\'attente</span>' in html
+
+
+def test_fusion_garde_attente_et_dates(full):
+    from app.services import directory as directory_service
+
+    double = person("Chloé", "Petit")
+    dup = Membership(person=double, season=full["season"])
+    db.session.add(dup)
+    db.session.flush()
+    enrollment, _ = courses.enroll(dup, full["piano"], NOV)
+    courses.withdraw(enrollment, DEC)
+    courses.add_to_waitlist(dup, full["flute"])
+    db.session.flush()
+    directory_service.merge_persons(full["chloe"].person, double)
+    db.session.flush()
+    kept = full["chloe"]
+    (moved,) = kept.enrollments
+    assert (moved.enrolled_on, moved.withdrawn_on) == (NOV, DEC)
+    assert [w.course for w in kept.waitlist] == [full["flute"]]

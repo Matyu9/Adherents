@@ -58,12 +58,13 @@ def test_a_household_from_start_to_iban(session):
     page.click("text=+ Nouvelle personne à charge")
     page.fill("#first_name", "Léon")
     page.fill("#birth_date", "2016-06-07")
-    page.click("main form[method=post] button[type=submit]")
-    page.wait_for_url("**/annuaire/foyers/*")
+    # Déjà sur une page de foyer : wait_for_url rendrait la main avant le rechargement. On attend la navigation.
+    with page.expect_navigation(url="**/annuaire/foyers/*"):
+        page.click("main form[method=post] button[type=submit]")
     page.fill("#telephones input[name=number]", "06 12 34 56 78")
     page.fill("#telephones input[name=label]", "portable mère")
-    page.click("#telephones button[type=submit]")
-    page.wait_for_url("**/annuaire/foyers/*")
+    with page.expect_navigation(url="**/annuaire/foyers/*"):
+        page.click("#telephones button[type=submit]")
     content = page.content()
     assert "06 12 34 56 78" in content and "Léon Lefèvre" in content and "Responsable 1" in content
 

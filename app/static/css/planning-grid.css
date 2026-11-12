@@ -289,15 +289,9 @@
 .pl-s-94 { grid-row-end: span 94; }
 .pl-s-95 { grid-row-end: span 95; }
 .pl-s-96 { grid-row-end: span 96; }
-.pl-lanes-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-.pl-l-1 { grid-column: 1; }
-.pl-lanes-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.pl-l-2 { grid-column: 2; }
-.pl-lanes-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.pl-l-3 { grid-column: 3; }
-.pl-lanes-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.pl-l-4 { grid-column: 4; }
-.pl-lanes-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.pl-l-5 { grid-column: 5; }
-.pl-lanes-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-.pl-l-6 { grid-column: 6; }
+.pl-l-1 { margin-left: calc(0 * 24%); z-index: 1; }
+.pl-l-2 { margin-left: calc(1 * 24%); z-index: 2; }
+.pl-l-3 { margin-left: calc(2 * 24%); z-index: 3; }
+.pl-l-4 { margin-left: calc(3 * 24%); z-index: 4; }
+.pl-l-5 { margin-left: calc(4 * 24%); z-index: 5; }
+.pl-l-6 { margin-left: calc(5 * 24%); z-index: 6; }

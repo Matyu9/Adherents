@@ -85,10 +85,10 @@
       {% for row, label in layout.hours %}<span class="pl-r-{{ row }} pl-s-4">{{ label }}</span>{% endfor %}
     </div>
     {% for d in layout.days %}
-    <div class="pl-day pl-rows-{{ layout.rows }} pl-lanes-{{ d.lanes }}{{ ' is-today' if d.today }}{{ ' is-past' if d.past }}">
+    <div class="pl-day pl-rows-{{ layout.rows }}{{ ' is-today' if d.today }}{{ ' is-past' if d.past }}">
       {% if layout.now_row and d.today %}<div class="pl-now pl-r-{{ layout.now_row }} pl-s-1" aria-hidden="true"></div>{% endif %}
       {% for e in d.events %}
-      {% if e.link %}<a href="{{ e.link }}"{% else %}<div{% endif %} class="pl-event {{ e.classes }}">{{ event_body(e, e.span <= 2) }}{% if e.link %}</a>{% else %}</div>{% endif %}
+      {% if e.link %}<a href="{{ e.link }}"{% else %}<div{% endif %} class="pl-event {{ e.classes }}" title="{{ e.tooltip }}">{{ event_body(e, e.span <= 2 or e.lanes >= 3) }}{% if e.link %}</a>{% else %}</div>{% endif %}
       {% endfor %}
     </div>
     {% endfor %}

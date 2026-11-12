@@ -51,6 +51,16 @@ class Event:
     lanes: int = 1
 
     @property
+    def tooltip(self):
+        """Tout ce que la case n'a pas la place de montrer."""
+        parts = [f"{self.starts_at:%H:%M}–{self.ends_at:%H:%M}", self.title, *self.details]
+        if self.cancelled:
+            parts.append("Annulée" + (f" : {self.note}" if self.note else ""))
+        elif self.edited:
+            parts.append("Modifiée" + (f" : {self.note}" if self.note else ""))
+        return " · ".join(parts)
+
+    @property
     def minutes(self):
         return _minutes(self.starts_at), _minutes(self.ends_at)
 
@@ -66,6 +76,7 @@ class Event:
                 "is-past" if self.past else "",
                 "is-cancelled" if self.cancelled else "",
                 "is-short" if self.span <= 2 else "",
+                "is-narrow" if self.lanes >= 3 else "",
             )
             if c
         )
@@ -112,7 +123,7 @@ def legend(events):
 
 
 def _assign_lanes(events):
-    """Côte à côte les séances qui se chevauchent : chaque groupe qui se chevauche partage la largeur du jour."""
+    """Les séances qui se chevauchent sont décalées (une « voie » chacune) et se superposent, comme dans un agenda."""
     events = sorted(events, key=lambda e: (e.minutes[0], -e.minutes[1]))
     group, ends, group_end = [], [], -1
     for event in events + [None]:

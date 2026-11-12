@@ -147,6 +147,7 @@ Règles portées par la base :
 2. **Correction** d'une ligne : nouveau montant et motif obligatoires, inscrits au journal. Elle peut être annulée.
 3. **Validation** : la cotisation ne bouge plus. Pour la corriger, on la **rouvre** avec un motif.
 4. **Écart** : si les règles ou les inscriptions changent après coup, un nouveau calcul est comparé au total enregistré, sans rien modifier.
+5. **À revoir** : un changement d'inscription (élève inscrit, transféré ou parti, adhésion ajoutée ou abandonnée) marque la cotisation déjà calculée, avec un motif, sans la recalculer. Le signal tombe au prochain calcul, ou quand un gestionnaire indique qu'il n'y a rien à changer. Voir [cours.md](cours.md#cotisation--à-revoir-).
 
 ## Effet d'une règle
 

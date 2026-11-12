@@ -4,6 +4,14 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ## Non publié
 
+### Ajouté : gestion des cours, effectifs et inscriptions en cours de saison
+
+- **Page d'un cours** (Catalogue → un cours) : élèves inscrits avec leurs responsables et leur date d'arrivée, effectif face à la capacité, élèves partis en cours de saison, liste en CSV, lien pour écrire aux familles en copie cachée.
+- **Inscrire, changer de cours, noter l'abandon d'un cours**, depuis la page du cours ou la fiche de l'élève. Nouveau droit `enrollment.edit`, donné au gestionnaire.
+- **Cotisation « à revoir »** : un changement d'inscription marque la cotisation déjà calculée de chaque foyer de l'élève, avec un motif, sans la recalculer. Filtre « À revoir » dans Tarifs → Cotisations, et bouton « rien à changer ».
+- **Migration `a0000007effectifs`** : date d'entrée de chaque inscription (reprise de sa date d'enregistrement), lien de transfert, motifs « à revoir ». Voir [docs/cours.md](docs/cours.md).
+- **Feuille de route** : la gestion des cours, en six étapes (effectifs, cours individuels, liste d'attente, séances et agendas, agendas des salles Google Workspace, présences).
+
 ### Changé : les types de discipline se composent
 
 - **Types de discipline** : la liste fixe (instrument, formation musicale, pratique collective, éveil, autre) laisse place à une liste que chaque association compose, dans **Catalogue → Disciplines, niveaux et lieux**. Un type a un nom et un ordre ; un type qui a servi s'archive au lieu de se supprimer. Rien n'est plus propre à la musique.

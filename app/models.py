@@ -960,6 +960,8 @@ class Enrollment(TimestampMixin, db.Model):
     __table_args__ = (
         db.UniqueConstraint("membership_id", "course_id"),
         db.CheckConstraint("status IN ('active', 'withdrawn')", name="ck_enrollment_status"),
+        db.CheckConstraint("withdrawn_on >= enrolled_on", name="ck_enrollment_dates"),
+        db.CheckConstraint("replaces_id <> id", name="ck_enrollment_replaces"),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -967,14 +969,27 @@ class Enrollment(TimestampMixin, db.Model):
     # Un cours qui a des élèves ne se supprime pas.
     course_id = db.Column(db.ForeignKey("course.id", ondelete="RESTRICT"), nullable=False, index=True)
     status = db.Column(db.String(10), nullable=False, default=ACTIVE)
+    # Date d'entrée dans le cours : la validation du dossier, ou l'arrivée en cours de saison.
+    enrolled_on = db.Column(db.Date, nullable=False, default=date.today, server_default=db.text("CURRENT_DATE"))
     withdrawn_on = db.Column(db.Date)
     dossier_id = db.Column(db.ForeignKey("dossier.id", ondelete="SET NULL"), index=True)
+    # Transfert : l'inscription quittée pour celle-ci (même saison). Voir docs/cours.md.
+    replaces_id = db.Column(db.ForeignKey("enrollment.id", ondelete="SET NULL"), index=True)
 
     membership = db.relationship(
         "Membership", backref=db.backref("enrollments", cascade="all, delete-orphan", passive_deletes=True)
     )
     course = db.relationship("Course", backref=db.backref("enrollments", passive_deletes=True))
     dossier = db.relationship("Dossier")
+    replaces = db.relationship("Enrollment", remote_side=[id])
+
+    @property
+    def active(self):
+        return self.status == self.ACTIVE
+
+    @property
+    def status_label(self):
+        return self.STATUSES[self.status]
 
 
 class Consent(db.Model):
@@ -1201,6 +1216,9 @@ class Assessment(TimestampMixin, db.Model):
     validated_at = db.Column(db.DateTime)
     validated_by_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"))
     warnings = db.Column(db.JSON, nullable=False, default=list)
+    # Changements d'inscription survenus depuis le calcul (« à revoir »). Vidé par un nouveau calcul, ou quand un
+    # gestionnaire constate qu'il n'y a rien à changer. Voir docs/cours.md.
+    review_reasons = db.Column(db.JSON, nullable=False, default=list, server_default="[]")
 
     household = db.relationship("Household")
     season = db.relationship("Season")

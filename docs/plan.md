@@ -53,7 +53,7 @@ Adhérents a deux missions :
 | Campagnes d'inscription | Fait | [inscriptions.md](inscriptions.md) |
 | Espace adhérent | Fait | Foyer, cours, dossiers, matériel prêté |
 | Tarifs et cotisations | Fait | [tarifs.md](tarifs.md) |
-| Gestion des cours | À faire | Voir ci-dessous |
+| Gestion des cours | En cours : effectifs et inscriptions en cours de saison faits | [cours.md](cours.md), et ci-dessous |
 | Import depuis un logiciel de gestion | À faire | Voir ci-dessous |
 | Règlements | À faire | Voir ci-dessous |
 | Bascule | À faire | Voir ci-dessous |
@@ -64,7 +64,7 @@ Adhérents a deux missions :
 
 La vie d'un cours pendant la saison, une fois le catalogue construit. Chaque étape se livre et se teste seule.
 
-1. **Effectifs et inscriptions en cours de saison.**
+1. **Effectifs et inscriptions en cours de saison** (fait, voir [cours.md](cours.md)).
    - Une page par cours : élèves, effectif face à la capacité, export, email aux responsables.
    - Le secrétariat inscrit un élève qui a une adhésion de la saison, le transfère vers un autre cours ou note l'abandon d'un seul cours. L'inscription garde sa date d'entrée et, après un transfert, le cours d'origine.
    - Un cours complet n'est plus proposé dans les dossiers.

@@ -27,7 +27,7 @@ Les inscriptions s'appuient sur l'[annuaire](annuaire.md) et le [catalogue](cata
 | `campaign` | Campagne d'une saison : titre, ouverture et clôture (date et heure), message aux familles, formulaire public ou non |
 | `campaign_consent` | Consentement demandé : intitulé, texte, pour chaque élève ou pour le foyer, obligatoire ou non |
 | `dossier` | Dossier d'un foyer pour une campagne : statut, saisie de la famille (`data`), IBAN chiffré, message de retour, dates |
-| `enrollment` | Inscription d'un élève à un cours, rattachée à son adhésion de la saison |
+| `enrollment` | Inscription d'un élève à un cours, rattachée à son adhésion de la saison, datée du jour de la validation. Ce qu'elle devient pendant la saison : voir [cours.md](cours.md). |
 | `consent` | Réponse donnée pour une saison, datée, avec le texte tel qu'il était affiché et le nom de la personne qui a répondu |
 
 Règles portées par la base :

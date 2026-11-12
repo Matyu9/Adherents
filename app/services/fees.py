@@ -575,6 +575,7 @@ def assess(household, season, discard_corrections=False):
     assessment.computed_total = result.total
     assessment.computed_at = datetime.now()
     assessment.warnings = prepared.warnings
+    assessment.review_reasons = []
     db.session.flush()
     return assessment
 
@@ -711,6 +712,21 @@ def reopen(assessment, reason, user=None):
         user=user,
         household=assessment.household,
     )
+    db.session.flush()
+
+
+def acknowledge_review(assessment, user=None):
+    """Le gestionnaire a vu les changements d'inscription et il n'y a rien à changer : le signal « à revoir » tombe."""
+    if not assessment.review_reasons:
+        raise FeeError("Cette cotisation n'est pas à revoir.")
+    log(
+        "fee.review",
+        f"Cotisation {assessment.season.label} du foyer {assessment.household.name} revue sans changement "
+        f"({len(assessment.review_reasons)} changement(s) d'inscription)",
+        user=user,
+        household=assessment.household,
+    )
+    assessment.review_reasons = []
     db.session.flush()
 
 

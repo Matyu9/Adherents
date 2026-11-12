@@ -265,6 +265,8 @@ input, select, textarea { font-size: .93rem; }
 .filters > * { margin-bottom: 0; }
 .nowrap { white-space: nowrap; }
 details summary { font-weight: 600; color: var(--text-2); }
+td.actions details { display: inline-block; vertical-align: baseline; margin: 0; padding: 0; border: 0; }
+td.actions details > summary { font-weight: 400; color: var(--pico-primary); }
 fieldset { margin-bottom: .75rem; min-width: 0; }
 fieldset[role=group] input { min-width: 0; }
 .pagination { display: flex; gap: 1rem; justify-content: center; align-items: center; margin: 1rem 0; }

@@ -1,19 +1,34 @@
 """Catalogue : disciplines, niveaux, sites et salles communs à toutes les saisons, puis les cours de chaque saison et
 les disciplines de chaque professeur. Voir docs/catalogue.md."""
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+import csv
+import io
+from datetime import date
+
+from flask import Blueprint, Response, abort, flash, redirect, render_template, request, url_for
+from flask_login import current_user
 from flask_wtf import FlaskForm
-from wtforms import BooleanField, IntegerField, SelectField, SelectMultipleField, StringField, TextAreaField, TimeField
+from wtforms import (
+    BooleanField,
+    DateField,
+    IntegerField,
+    SelectField,
+    SelectMultipleField,
+    StringField,
+    TextAreaField,
+    TimeField,
+)
 from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError
 from wtforms.widgets import CheckboxInput, ListWidget
 
 from ..extensions import db, fold
 from ..filters import date_fr
-from ..models import Course, Discipline, DisciplineType, Level, Room, Season, Site, Teacher
-from ..permissions import require
-from ..services import catalog, directory, registration
+from ..models import Course, Discipline, DisciplineType, Enrollment, Level, Membership, Room, Season, Site, Teacher
+from ..permissions import can, require
+from ..services import catalog, courses, directory, registration
 from ..services.activity import diff, log
 from ..services.catalog import CatalogError
+from ..services.courses import CourseError
 from .directory import _blank, _strip
 
 bp = Blueprint("catalog", __name__, url_prefix="/catalogue")
@@ -365,6 +380,182 @@ def delete_course(course_id):
     db.session.commit()
     flash("Cours supprimé.", "success")
     return redirect(url_for(".index", saison=season_id))
+
+
+# ---------------------------------------------------------------------------
+# Élèves d'un cours : inscrire, transférer, noter un abandon (voir docs/cours.md)
+# ---------------------------------------------------------------------------
+
+
+class _DatedForm(FlaskForm):
+    on = DateField("À partir du", validators=[DataRequired("Indiquez la date.")], default=date.today)
+
+
+class EnrollStudentForm(_DatedForm):
+    membership_id = Choice("Élève", coerce=_optional_int, validators=[DataRequired("Choisissez l'élève.")])
+
+
+class EnrollCourseForm(_DatedForm):
+    course_id = Choice("Cours", coerce=_optional_int, validators=[DataRequired("Choisissez le cours.")])
+
+
+class WithdrawForm(_DatedForm):
+    on = DateField("Date de l'abandon", validators=[DataRequired("Indiquez la date.")], default=date.today)
+
+
+def _course_choices(form, course_list, counts):
+    form.course_id.choices = [("", "—")] + [
+        (str(c.id), catalog.describe(c) + (" — complet" if c.is_full(counts.get(c.id, 0)) else "")) for c in course_list
+    ]
+
+
+def _back_to(enrollment_or_course, person=None):
+    """Retour à la fiche de l'élève (?retour=fiche) ou, par défaut, à la page du cours."""
+    if request.values.get("retour") == "fiche" and person is not None:
+        return redirect(url_for("directory.person", person_id=person.id) + "#adhesions")
+    course = enrollment_or_course if isinstance(enrollment_or_course, Course) else enrollment_or_course.course
+    return redirect(url_for(".course", course_id=course.id))
+
+
+def _flash_all(messages, category="warning"):
+    for message in messages:
+        flash(message, category)
+
+
+@bp.route("/cours/<int:course_id>")
+@require("catalog.view")
+def course(course_id):
+    if not can(current_user, "directory.view"):  # la liste des élèves vient de l'annuaire
+        abort(403)
+    record = _course(course_id)
+    active, gone = courses.roster(record)
+    count = len(active)
+    return render_template(
+        "catalog/course.html",
+        course=record,
+        season=record.season,
+        active=active,
+        gone=gone,
+        count=count,
+        full=record.is_full(count),
+        guardians={e.id: courses.guardians_of(e.membership.person) for e in active},
+        recipients=courses.recipients(record),
+        withdraw_form=WithdrawForm(),
+    )
+
+
+@bp.route("/cours/<int:course_id>/eleves.csv")
+@require("catalog.view")
+def course_csv(course_id):
+    if not can(current_user, "directory.view"):
+        abort(403)
+    record = _course(course_id)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, delimiter=";")
+    writer.writerow(courses.ROSTER_COLUMNS)
+    writer.writerows(courses.roster_rows(record))
+    response = Response("\ufeff" + buffer.getvalue(), mimetype="text/csv")  # BOM : Excel lit les accents
+    response.headers["Content-Disposition"] = f'attachment; filename="eleves-cours-{record.id}.csv"'
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@bp.route("/cours/<int:course_id>/inscrire", methods=["GET", "POST"])
+@require("enrollment.edit")
+def enroll_student(course_id):
+    """Depuis la page du cours : choisir l'élève parmi les adhérents de la saison."""
+    record = _course(course_id)
+    form = EnrollStudentForm()
+    form.membership_id.choices = [("", "—")] + [
+        (
+            str(m.id),
+            m.person.sort_name + (f" ({m.person.age(record.season.starts_on)} ans)" if m.person.birth_date else ""),
+        )
+        for m in courses.candidates(record)
+    ]
+    if form.validate_on_submit():
+        membership = db.session.get(Membership, form.membership_id.data) or abort(404)
+        try:
+            _, warnings = courses.enroll(membership, record, form.on.data)
+        except CourseError as exc:
+            form.on.errors.append(str(exc))
+        else:
+            db.session.commit()
+            flash(f"{membership.person.full_name} est inscrit(e) au cours.", "success")
+            _flash_all(warnings)
+            return redirect(url_for(".course", course_id=record.id))
+    return render_template("catalog/enroll_form.html", form=form, course=record, membership=None, enrollment=None)
+
+
+@bp.route("/adhesions/<int:membership_id>/inscrire", methods=["GET", "POST"])
+@require("enrollment.edit")
+def enroll_in_course(membership_id):
+    """Depuis la fiche de l'élève : choisir le cours de la saison."""
+    membership = db.session.get(Membership, membership_id) or abort(404)
+    form = EnrollCourseForm()
+    _course_choices(form, *courses.open_courses(membership))
+    if form.validate_on_submit():
+        record = db.session.get(Course, form.course_id.data) or abort(404)
+        try:
+            _, warnings = courses.enroll(membership, record, form.on.data)
+        except CourseError as exc:
+            form.on.errors.append(str(exc))
+        else:
+            db.session.commit()
+            flash(f"{membership.person.full_name} est inscrit(e) à {record.title}.", "success")
+            _flash_all(warnings)
+            return redirect(url_for("directory.person", person_id=membership.person_id) + "#adhesions")
+    return render_template("catalog/enroll_form.html", form=form, course=None, membership=membership, enrollment=None)
+
+
+def _enrollment(enrollment_id):
+    return db.session.get(Enrollment, enrollment_id) or abort(404)
+
+
+@bp.route("/inscriptions/<int:enrollment_id>/transferer", methods=["GET", "POST"])
+@require("enrollment.edit")
+def transfer(enrollment_id):
+    enrollment = _enrollment(enrollment_id)
+    membership = enrollment.membership
+    if not enrollment.active:
+        flash("Cette inscription est déjà terminée.", "error")
+        return _back_to(enrollment, membership.person)
+    form = EnrollCourseForm()
+    _course_choices(form, *courses.open_courses(membership, exclude=enrollment.course))
+    if form.validate_on_submit():
+        record = db.session.get(Course, form.course_id.data) or abort(404)
+        try:
+            new, warnings = courses.transfer(enrollment, record, form.on.data)
+        except CourseError as exc:
+            form.on.errors.append(str(exc))
+        else:
+            db.session.commit()
+            flash(f"{membership.person.full_name} passe à {record.title}.", "success")
+            _flash_all(warnings)
+            return _back_to(new, membership.person)
+    return render_template(
+        "catalog/enroll_form.html", form=form, course=enrollment.course, membership=membership, enrollment=enrollment
+    )
+
+
+@bp.route("/inscriptions/<int:enrollment_id>/abandon", methods=["POST"])
+@require("enrollment.edit")
+def withdraw(enrollment_id):
+    enrollment = _enrollment(enrollment_id)
+    person = enrollment.membership.person
+    form = WithdrawForm()
+    if not form.validate_on_submit():
+        flash("Indiquez une date valide.", "error")
+        return _back_to(enrollment, person)
+    try:
+        courses.withdraw(enrollment, form.on.data)
+    except CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+        flash(f"Abandon de {person.full_name} noté. Son adhésion reste active.", "success")
+    return _back_to(enrollment, person)
 
 
 # ---------------------------------------------------------------------------

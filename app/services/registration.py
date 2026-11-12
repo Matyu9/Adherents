@@ -496,7 +496,7 @@ def validate(dossier, actor, now=None):
         _set_phone(person, g.get("phone"), "portable")
         guardians.append(person)
 
-    counts = enrolled_counts(season)
+    counts, added = enrolled_counts(season), []
     for s in enrolled_students(dossier):
         if s.get("guardian") is not None:
             person = guardians[s["guardian"]]
@@ -522,12 +522,16 @@ def validate(dossier, actor, now=None):
             if course is None or course.season_id != season.id:
                 continue
             if course_id in held:
-                held[course_id].status, held[course_id].withdrawn_on = Enrollment.ACTIVE, None
+                if not held[course_id].active:  # retour dans un cours quitté : il reprend à la validation
+                    held[course_id].status, held[course_id].withdrawn_on = Enrollment.ACTIVE, None
+                    held[course_id].enrolled_on = now.date()
+                    added.append((person, course))
                 continue
             if course.is_full(counts.get(course_id, 0)):
                 warnings.append(f"{course.title} était complet : {person.full_name} y est inscrit(e) quand même.")
-            membership.enrollments.append(Enrollment(course=course, dossier=dossier))
+            membership.enrollments.append(Enrollment(course=course, dossier=dossier, enrolled_on=now.date()))
             counts[course_id] = counts.get(course_id, 0) + 1
+            added.append((person, course))
         for consent in dossier.campaign.consents:
             if consent.scope == CampaignConsent.STUDENT and str(consent.id) in s.get("consents", {}):
                 _record_consent(dossier, consent, s["consents"][str(consent.id)], season, person=person)
@@ -551,6 +555,10 @@ def validate(dossier, actor, now=None):
             db.session.add(account)
             if others := [a for a in bank.same_iban(iban) if a.household_id != household.id]:
                 warnings.append(f"Cet IBAN est aussi celui de {len(others)} autre(s) foyer(s).")
+    from .courses import flag_review  # import ici : courses dépend de ce module
+
+    for person, course in added:  # une cotisation déjà calculée (second dossier du foyer) est à revoir
+        flag_review(person, season, f"{person.full_name} inscrit(e) à {course.title} par un dossier validé")
     dossier.data = {**data, "changes": snapshot}
     dossier.status = Dossier.VALIDATED
     dossier.validated_at = now

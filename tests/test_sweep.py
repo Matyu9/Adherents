@@ -24,6 +24,7 @@ DIR_VIEW, DIR_EDIT, DIR_MERGE, BANK = "directory.view", "directory.edit", "direc
 LINKING = "account.manage+directory.edit"
 TEACHERS = "teacher.manage"
 CAT_VIEW, CAT_EDIT = "catalog.view", "catalog.edit"
+ROSTER, ENROLL = "catalog.view+directory.view", "enrollment.edit"
 REG_VIEW, REG_MANAGE, REG_IBAN = "registration.view", "registration.manage", "registration.manage+bank.view"
 FEE_VIEW, FEE_EDIT, FEE_ASSESS, FEE_SITUATION = "fee.view", "fee.edit", "fee.assess", "fee.situation"
 ACCESS = {
@@ -187,6 +188,7 @@ ACCESS = {
             "undo_line",
             "validate_assessment",
             "reopen_assessment",
+            "acknowledge_review",
             "delete_assessment",
         )
     },
@@ -227,6 +229,9 @@ ACCESS = {
             "delete_item",
         )
     },
+    "catalog.course": ROSTER,
+    "catalog.course_csv": ROSTER,
+    **{f"catalog.{name}": ENROLL for name in ("enroll_student", "enroll_in_course", "transfer", "withdraw")},
     "directory.merge_person": DIR_MERGE,
     "directory.merge_household": DIR_MERGE,
     **{
@@ -262,6 +267,8 @@ HOLDERS = {
     TEACHERS: {A},
     CAT_VIEW: {A, G},
     CAT_EDIT: {A, G},
+    ROSTER: {A, G},
+    ENROLL: {A, G},
     REG_VIEW: {A, G},
     REG_MANAGE: {A, G},
     REG_IBAN: {A},
@@ -299,6 +306,7 @@ ARGUMENTS = {
     "assessment_id": 999,
     "pick_id": 999,
     "regie_id": 999,
+    "enrollment_id": 999,
 }
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
 SENDS_TO_LOGIN = {"auth.logout", "auth.two_factor", "auth.token_link", "oidc.end_session", "enrollment.access"}
@@ -333,6 +341,7 @@ def test_every_declared_permission_exists():
         TEACHERS,
         CAT_VIEW,
         CAT_EDIT,
+        ENROLL,
         REG_VIEW,
         REG_MANAGE,
         FEE_VIEW,
@@ -563,7 +572,19 @@ def _fees(season, household):
     fees.add_pick(household, membership.person, location, "<b>violon")
     assessment = fees.assess(household, season)
     fees.correct_line(assessment.lines[0], 30000, "Geste <b>")
+    _transfer(season, membership)
     db.session.flush()
+
+
+def _transfer(season, membership):
+    """Un élève passé d'un cours à l'autre : la cotisation de son foyer est « à revoir »."""
+    from app.models import Course
+    from app.services import courses
+
+    first, second = db.session.scalars(db.select(Course).where(Course.season_id == season.id).order_by(Course.id))
+    enrollment = next(e for e in membership.enrollments if e.course_id == first.id)
+    courses.transfer(enrollment, second, enrollment.enrolled_on)
+    courses.flag_review(membership.person, season, "Motif <script>")
 
 
 INLINE = re.compile(
@@ -632,6 +653,9 @@ def test_crawl_every_link(app, rich, who):
     assert any(p.endswith("/fusionner") for p in seen) == (who in (A, G))
     assert ("/catalogue" in seen) == (who in (A, G)) and ("/catalogue/referentiels" in seen) == (who in (A, G))
     assert any(p.startswith("/catalogue/cours/") for p in seen) == (who in (A, G))
+    assert any(p.endswith("/eleves.csv") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/catalogue/inscriptions/") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/catalogue/adhesions/") for p in seen) == (who in (A, G))
     assert any(p.startswith("/catalogue/copier") for p in seen) == (who in (A, G))
     assert ("/campagnes" in seen) == (who in (A, G))
     assert any(p.startswith("/campagnes/dossiers/") for p in seen) == (who in (A, G))

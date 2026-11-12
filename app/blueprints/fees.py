@@ -755,7 +755,9 @@ def assessments():
         for household in sorted(households, key=lambda h: fold(h.name)):
             assessment = existing.get(household.id)
             state = assessment.status if assessment else "none"
-            if status and status != state:
+            if status == "review" and not (assessment and assessment.review_reasons):
+                continue
+            if status and status != "review" and status != state:
                 continue
             rows.append((household, assessment))
     totals = {
@@ -942,6 +944,20 @@ def reopen_assessment(assessment_id):
         fees.reopen(assessment, request.form.get("reason"), current_user)
         db.session.commit()
         flash("Cotisation rouverte.", "success")
+    except FeeError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    return _back(assessment.household_id, assessment.season_id)
+
+
+@bp.route("/cotisations/<int:assessment_id>/revue", methods=["POST"])
+@require("fee.assess")
+def acknowledge_review(assessment_id):
+    assessment = _assessment(assessment_id)
+    try:
+        fees.acknowledge_review(assessment, current_user)
+        db.session.commit()
+        flash("Cotisation revue : rien à changer.", "success")
     except FeeError as exc:
         db.session.rollback()
         flash(str(exc), "error")

@@ -30,6 +30,7 @@ from ..models import (
 from ..permissions import can, require
 from ..services import accounts as accounts_service
 from ..services import bank, catalog, directory, guard, throttle
+from ..services import courses as course_service
 from ..services import totp as totp_service
 from ..services.activity import diff, log
 from ..services.directory import DirectoryError
@@ -488,6 +489,9 @@ def create_membership(person_id):
         db.session.add(membership)
         db.session.flush()
         log("membership.create", f"Adhésion {membership.season.label} ajoutée à {person.full_name}", person=person)
+        course_service.flag_review(
+            person, membership.season, f"Adhésion {membership.season.label} de {person.full_name} ajoutée"
+        )
         db.session.commit()
         flash("Adhésion enregistrée.", "success")
         return redirect(url_for(".person", person_id=person.id) + "#adhesions")
@@ -521,6 +525,11 @@ def edit_membership(membership_id):
                 changes=changes,
                 person=person,
             )
+            if "status" in changes or "season_id" in changes:
+                label = membership.STATUSES[membership.status].lower()
+                course_service.flag_review(
+                    person, membership.season, f"Adhésion {membership.season.label} de {person.full_name} : {label}"
+                )
         db.session.commit()
         flash("Adhésion enregistrée.", "success")
         return redirect(url_for(".person", person_id=person.id) + "#adhesions")

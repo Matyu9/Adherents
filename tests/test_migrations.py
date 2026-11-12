@@ -478,7 +478,7 @@ def test_saved_manager_role_gets_the_fee_rights(migrated):
         "INSERT INTO role (key, name, permissions) VALUES ('gestionnaire', 'Gestionnaire', "
         "'[\"catalog.view\"]'), ('regie', 'Régie', '[\"activity.view\"]')",
     )
-    upgrade(MIGRATIONS)
+    upgrade(MIGRATIONS, revision="a0000005tarifs")
     (rows,) = run_sql(migrated, "SELECT key, permissions::text FROM role ORDER BY key")
     assert rows == [
         ("gestionnaire", '["catalog.view", "fee.view", "fee.edit", "fee.assess"]'),
@@ -487,3 +487,48 @@ def test_saved_manager_role_gets_the_fee_rights(migrated):
     downgrade(MIGRATIONS, revision="a0000004conservation")
     (rows,) = run_sql(migrated, "SELECT key, permissions::text FROM role ORDER BY key")
     assert rows == [("gestionnaire", '["catalog.view"]'), ("regie", '["activity.view"]')]
+
+
+def test_enrollment_dates_and_review_on_the_real_schema(migrated):
+    """Les inscriptions existantes prennent la date de leur enregistrement ; dates et transferts sont contrôlés."""
+    upgrade(MIGRATIONS, revision="a0000006types")
+    run_sql(
+        migrated,
+        *SEED,
+        *CATALOG,
+        "INSERT INTO household (id, uuid, name, country, created_at, updated_at) "
+        "VALUES (1, 'h1', 'Famille Martin', 'FR', now(), now())",
+        "INSERT INTO membership (id, person_id, season_id, status, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'active', now(), now())",
+        "INSERT INTO enrollment (id, membership_id, course_id, status, withdrawn_on, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'withdrawn', '2026-10-01', '2026-11-05 10:00', now())",
+        "INSERT INTO assessment (id, household_id, season_id, status, computed_total, computed_at, warnings, "
+        "created_at, updated_at) VALUES (1, 1, 1, 'proposed', 0, now(), '[]', now(), now())",
+        "INSERT INTO role (key, name, permissions) VALUES ('gestionnaire', 'Gestionnaire', '[\"fee.view\"]')",
+    )
+    upgrade(MIGRATIONS)
+    # Abandonnée avant d'avoir été enregistrée (saisie a posteriori) : la date d'entrée ne la dépasse pas.
+    assert run_sql(
+        migrated,
+        "SELECT enrolled_on::text, replaces_id FROM enrollment",
+        "SELECT review_reasons::text FROM assessment",
+        "SELECT permissions::text FROM role WHERE key = 'gestionnaire'",
+    ) == [[("2026-10-01", None)], [("[]",)], [('["fee.view", "enrollment.edit"]',)]]
+    run_sql(
+        migrated,
+        "INSERT INTO course (id, season_id, discipline_id, marked_full, created_at, updated_at) "
+        "VALUES (9, 1, 1, false, now(), now())",
+        "INSERT INTO enrollment (id, membership_id, course_id, status, replaces_id, created_at, updated_at) "
+        "VALUES (2, 1, 9, 'active', 1, now(), now())",
+    )
+    assert run_sql(migrated, "SELECT enrolled_on = CURRENT_DATE FROM enrollment WHERE id = 2") == [[(True,)]]
+    for statement in (
+        "UPDATE enrollment SET withdrawn_on = enrolled_on - 1 WHERE id = 2",
+        "UPDATE enrollment SET replaces_id = 2 WHERE id = 2",
+        "UPDATE enrollment SET enrolled_on = NULL WHERE id = 2",
+    ):
+        assert_fails(migrated, statement)
+    run_sql(migrated, "DELETE FROM enrollment WHERE id = 1")
+    assert run_sql(migrated, "SELECT replaces_id FROM enrollment WHERE id = 2") == [[(None,)]]
+    downgrade(MIGRATIONS, revision="a0000006types")
+    assert run_sql(migrated, "SELECT permissions::text FROM role WHERE key = 'gestionnaire'") == [[('["fee.view"]',)]]

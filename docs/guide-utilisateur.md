@@ -16,6 +16,7 @@ Pour le fonctionnement interne, voir [annuaire.md](annuaire.md), [catalogue.md](
   - [Les saisons](#les-saisons)
   - [L'annuaire](#lannuaire)
   - [Le catalogue](#le-catalogue)
+  - [Les élèves d'un cours](#les-élèves-dun-cours)
   - [Préparer une nouvelle saison](#préparer-une-nouvelle-saison)
   - [Les campagnes d'inscription](#les-campagnes-dinscription)
   - [Relire et valider les dossiers](#relire-et-valider-les-dossiers)
@@ -168,6 +169,23 @@ La fiche d'une personne montre aussi l'historique de ce qui l'a concernée (jour
 
 **Professeurs.** Les disciplines enseignées par chaque professeur, saison par saison. Confier un cours à un professeur ajoute sa discipline d'office ; à l'inverse, on ne peut pas lui retirer une discipline dont il a encore un cours.
 
+### Les élèves d'un cours
+
+**Catalogue → cliquez sur un cours.** La page montre ses élèves, leurs responsables et leur date d'arrivée, l'effectif face au maximum, et en bas les élèves partis en cours d'année.
+
+- **Télécharger la liste** donne un fichier à ouvrir dans un tableur.
+- **Écrire aux familles** ouvre votre messagerie avec les adresses des responsables en copie cachée.
+
+En cours d'année, le secrétariat peut :
+
+- **+ Inscrire un élève** : choisissez-le parmi les adhérents de la saison, et la date de son premier cours. On peut aussi partir de sa fiche : **Annuaire → la personne → Adhésions → + Inscrire à un cours**.
+- **Changer de cours** : l'élève quitte son groupe et rejoint l'autre à la date indiquée. Les deux cours gardent la trace du passage.
+- **Abandon** : l'élève quitte ce cours seulement ; il reste adhérent et garde ses autres cours. S'il quitte l'association, passez plutôt son adhésion en « Abandon » sur sa fiche.
+
+Un cours complet accepte quand même l'élève, avec un avertissement.
+
+**La cotisation n'est jamais recalculée toute seule.** Si celle du foyer était déjà calculée, elle est marquée **à revoir** dans **Tarifs → Cotisations**, avec la liste des changements. Recalculez-la, ou indiquez qu'il n'y a rien à changer.
+
 ### Préparer une nouvelle saison
 
 1. **Annuaire → Saisons → + Nouvelle saison** (sans la mettre en cours).
@@ -306,6 +324,7 @@ Le même écran supprime les **anciens dossiers d'inscription** des campagnes tr
 | Pendant la campagne | Secrétariat | Relire, renvoyer ou valider ; reporter dans le logiciel de gestion |
 | Toutes les semaines | (automatique) | Relances des dossiers non envoyés |
 | Rentrée | Secrétariat | Mettre la nouvelle saison en cours ; fermer les cours complets ; trouver les professeurs « à trouver » |
+| Toute l'année | Secrétariat | Arrivées, changements de cours et abandons ; revoir les cotisations marquées « à revoir » |
 | Une fois par an | Administrateur | Anonymiser les anciens adhérents, supprimer les anciens dossiers |
 
 ## Qui peut faire quoi
@@ -316,6 +335,7 @@ Le même écran supprime les **anciens dossiers d'inscription** des campagnes tr
 | Mes élèves | | ✓ | | |
 | Annuaire : consulter, modifier, fusionner | | | ✓ | ✓ |
 | Catalogue : consulter, modifier, copier une saison | | | ✓ | ✓ |
+| Élèves d'un cours : inscrire, changer de cours, noter un abandon | | | ✓ | ✓ |
 | Campagnes : créer, relire, valider, fichier de report | | | ✓ | ✓ |
 | Fichier de report avec les IBAN, coordonnées bancaires | | | | ✓ |
 | Professeurs et contrats | | | | ✓ |

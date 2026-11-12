@@ -51,14 +51,19 @@
 {% if edit and not person.archived_at %}<p><a href="{{ url_for('directory.create_household', personne=person.id) }}">+ Créer un foyer dont {{ person.first_name }} est responsable</a></p>{% endif %}
 
 <h2 id="adhesions">Adhésions</h2>
+{% set enroll_edit = can(current_user, "enrollment.edit") %}
 {% if person.memberships %}
 <div class="overflow-auto"><table class="striped responsive">
-  <thead><tr><th>Saison</th><th>Statut</th><th>Catégorie</th><th>Scolarité</th><th></th></tr></thead>
+  <thead><tr><th>Saison</th><th>Statut</th><th>Cours</th><th>Catégorie</th><th>Scolarité</th><th></th></tr></thead>
   <tbody>
   {% for m in person.memberships %}
   <tr>
     <td data-label="Saison">{{ m.season.label }}{% if current and current.id == m.season_id %} <small class="muted">(en cours)</small>{% endif %}</td>
     <td data-label="Statut"><span class="badge{{ ' badge-ok' if m.status == 'active' }}">{{ m.STATUSES[m.status] }}</span>{% if m.withdrawn_on %} <small>le {{ m.withdrawn_on | date_fr }}</small>{% endif %}</td>
+    <td data-label="Cours"><small>{% for e in m.enrollments | sort(attribute="enrolled_on") %}
+      <span class="{{ '' if e.active else 'muted' }}">{% if can(current_user, "catalog.view") %}<a href="{{ url_for('catalog.course', course_id=e.course_id) }}">{{ e.course.title }}</a>{% else %}{{ e.course.title }}{% endif %}{% if not e.active %} (parti{% if e.withdrawn_on %} le {{ e.withdrawn_on | date_fr }}{% endif %}){% elif enroll_edit %} · <a href="{{ url_for('catalog.transfer', enrollment_id=e.id, retour='fiche') }}">changer</a>{% endif %}</span>{% if not loop.last %}<br>{% endif %}
+      {%- else %}—{% endfor %}
+      {% if enroll_edit and m.status == "active" %}<br><a href="{{ url_for('catalog.enroll_in_course', membership_id=m.id) }}">+ Inscrire à un cours</a>{% endif %}</small></td>
     <td data-label="Catégorie">{{ m.category or "—" }}</td>
     <td data-label="Scolarité">{{ [m.school_level, m.school_class] | select | join(" · ") or "—" }}</td>
     <td data-label="" class="actions">{% if edit %}<a href="{{ url_for('directory.edit_membership', membership_id=m.id) }}">Modifier</a>{% endif %}</td>

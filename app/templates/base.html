@@ -36,7 +36,7 @@
       {{ navlink("notifications.index", "Notifications", "bell", ["notifications"]) }}
       {% if current_user.person %}{{ navlink("member.index", "Mon espace", "home") }}{% endif %}
       {{ navlink("enrollment.index", "Inscriptions", "clipboard") }}
-      {% if current_user.person and current_user.person.teacher %}{{ navlink("enrollment.my_students", "Mes élèves", "music") }}{% endif %}
+      {% if current_user.person and current_user.person.teacher %}{{ navlink("enrollment.my_students", "Mes élèves", "music") }}{{ navlink("lessons.mine", "Mes séances", "calendar") }}{% endif %}
       {% if can(current_user, "directory.view") or can(current_user, "teacher.manage") or can(current_user, "directory.anonymize") %}
       <p class="nav-title">Annuaire</p>
       {% if can(current_user, "directory.view") %}
@@ -48,12 +48,14 @@
       {% if can(current_user, "directory.edit") and can(current_user, "account.manage") %}{{ navlink("directory.link_accounts", "Rattachement", "user-check") }}{% endif %}
       {% if can(current_user, "directory.anonymize") %}{{ navlink("retention.index", "Conservation", "clock", ["retention"]) }}{% endif %}
       {% endif %}
-      {% if can(current_user, "catalog.view") or can(current_user, "registration.view") or can(current_user, "fee.view") %}
+      {% if can(current_user, "catalog.view") or can(current_user, "registration.view") or can(current_user, "fee.view") or can(current_user, "lesson.manage") %}
       <p class="nav-title">Enseignement</p>
       {% endif %}
       {% if can(current_user, "catalog.view") %}
       {{ navlink("catalog.index", "Catalogue", "layers", ["catalog"]) }}
+      {{ navlink("lessons.planning", "Planning", "calendar") }}
       {% endif %}
+      {% if can(current_user, "lesson.manage") %}{{ navlink("lessons.calendar", "Calendrier", "clock") }}{% endif %}
       {% if can(current_user, "registration.view") %}{{ navlink("campaigns.index", "Campagnes", "calendar", ["campaigns"]) }}{% endif %}
       {% if can(current_user, "fee.view") %}{{ navlink("fees.index", "Tarifs", "tag", ["fees"]) }}{% endif %}
       {% if current_user.is_admin or can(current_user, "account.manage") or can(current_user, "group.manage") or can(current_user, "client.manage") or can(current_user, "settings.manage") or can(current_user, "activity.view") %}

@@ -1,0 +1,22 @@
+{#- Une séance dans une liste : date, horaire, salle, état. -#}
+{% macro when(lesson) -%}
+<strong>{{ lesson.day | date_fr }}</strong> {{ lesson.starts_at.strftime("%H:%M") }}-{{ lesson.ends_at.strftime("%H:%M") }}
+{%- endmacro %}
+
+{% macro state(lesson) -%}
+{% if lesson.cancelled %}<span class="badge health-warn">annulée</span>{% if lesson.reason %} <small class="muted">{{ lesson.reason }}</small>{% endif %}
+{% else %}{% if lesson.extra %}<span class="badge">ajoutée</span>{% elif lesson.edited %}<span class="badge">modifiée</span>{% endif %}{% if lesson.reason %} <small class="muted">{{ lesson.reason }}</small>{% endif %}{% endif %}
+{%- if lesson.substitute %} <small>remplacé par {{ lesson.substitute.person.full_name }}</small>{% endif %}
+{%- endmacro %}
+
+{% macro cancel_form(lesson, back=none) -%}
+<details>
+  <summary>Annuler</summary>
+  <form method="post" action="{{ url_for('lessons.cancel', lesson_id=lesson.id) }}" class="inline-form" data-confirm="Annuler cette séance ? Les familles seront prévenues.">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if back %}<input type="hidden" name="retour" value="{{ back }}">{% endif %}
+    <input type="text" name="reason" maxlength="200" placeholder="Motif, transmis aux familles" aria-label="Motif" required>
+    <button type="submit" class="secondary small">Annuler la séance</button>
+  </form>
+</details>
+{%- endmacro %}

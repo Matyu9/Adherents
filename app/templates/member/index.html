@@ -27,6 +27,7 @@
 <div class="page-head">
   <div><h1>Mon espace</h1><p class="muted">Ce que l'association sait de votre foyer. Pour corriger une information, passez par votre dossier d'inscription ou par le secrétariat.</p></div>
   <a href="{{ url_for('enrollment.index') }}" role="button" class="secondary">Inscriptions</a>
+  <a href="{{ url_for('lessons.agenda_page') }}" role="button" class="secondary">Ajouter les cours à mon agenda</a>
 </div>
 {% if not person %}
 <p class="empty">Votre compte n'est pas encore relié à votre fiche d'adhérent : contactez le secrétariat.</p>

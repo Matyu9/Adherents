@@ -506,7 +506,7 @@ def test_enrollment_dates_and_review_on_the_real_schema(migrated):
         "created_at, updated_at) VALUES (1, 1, 1, 'proposed', 0, now(), '[]', now(), now())",
         "INSERT INTO role (key, name, permissions) VALUES ('gestionnaire', 'Gestionnaire', '[\"fee.view\"]')",
     )
-    upgrade(MIGRATIONS)
+    upgrade(MIGRATIONS, revision="a0000007effectifs")
     # Abandonnée avant d'avoir été enregistrée (saisie a posteriori) : la date d'entrée ne la dépasse pas.
     assert run_sql(
         migrated,
@@ -580,3 +580,43 @@ def test_waitlist_on_the_real_schema(migrated):
     assert run_sql(migrated, "SELECT count(*) FROM waitlist_entry") == [[(0,)]]
     downgrade(MIGRATIONS, revision="a0000008individuel")
     assert run_sql(migrated, "SELECT to_regclass('waitlist_entry') IS NULL") == [[(True,)]]
+
+
+def test_lessons_on_the_real_schema(migrated):
+    upgrade(MIGRATIONS, revision="a0000009attente")
+    run_sql(migrated, *SEED, *CATALOG, "INSERT INTO role (key, name, permissions) VALUES ('gestionnaire', 'G', '[]')")
+    upgrade(MIGRATIONS)
+    assert run_sql(migrated, "SELECT permissions::text FROM role WHERE key = 'gestionnaire'") == [
+        [('["lesson.manage"]',)]
+    ]
+    run_sql(
+        migrated,
+        "INSERT INTO season_break (id, season_id, label, starts_on, ends_on) VALUES (1, 1, 'Toussaint', '2026-10-17', '2026-11-01')",
+        "INSERT INTO lesson (id, course_id, scheduled_on, day, starts_at, ends_at, room_id, substitute_id, status, created_at) "
+        "VALUES (1, 1, '2026-10-07', '2026-10-07', '17:00', '18:00', 1, 1, 'planned', now())",
+        "UPDATE account SET calendar_token = 'abc' WHERE id = 1",
+    )
+    assert run_sql(migrated, "SELECT edited, revision FROM lesson") == [[(False, 0)]]
+    for statement in (
+        "INSERT INTO season_break (season_id, label, starts_on, ends_on) VALUES (1, 'x', '2026-10-02', '2026-10-01')",
+        "INSERT INTO lesson (course_id, scheduled_on, day, starts_at, ends_at, status, created_at) "
+        "VALUES (1, '2026-10-07', '2026-10-08', '17:00', '18:00', 'planned', now())",  # un créneau, une séance
+        "UPDATE lesson SET ends_at = '16:00'",
+        "UPDATE lesson SET status = 'perdue'",
+        "UPDATE account SET calendar_token = 'abc' WHERE id = 2",
+    ):
+        assert_fails(migrated, statement)
+    run_sql(
+        migrated,
+        "UPDATE course SET room_id = NULL",
+        "DELETE FROM room WHERE id = 1",
+        "DELETE FROM teacher_discipline",
+        "DELETE FROM teacher WHERE person_id = 1",
+    )
+    assert run_sql(migrated, "SELECT room_id, substitute_id FROM lesson") == [[(None, None)]]
+    run_sql(
+        migrated, "DELETE FROM teacher_discipline", "DELETE FROM course WHERE id = 1", "DELETE FROM season WHERE id = 1"
+    )
+    assert run_sql(migrated, "SELECT count(*) FROM lesson", "SELECT count(*) FROM season_break") == [[(0,)], [(0,)]]
+    downgrade(MIGRATIONS, revision="a0000009attente")
+    assert run_sql(migrated, "SELECT permissions::text FROM role WHERE key = 'gestionnaire'") == [[("[]",)]]

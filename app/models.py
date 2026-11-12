@@ -103,6 +103,8 @@ class Account(UserMixin, TimestampMixin, db.Model):
     totp_enabled_at = db.Column(db.DateTime)
     totp_last_counter = db.Column(db.Integer)  # dernier code accepté : un code ne sert qu'une fois
     theme = db.Column(db.String(10))  # "light", "dark" ou None (celui du système)
+    # Empreinte du jeton de l'agenda à s'abonner (.ics) ; le jeton lui-même n'est montré qu'une fois.
+    calendar_token = db.Column(db.String(64), unique=True)
     text_size = db.Column(db.String(10))  # "large", "xlarge" ou None (normale)
 
     groups = db.relationship(
@@ -598,9 +600,37 @@ class Season(db.Model):
     label = db.Column(db.String(20), nullable=False, unique=True)
     starts_on = db.Column(db.Date, nullable=False)
     ends_on = db.Column(db.Date, nullable=False)
+    # Reprise et fin des cours ; vides : les dates de la saison. Voir docs/cours.md.
+    lessons_from = db.Column(db.Date)
+    lessons_until = db.Column(db.Date)
+
+    breaks = db.relationship(
+        "SeasonBreak", back_populates="season", cascade="all, delete-orphan", order_by="SeasonBreak.starts_on"
+    )
+
+    @property
+    def lessons_window(self):
+        return self.lessons_from or self.starts_on, self.lessons_until or self.ends_on
 
     def __repr__(self):
         return f"<Season {self.label}>"
+
+
+class SeasonBreak(db.Model):
+    """Période sans cours d'une saison (vacances, jour férié), saisie par l'association : rien n'est fourni d'office."""
+
+    __table_args__ = (db.CheckConstraint("ends_on >= starts_on", name="ck_season_break_dates"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="CASCADE"), nullable=False, index=True)
+    label = db.Column(db.String(80), nullable=False)
+    starts_on = db.Column(db.Date, nullable=False)
+    ends_on = db.Column(db.Date, nullable=False)
+
+    season = db.relationship("Season", back_populates="breaks")
+
+    def covers(self, day):
+        return self.starts_on <= day <= self.ends_on
 
 
 class Membership(TimestampMixin, db.Model):
@@ -814,6 +844,69 @@ class Course(TimestampMixin, db.Model):
 
     def __repr__(self):
         return f"<Course {self.id}>"
+
+
+class Lesson(db.Model):
+    """Séance d'un cours, à une date. Générée depuis le créneau du cours, ou ajoutée (rattrapage).
+
+    Une séance modifiée à la main (`edited`) n'est plus touchée par une nouvelle génération. `previous` garde l'état
+    d'avant la dernière modification, pour que le secrétariat puisse revenir en arrière. `revision` augmente à chaque
+    changement : c'est le SEQUENCE des agendas. Voir docs/cours.md.
+    """
+
+    PLANNED = "planned"
+    CANCELLED = "cancelled"
+    STATUSES = {PLANNED: "Prévue", CANCELLED: "Annulée"}
+    __table_args__ = (
+        db.UniqueConstraint("course_id", "scheduled_on"),
+        db.CheckConstraint("ends_at > starts_at", name="ck_lesson_times"),
+        db.CheckConstraint("status IN ('planned', 'cancelled')", name="ck_lesson_status"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    course_id = db.Column(db.ForeignKey("course.id", ondelete="CASCADE"), nullable=False, index=True)
+    # Date du créneau régulier dont la séance vient ; vide pour une séance ajoutée.
+    scheduled_on = db.Column(db.Date)
+    day = db.Column(db.Date, nullable=False, index=True)
+    starts_at = db.Column(db.Time, nullable=False)
+    ends_at = db.Column(db.Time, nullable=False)
+    room_id = db.Column(db.ForeignKey("room.id", ondelete="SET NULL"), index=True)
+    substitute_id = db.Column(db.ForeignKey("teacher.person_id", ondelete="SET NULL"), index=True)
+    status = db.Column(db.String(10), nullable=False, default=PLANNED)
+    reason = db.Column(db.String(200))  # motif d'annulation ou de déplacement, montré aux familles
+    edited = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    previous = db.Column(db.JSON)
+    changed_by_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"))
+    changed_at = db.Column(db.DateTime)
+    revision = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    course = db.relationship("Course", backref=db.backref("lessons", passive_deletes=True, order_by="Lesson.day"))
+    room = db.relationship("Room")
+    substitute = db.relationship("Teacher")
+    changed_by = db.relationship("Account")
+
+    @property
+    def extra(self):
+        return self.scheduled_on is None
+
+    @property
+    def cancelled(self):
+        return self.status == self.CANCELLED
+
+    @property
+    def teacher(self):
+        """Qui fait la séance : le remplaçant s'il y en a un, sinon le professeur du cours."""
+        return self.substitute or self.course.teacher
+
+    def starts(self):
+        return datetime.combine(self.day, self.starts_at)
+
+    def ends(self):
+        return datetime.combine(self.day, self.ends_at)
+
+    def __repr__(self):
+        return f"<Lesson {self.course_id} {self.day}>"
 
 
 class TeacherDiscipline(db.Model):

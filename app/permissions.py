@@ -41,6 +41,7 @@ PERMISSION_GROUPS = [
             ("registration.view", "Consulter les campagnes et les dossiers d'inscription"),
             ("registration.manage", "Ouvrir les campagnes, valider ou renvoyer les dossiers, préparer le report"),
             ("enrollment.edit", "Inscrire, transférer ou désinscrire un élève d'un cours en cours de saison"),
+            ("lesson.manage", "Calendrier de la saison, séances de tous les cours, remplaçants ; avis des changements"),
         ],
     ),
     (
@@ -83,6 +84,7 @@ DEFAULT_PERMISSIONS = {
         "registration.view",
         "registration.manage",
         "enrollment.edit",
+        "lesson.manage",
         "fee.view",
         "fee.edit",
         "fee.assess",

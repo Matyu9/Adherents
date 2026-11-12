@@ -24,7 +24,7 @@ DIR_VIEW, DIR_EDIT, DIR_MERGE, BANK = "directory.view", "directory.edit", "direc
 LINKING = "account.manage+directory.edit"
 TEACHERS = "teacher.manage"
 CAT_VIEW, CAT_EDIT = "catalog.view", "catalog.edit"
-ROSTER, ENROLL = "catalog.view+directory.view", "enrollment.edit"
+ROSTER, ENROLL, LESSONS = "catalog.view+directory.view", "enrollment.edit", "lesson.manage"
 REG_VIEW, REG_MANAGE, REG_IBAN = "registration.view", "registration.manage", "registration.manage+bank.view"
 FEE_VIEW, FEE_EDIT, FEE_ASSESS, FEE_SITUATION = "fee.view", "fee.edit", "fee.assess", "fee.situation"
 ACCESS = {
@@ -245,6 +245,13 @@ ACCESS = {
             "enroll_from_waitlist",
         )
     },
+    **{
+        f"lessons.{name}": LESSONS
+        for name in ("calendar", "add_break", "delete_break", "generate", "save_delay", "revert", "substitute")
+    },
+    **{f"lessons.{name}": LOGGED_IN for name in ("course", "edit", "add", "cancel", "mine", "agenda_page")},
+    "lessons.planning": CAT_VIEW,
+    "lessons.feed": PUBLIC,
     "directory.merge_person": DIR_MERGE,
     "directory.merge_household": DIR_MERGE,
     **{
@@ -282,6 +289,7 @@ HOLDERS = {
     CAT_EDIT: {A, G},
     ROSTER: {A, G},
     ENROLL: {A, G},
+    LESSONS: {A, G},
     REG_VIEW: {A, G},
     REG_MANAGE: {A, G},
     REG_IBAN: {A},
@@ -321,6 +329,8 @@ ARGUMENTS = {
     "regie_id": 999,
     "enrollment_id": 999,
     "entry_id": 999,
+    "lesson_id": 999,
+    "break_id": 999,
     "direction": "monter",
 }
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
@@ -357,6 +367,7 @@ def test_every_declared_permission_exists():
         CAT_VIEW,
         CAT_EDIT,
         ENROLL,
+        LESSONS,
         REG_VIEW,
         REG_MANAGE,
         FEE_VIEW,
@@ -601,6 +612,20 @@ def _transfer(season, membership):
     courses.transfer(enrollment, second, enrollment.enrolled_on)
     courses.flag_review(membership.person, season, "Motif <script>")
     courses.add_to_waitlist(membership, first)
+    _lessons(season, first)
+
+
+def _lessons(season, course):
+    """Un calendrier : une période sans cours au nom piégé, les séances générées, une séance déplacée et annulée."""
+    from datetime import date
+
+    from app.services import lessons
+
+    lessons.add_break(season, "Vacances <b>", date(2026, 10, 17), date(2026, 11, 1))
+    lessons.generate(season, today=date(2026, 9, 1), apply=True)
+    first, second = course.lessons[:2]
+    first.reason, first.edited, first.previous = "Motif <script>", True, {"extra": True}
+    second.status, second.reason = "cancelled", "Grève <script>"
 
 
 INLINE = re.compile(
@@ -650,6 +675,8 @@ def test_crawl_every_link(app, rich, who):
             problems.append(f"{path} : une donnée n'a pas été échappée")
         for link in LINK.findall(html):
             target = urlsplit(urljoin(path, link.replace("&amp;", "&")))
+            if "semaine=" in target.query:  # le planning va de semaine en semaine sans fin
+                continue
             if not target.netloc and target.scheme not in ("data", "mailto", "tel"):  # data : QR code intégré
                 queue.append(target.path + (f"?{target.query}" if target.query else ""))
     assert not problems, "\n".join(problems)
@@ -672,6 +699,11 @@ def test_crawl_every_link(app, rich, who):
     assert any(p.endswith("/eleves.csv") for p in seen) == (who in (A, G))
     assert any(p.startswith("/catalogue/inscriptions/") for p in seen) == (who in (A, G))
     assert any(p.startswith("/catalogue/adhesions/") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/seances/calendrier") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/seances/cours/") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/seances/planning") for p in seen) == (who in (A, G))
+    assert any(p.endswith("/modifier") and p.startswith("/seances/") for p in seen) == (who in (A, G))
+    assert "/seances/agenda" in seen
     assert any(p.startswith("/catalogue/copier") for p in seen) == (who in (A, G))
     assert ("/campagnes" in seen) == (who in (A, G))
     assert any(p.startswith("/campagnes/dossiers/") for p in seen) == (who in (A, G))

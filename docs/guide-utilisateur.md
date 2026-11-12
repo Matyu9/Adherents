@@ -17,6 +17,7 @@ Pour le fonctionnement interne, voir [annuaire.md](annuaire.md), [catalogue.md](
   - [L'annuaire](#lannuaire)
   - [Le catalogue](#le-catalogue)
   - [Les élèves d'un cours](#les-élèves-dun-cours)
+  - [Calendrier et séances](#calendrier-et-séances)
   - [Préparer une nouvelle saison](#préparer-une-nouvelle-saison)
   - [Les campagnes d'inscription](#les-campagnes-dinscription)
   - [Relire et valider les dossiers](#relire-et-valider-les-dossiers)
@@ -116,6 +117,16 @@ Pour la saison en cours, ou une autre choisie en haut à droite, la page liste *
 
 Vous ne voyez que vos élèves, et rien d'autre de l'annuaire. Un professeur qui est aussi parent retrouve son foyer dans **Mon espace**.
 
+**Menu → Mes séances** : vos séances d'aujourd'hui, des huit semaines à venir et de la semaine passée, y compris celles où vous remplacez un collègue.
+
+- **Déplacer** : choisissez la date et l'horaire, puis **Voir les salles libres à ce créneau**, et la salle. Ce qui gêne (salle prise, élève qui a un autre cours…) est signalé.
+- **Annuler** : indiquez le motif, il est transmis aux familles.
+- **Toutes les séances → + Ajouter une séance** : un rattrapage.
+
+Le changement s'applique tout de suite : les familles reçoivent un message, et le secrétariat est prévenu. Une séance déjà commencée ne se modifie plus, et l'association peut fixer un délai avant la séance.
+
+**Mon agenda** : une adresse à ajouter à votre agenda (Google Agenda : *Autres agendas → + → À partir de l'URL*), avec vos séances à jour. Elle n'est affichée qu'une fois : gardez-la pour vous.
+
 ---
 
 ## Pour le secrétariat
@@ -190,6 +201,19 @@ Un cours complet accepte quand même l'élève, avec un avertissement.
 **Cours individuel.** Sur la page du cours, chaque ligne a une heure de passage et une durée. Les élèves se rangent dans l'ordre de la journée et les plages libres s'affichent en haut. Un passage qui déborde du créneau, qui chevauche celui d'un autre élève ou un autre cours du même élève est signalé en rouge. Le professeur voit ces heures dans **Mes élèves**, la famille dans **Mon espace**.
 
 **La cotisation n'est jamais recalculée toute seule.** Si celle du foyer était déjà calculée, elle est marquée **à revoir** dans **Tarifs → Cotisations**, avec la liste des changements. Recalculez-la, ou indiquez qu'il n'y a rien à changer.
+
+### Calendrier et séances
+
+**Menu → Calendrier.**
+
+1. **Dates des cours** : reprise et fin, si elles diffèrent de celles de la saison.
+2. **Périodes sans cours** : vacances, jours fériés, fermetures. Aucune n'est fournie d'office : saisissez celles de votre association (un jour férié est une période d'un jour).
+3. **Générer les séances** : l'aperçu dit combien seront créées. Relancez-la après avoir changé un horaire ou ajouté une période : les séances passées et celles modifiées à la main ne bougent pas.
+4. **Délai** (facultatif) : en deçà de ce nombre d'heures avant une séance, le professeur ne la modifie plus lui-même.
+
+**Séances d'un cours** (page du cours → **Séances**) : déplacer, annuler, ajouter, nommer un **remplaçant** pour une séance, ou **revenir en arrière** sur un changement fait par un professeur. Les familles sont prévenues à chaque fois.
+
+**Menu → Planning** : l'emploi du temps par salle, par professeur ou par site, en semaine type ou semaine par semaine.
 
 ### Préparer une nouvelle saison
 
@@ -341,6 +365,9 @@ Le même écran supprime les **anciens dossiers d'inscription** des campagnes tr
 | Annuaire : consulter, modifier, fusionner | | | ✓ | ✓ |
 | Catalogue : consulter, modifier, copier une saison | | | ✓ | ✓ |
 | Élèves d'un cours : inscrire, changer de cours, noter un abandon | | | ✓ | ✓ |
+| Déplacer, annuler, ajouter une séance | | ✓ (ses cours) | ✓ | ✓ |
+| Calendrier, génération des séances, remplaçants, retour en arrière | | | ✓ | ✓ |
+| Agenda à s'abonner | ✓ | ✓ | ✓ | ✓ |
 | Campagnes : créer, relire, valider, fichier de report | | | ✓ | ✓ |
 | Fichier de report avec les IBAN, coordonnées bancaires | | | | ✓ |
 | Professeurs et contrats | | | | ✓ |

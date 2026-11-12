@@ -13,6 +13,9 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 - **Cours individuels** : case « Cours individuel » sur un cours ; heure de passage et durée de chaque élève, plages libres du créneau, passages qui débordent ou se chevauchent signalés. Visibles dans Mes élèves et Mon espace. Migration `a0000008individuel`.
 - **Liste d'attente** d'un cours complet : demandée par la famille dans son dossier ou ajoutée par le secrétariat, ordre réglable, inscription en un clic ; notification au secrétariat quand une place se libère, sans inscription automatique. Migration `a0000009attente`.
 - **Fusion de deux fiches** : les inscriptions passent sur la fiche gardée avec leurs dates (elles étaient recréées sans).
+- **Calendrier et séances** : reprise et fin des cours, périodes sans cours saisies par l'association, génération des séances (relançable, sans toucher aux séances passées ni modifiées à la main). Le **professeur déplace, annule ou ajoute ses séances** depuis **Mes séances**, avec les salles libres et les gênes signalées ; les familles et le secrétariat sont prévenus, le secrétariat peut revenir en arrière et nommer un remplaçant. Délai réglable, sans valeur par défaut. Nouveau droit `lesson.manage`. Migration `a0000010seances`.
+- **Plannings** par salle, professeur ou site, en semaine type ou semaine réelle.
+- **Agenda à s'abonner** (.ics) pour chaque compte : séances du professeur, ou des enfants, sans nom d'élève, à adresse secrète régénérable. Nouveau réglage `TIMEZONE`.
 - **Feuille de route** : la gestion des cours, en six étapes (effectifs, cours individuels, liste d'attente, séances et agendas, agendas des salles Google Workspace, présences).
 
 ### Changé : les types de discipline se composent

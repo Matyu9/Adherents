@@ -84,6 +84,7 @@ def create_app(config_class=Config):
     from .blueprints.groups import bp as groups_bp
     from .blueprints.health import bp as health_bp
     from .blueprints.journal import bp as journal_bp
+    from .blueprints.lessons import bp as lessons_bp
     from .blueprints.member import bp as member_bp
     from .blueprints.notifications import bp as notifications_bp
     from .blueprints.oidc import bp as oidc_bp
@@ -102,6 +103,7 @@ def create_app(config_class=Config):
     app.register_blueprint(directory_bp)
     app.register_blueprint(teachers_bp)
     app.register_blueprint(catalog_bp)
+    app.register_blueprint(lessons_bp)
     app.register_blueprint(fees_bp)
     app.register_blueprint(campaigns_bp)
     app.register_blueprint(enrollment_bp)

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% from "directory/_macros.html" import csrf, post_button %}
+{% from "catalog/_season_picker.html" import season_picker %}
+{% block title %}Calendrier {{ season.label }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Calendrier {{ season.label }}</h1>
+    <p class="muted">Dates des cours, périodes sans cours et séances de chaque cours. {{ lesson_count }} séance{{ "s" if lesson_count > 1 }} enregistrée{{ "s" if lesson_count > 1 }}.</p>
+  </div>
+  <div class="actions">{{ season_picker(seasons, season, "lessons.calendar") }}
+    <a href="{{ url_for('lessons.planning', saison=season.id) }}" role="button" class="secondary">Planning</a></div>
+</div>
+
+<section class="card settings-block">
+  <h2>Dates des cours</h2>
+  <form method="post" novalidate>
+    {{ window.hidden_tag() }}
+    <input type="hidden" name="saison" value="{{ season.id }}">
+    <div class="grid"><div>{{ field(window.lessons_from) }}</div><div>{{ field(window.lessons_until) }}</div></div>
+    <p class="small muted">Vides : du {{ season.starts_on | date_fr }} au {{ season.ends_on | date_fr }}, les dates de la saison.</p>
+    <button type="submit" class="secondary">Enregistrer</button>
+  </form>
+</section>
+
+<section class="card settings-block" id="periodes">
+  <h2>Périodes sans cours</h2>
+  <p class="small muted">Vacances, jours fériés, fermetures : saisissez celles de votre association, aucune n'est fournie d'office.</p>
+  {% if season.breaks %}
+  <ul class="plain-list">
+    {% for b in season.breaks %}
+    <li>{{ b.label }} : <strong>{{ b.starts_on | date_fr }}</strong>{% if b.ends_on != b.starts_on %} au <strong>{{ b.ends_on | date_fr }}</strong>{% endif %}
+      {{ post_button(url_for('lessons.delete_break', break_id=b.id), "Supprimer", "link-button small", "Supprimer la période « " ~ b.label ~ " » ?") }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">Aucune période pour l'instant.</p>{% endif %}
+  <form method="post" action="{{ url_for('lessons.add_break', season_id=season.id) }}" novalidate>
+    {{ break_form.hidden_tag() }}
+    <div class="grid"><div>{{ field(break_form.label) }}</div><div>{{ field(break_form.starts_on) }}</div><div>{{ field(break_form.ends_on) }}</div></div>
+    <button type="submit" class="secondary">Ajouter la période</button>
+  </form>
+</section>
+
+<section class="card settings-block" id="generation">
+  <h2>Séances</h2>
+  <p>La génération crée une séance pour chaque jour de cours, et recale les séances à venir sur le créneau de leur cours. Elle peut être relancée sans risque : elle ne touche ni aux séances passées ni à celles modifiées à la main.</p>
+  {% if plan.changes %}
+  <p><strong>Aperçu :</strong> {{ plan.created | length }} séance(s) à créer, {{ plan.updated | length }} à recaler, {{ plan.removed | length }} à retirer (période sans cours, jour changé){% if plan.kept %}, {{ plan.kept }} laissée(s) telle(s) quelle(s){% endif %}.</p>
+  <form method="post" action="{{ url_for('lessons.generate', season_id=season.id) }}">
+    {{ csrf() }}
+    <button type="submit">Générer les séances</button>
+  </form>
+  {% else %}<p class="muted">Les séances sont à jour.</p>{% endif %}
+  {% if plan.skipped %}<p class="small muted">Sans jour ni horaire, donc sans séance : {% for c in plan.skipped %}{{ c.title }}{{ ", " if not loop.last }}{% endfor %}.</p>{% endif %}
+</section>
+
+<section class="card settings-block" id="reglages">
+  <h2>Modifications par les professeurs</h2>
+  <p class="small muted">Un professeur déplace, annule ou ajoute ses séances lui-même : le changement s'applique tout de suite, les familles et le secrétariat sont prévenus, et le secrétariat peut revenir en arrière.</p>
+  <form method="post" action="{{ url_for('lessons.save_delay') }}" novalidate>
+    {{ delay.hidden_tag() }}
+    <input type="hidden" name="saison" value="{{ season.id }}">
+    {{ field(delay.hours) }}<small class="muted">{{ delay.hours.description }}</small>
+    <button type="submit" class="secondary">Enregistrer</button>
+  </form>
+</section>
+{% endblock %}

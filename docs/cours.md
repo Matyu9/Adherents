@@ -97,6 +97,72 @@ Table `waitlist_entry` : un cours, une adhésion de la même saison, une **posit
 - La famille voit dans **Mon espace** les cours où ses enfants attendent.
 - La fusion de deux fiches garde les inscriptions (avec leurs dates et heures de passage) et les listes d'attente de la fiche abandonnée.
 
+## Calendrier et séances
+
+**Enseignement → Calendrier** (droit `lesson.manage`).
+
+| Table / colonne | Rôle |
+|---|---|
+| `season.lessons_from`, `lessons_until` | reprise et fin des cours ; vides : les dates de la saison |
+| `season_break` | périodes sans cours (nom, premier et dernier jour inclus). L'association les saisit : aucune liste de vacances ni de jours fériés n'est fournie. Un jour férié est une période d'un jour. |
+| `lesson` | une séance : cours, date, horaire, salle, remplaçant, statut (`planned`, `cancelled`), motif |
+
+Colonnes de suivi d'une séance :
+
+- `scheduled_on` : le jour du créneau régulier dont elle vient, unique par cours ; vide pour une séance ajoutée (rattrapage).
+- `edited` : modifiée à la main, donc laissée telle quelle par la génération.
+- `previous` : l'état d'avant la dernière modification, pour revenir en arrière.
+- `revision` : augmente à chaque changement ; c'est le `SEQUENCE` des agendas.
+- `changed_by`, `changed_at` : qui a fait le dernier changement, et quand.
+
+**Génération.** Pour chaque cours qui a un jour et un horaire, une séance par semaine entre reprise et fin des cours, hors périodes sans cours. L'écran montre d'abord un aperçu (à créer, à recaler, à retirer). On peut la relancer après avoir changé un créneau, ajouté une période ou décalé les dates :
+
+- les séances qui manquent sont créées ;
+- les séances **à venir** qui n'ont pas été modifiées à la main sont recalées sur le créneau du cours (jour, horaire, salle) ;
+- celles qui ne tombent plus sur un jour de cours sont retirées (annulées si l'appel a été fait) ;
+- les séances passées et celles modifiées à la main ne bougent pas.
+
+Un élève **suit une séance** s'il est inscrit au cours ce jour-là (date d'entrée et de départ). Dans un cours individuel, son heure de passage suit la séance : déplacée d'une heure, la séance décale son passage d'autant.
+
+## Séances modifiées par le professeur
+
+Le professeur du cours (pas le remplaçant) déplace, annule ou ajoute une séance depuis **Mes séances**, sans validation :
+
+- **Déplacer** : date, horaire et salle. L'écran montre les salles libres à ce créneau (d'après les autres séances, et l'agenda de la salle s'il est relié), puis signale sans refuser une salle prise, un professeur déjà en cours, un élève qui a un autre cours, un jour pendant une période sans cours.
+- **Annuler** : le motif est obligatoire, il est transmis aux familles.
+- **Ajouter** une séance de rattrapage.
+
+Le changement s'applique tout de suite :
+
+- les familles des élèves de la séance reçoivent une notification (et l'email qui va avec), ou un email direct si elles n'ont pas de compte ;
+- les comptes qui ont `lesson.manage` reçoivent une notification avec le lien vers les séances du cours ;
+- tout est noté au journal.
+
+**Ce que le professeur ne peut pas faire :** modifier une séance déjà commencée, déplacer ou ajouter une séance dans le passé, changer le créneau habituel du cours (secrétariat, catalogue). Le **délai** avant une séance en deçà duquel il ne peut plus la modifier est un réglage de l'association (`lesson_teacher_delay_hours`), **sans valeur par défaut** : tant qu'il n'est pas fixé, il n'y a pas de limite.
+
+**Le secrétariat** fait tout cela sans délai, sur toutes les séances, et en plus :
+
+- **revient en arrière** sur la dernière modification d'une séance : l'état d'avant revient, une séance ajoutée disparaît, et les familles sont prévenues ;
+- nomme un **remplaçant** pour une séance, qui reçoit une notification, voit la séance dans Mes séances et pourra faire l'appel, mais ne la déplace pas.
+
+## Plannings
+
+**Enseignement → Planning** (droit `catalog.view`) : par salle, par professeur ou par site, la **semaine type** (créneaux des cours de la saison) ou une **semaine réelle** (séances, avec annulations et modifications), de semaine en semaine.
+
+## Agenda à s'abonner
+
+Chaque compte peut créer une adresse secrète (`/seances/agenda/<jeton>.ics`), depuis **Mon compte**, **Mon espace** ou **Mes séances**, et l'ajouter à Google Agenda, Apple, Outlook… :
+
+- un professeur y trouve ses séances et ses remplacements ;
+- un responsable, les séances des enfants de ses foyers (et les siennes), avec l'heure de passage d'un cours individuel ;
+- les séances du mois passé et de l'année à venir. Une séance annulée reste, marquée `STATUS:CANCELLED` ; chaque changement augmente son `SEQUENCE`.
+
+**Aucun nom d'élève** dans les événements : seulement le cours, la salle, l'horaire et le motif d'un changement. L'adresse peut circuler, et le calendrier qui la lit en garde une copie.
+
+Le jeton est montré **une seule fois**, à sa création ; seule son empreinte (SHA-256) est gardée, dans `account.calendar_token`. En créer un nouveau coupe l'ancienne adresse ; on peut aussi la supprimer. Un compte coupé n'a plus d'agenda. Les heures sont écrites en UTC, calculées depuis le fuseau `TIMEZONE` (`Europe/Paris` par défaut) : les changements d'heure tombent juste.
+
+Les calendriers relisent ces adresses toutes les quelques heures (jusqu'à 24 h chez Google) : c'est pourquoi un changement de séance passe aussi par notification et email.
+
 ## Droits
 
 | Droit | Donne accès à |
@@ -104,8 +170,12 @@ Table `waitlist_entry` : un cours, une adhésion de la même saison, une **posit
 | `catalog.view` et `directory.view` | la page d'un cours et la liste de ses élèves |
 | `enrollment.edit` | inscrire, transférer, noter un abandon, fixer l'heure de passage, gérer la liste d'attente ; reçoit les avis de place libre |
 | `fee.assess` | indiquer qu'une cotisation à revoir n'a rien à changer |
+| `lesson.manage` | calendrier de la saison, génération, séances de tous les cours, retour en arrière, remplaçants ; reçoit les avis des changements faits par les professeurs |
+| `catalog.view` | les plannings |
+| (professeur du cours) | ses séances : déplacer, annuler, ajouter |
+| (tout compte) | son agenda à s'abonner |
 
-La migration `a0000007effectifs` ajoute `enrollment.edit` à un rôle Gestionnaire déjà enregistré. Les inscriptions existantes y prennent la date de leur enregistrement, sans dépasser leur date de départ.
+Les migrations `a0000007effectifs` et `a0000010seances` ajoutent `enrollment.edit` et `lesson.manage` à un rôle Gestionnaire déjà enregistré. Les inscriptions existantes y prennent la date de leur enregistrement, sans dépasser leur date de départ.
 
 ## Tests
 

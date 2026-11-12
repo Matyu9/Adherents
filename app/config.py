@@ -37,6 +37,8 @@ class Config:
     REMEMBER_COOKIE_SAMESITE = "Lax"
     REMEMBER_COOKIE_HTTPONLY = True
     ASSO_NAME = os.environ.get("ASSO_NAME", "Mon association")
+    # Fuseau des horaires de cours, pour les agendas à s'abonner (.ics).
+    TIMEZONE = os.environ.get("TIMEZONE", "Europe/Paris")
 
     SMTP_HOST = os.environ.get("SMTP_HOST", "")
     SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))

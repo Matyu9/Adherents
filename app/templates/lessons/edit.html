@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "partials/_form.html" import field %}
+{% block title %}{{ "Déplacer une séance" if lesson else "Ajouter une séance" }}{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>{{ "Déplacer une séance" if lesson else "Ajouter une séance" }}</h1>
+  <p class="muted">{{ course.title }}{% if lesson %} · prévue le {{ lesson.day | date_fr }} à {{ lesson.starts_at.strftime("%H:%M") }}{% if lesson.room %}, {{ lesson.room.label }}{% endif %}{% endif %}</p>
+  <form method="get" novalidate>
+    <div class="grid"><div>{{ field(form.day) }}</div><div>{{ field(form.starts_at) }}</div><div>{{ field(form.ends_at) }}</div></div>
+    <button type="submit" class="secondary">Voir les salles libres à ce créneau</button>
+  </form>
+  {% for w in warnings %}<p class="flash flash-warning">{{ w }}</p>{% endfor %}
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {% if request.args.get("retour") %}<input type="hidden" name="retour" value="{{ request.args.get('retour') }}">{% endif %}
+    <input type="hidden" name="day" value="{{ form.day._value() }}">
+    <input type="hidden" name="starts_at" value="{{ form.starts_at._value() }}">
+    <input type="hidden" name="ends_at" value="{{ form.ends_at._value() }}">
+    {% if form.day.errors %}<p class="error">{{ form.day.errors | join(" ") }}</p>{% endif %}
+    <p><strong>{{ form.day.data | date_fr if form.day.data else "Date à choisir" }}</strong>{% if form.starts_at.data and form.ends_at.data %}, {{ form.starts_at.data.strftime("%H:%M") }}-{{ form.ends_at.data.strftime("%H:%M") }}{% endif %}</p>
+    {{ field(form.room_id) }}
+    {{ field(form.reason) }}
+    <p class="small muted">Le changement s'applique tout de suite : les familles reçoivent un message{% if not can(current_user, "lesson.manage") %}, et le secrétariat est prévenu{% endif %}.</p>
+    <button type="submit"{% if not (form.day.data and form.starts_at.data and form.ends_at.data) %} disabled{% endif %}>{{ "Déplacer la séance" if lesson else "Ajouter la séance" }}</button>
+  </form>
+  <p class="small"><a href="{{ url_for('lessons.mine') if request.args.get('retour') == 'mes-seances' else url_for('lessons.course', course_id=course.id) }}">Annuler</a></p>
+</article>
+{% endblock %}

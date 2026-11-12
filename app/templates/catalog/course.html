@@ -20,6 +20,7 @@
   </div>
   <div class="actions">
     {% if edit %}<a href="{{ url_for('catalog.enroll_student', course_id=course.id) }}" role="button">+ Inscrire un élève</a>{% endif %}
+    <a href="{{ url_for('lessons.course', course_id=course.id) }}" role="button" class="secondary">Séances ({{ course.lessons | length }})</a>
     {% if can(current_user, "catalog.edit") %}<a href="{{ url_for('catalog.edit_course', course_id=course.id) }}" role="button" class="secondary">Modifier le cours</a>{% endif %}
   </div>
 </div>

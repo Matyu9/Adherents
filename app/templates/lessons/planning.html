@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Planning{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Planning{% if target %} : {{ target.label if view == "salle" else (target.person.full_name if view == "prof" else target.name) }}{% endif %}</h1>
+    <p class="muted">{% if kind == "type" %}Semaine type {{ season.label if season }}, d'après les créneaux des cours.{% else %}Semaine du {{ monday | date_fr }}, avec les séances réelles.{% endif %}</p>
+  </div>
+</div>
+<form method="get" class="filters">
+  <select name="type" aria-label="Semaine" data-autosubmit>
+    <option value="reelle" {{ "selected" if kind == "reelle" }}>Semaine réelle</option>
+    <option value="type" {{ "selected" if kind == "type" }}>Semaine type</option>
+  </select>
+  <select name="vue" aria-label="Vue" data-autosubmit>
+    <option value="salle" {{ "selected" if view == "salle" }}>Par salle</option>
+    <option value="prof" {{ "selected" if view == "prof" }}>Par professeur</option>
+    <option value="site" {{ "selected" if view == "site" }}>Par site</option>
+  </select>
+  <select name="id" aria-label="Choix" data-autosubmit>
+    <option value="">Tout</option>
+    {% if view == "salle" %}{% for r in rooms %}<option value="{{ r.id }}" {{ "selected" if target and target.id == r.id }}>{{ r.label }}</option>{% endfor %}
+    {% elif view == "prof" %}{% for t in teachers %}<option value="{{ t.person_id }}" {{ "selected" if target and target.person_id == t.person_id }}>{{ t.person.sort_name }}</option>{% endfor %}
+    {% else %}{% for s in sites %}<option value="{{ s.id }}" {{ "selected" if target and target.id == s.id }}>{{ s.name }}</option>{% endfor %}{% endif %}
+  </select>
+  {% if kind == "reelle" %}<input type="date" name="semaine" value="{{ monday.isoformat() }}" aria-label="Semaine du" data-autosubmit>{% endif %}
+  {% if season %}<input type="hidden" name="saison" value="{{ season.id }}">{% endif %}
+  <noscript><button type="submit">Voir</button></noscript>
+</form>
+{% if kind == "reelle" %}
+<p class="small"><a href="{{ url_for('lessons.planning', vue=view, id=target.id if view != 'prof' and target else (target.person_id if target else none), semaine=previous.isoformat()) }}">← Semaine précédente</a> · <a href="{{ url_for('lessons.planning', vue=view, id=target.id if view != 'prof' and target else (target.person_id if target else none), semaine=following.isoformat()) }}">Semaine suivante →</a></p>
+<div class="planning">
+  {% for day, items in rows.items() %}
+  <section class="card">
+    <h2>{{ day_label(day) | capitalize }}</h2>
+    {% for l in items %}
+    <p class="small{{ ' muted' if l.cancelled }}"><strong>{{ l.starts_at.strftime("%H:%M") }}-{{ l.ends_at.strftime("%H:%M") }}</strong> {{ l.course.title }}
+      {% if l.room and view != "salle" %}<br>{{ l.room.label }}{% endif %}{% if l.teacher and view != "prof" %}<br>{{ l.teacher.person.full_name }}{% endif %}
+      {% if l.cancelled %} <span class="badge health-warn">annulée</span>{% elif l.edited %} <span class="badge">modifiée</span>{% endif %}</p>
+    {% else %}<p class="small muted">—</p>{% endfor %}
+  </section>
+  {% endfor %}
+</div>
+{% else %}
+<div class="planning">
+  {% for d, items in days.items() %}
+  <section class="card">
+    <h2>{{ weekdays[d] }}</h2>
+    {% for c in items %}
+    <p class="small">{% if c.starts_at %}<strong>{{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}</strong> {% endif %}{{ c.title }}
+      {% if c.room and view != "salle" %}<br>{{ c.room.label }}{% endif %}{% if c.teacher and view != "prof" %}<br>{{ c.teacher.person.full_name }}{% endif %}</p>
+    {% else %}<p class="small muted">—</p>{% endfor %}
+  </section>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

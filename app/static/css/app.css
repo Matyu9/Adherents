@@ -266,6 +266,9 @@ input, select, textarea { font-size: .93rem; }
 .nowrap { white-space: nowrap; }
 details summary { font-weight: 600; color: var(--text-2); }
 td.actions details { display: inline-block; vertical-align: baseline; margin: 0; padding: 0; border: 0; }
+.planning { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .75rem; }
+.planning .card { margin: 0; padding: .75rem; }
+.planning h2 { font-size: 1rem; margin-bottom: .5rem; }
 .inline-form input.narrow-number { width: 5.5rem; }
 td.actions details > summary { font-weight: 400; color: var(--pico-primary); }
 fieldset { margin-bottom: .75rem; min-width: 0; }
@@ -462,3 +465,4 @@ a.badge:hover { text-decoration: none; border-color: var(--brand); }
 tr.total td { font-weight: 700; border-top: 2px solid var(--border); }
 .condition-param { display: contents; }
 .condition-param[hidden] { display: none; }
+.planning section.card + section.card { margin-top: 0; }

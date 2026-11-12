@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Mon agenda{% endblock %}
+{% block content %}
+<article class="narrow">
+  <h1>Mon agenda</h1>
+  <p>Abonnez votre agenda (Google Agenda, Apple, Outlook…) à vos cours : les séances{% if current_user.person and current_user.person.teacher %} que vous donnez ou remplacez{% endif %}, et celles des élèves dont vous êtes responsable, avec les annulations et les déplacements.</p>
+  {% if url %}
+  <section class="card">
+    <h2>Votre adresse</h2>
+    <p><input type="text" readonly value="{{ url }}" aria-label="Adresse de l'agenda"></p>
+    <p class="small"><strong>Copiez-la maintenant :</strong> elle ne sera plus affichée. Dans Google Agenda : <em>Autres agendas → + → À partir de l'URL</em>.</p>
+    <p class="small muted">Gardez-la pour vous : qui la connaît voit ces horaires. Les agendas relisent l'adresse toutes les quelques heures : une annulation du jour arrive aussi par message.</p>
+  </section>
+  {% endif %}
+  <form method="post">
+    {{ csrf() }}
+    <button type="submit"{% if has_token and not url %} class="secondary"{% endif %}>{{ "Créer une nouvelle adresse" if has_token else "Créer mon adresse d'agenda" }}</button>
+    {% if has_token %}<p class="small muted">Une nouvelle adresse remplace l'ancienne, qui ne fonctionne plus.</p>{% endif %}
+  </form>
+  {% if has_token %}
+  <form method="post" data-confirm="Supprimer l'adresse ? Les agendas abonnés ne recevront plus rien.">
+    {{ csrf() }}<input type="hidden" name="action" value="supprimer">
+    <button type="submit" class="contrast outline small">Supprimer l'adresse</button>
+  </form>
+  {% endif %}
+</article>
+{% endblock %}

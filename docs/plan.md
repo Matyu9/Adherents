@@ -53,11 +53,58 @@ Adhérents a deux missions :
 | Campagnes d'inscription | Fait | [inscriptions.md](inscriptions.md) |
 | Espace adhérent | Fait | Foyer, cours, dossiers, matériel prêté |
 | Tarifs et cotisations | Fait | [tarifs.md](tarifs.md) |
+| Gestion des cours | À faire | Voir ci-dessous |
 | Import depuis un logiciel de gestion | À faire | Voir ci-dessous |
 | Règlements | À faire | Voir ci-dessous |
 | Bascule | À faire | Voir ci-dessous |
 
 ## Ce qui reste
+
+### Gestion des cours
+
+La vie d'un cours pendant la saison, une fois le catalogue construit. Chaque étape se livre et se teste seule.
+
+1. **Effectifs et inscriptions en cours de saison.**
+   - Une page par cours : élèves, effectif face à la capacité, export, email aux responsables.
+   - Le secrétariat inscrit un élève qui a une adhésion de la saison, le transfère vers un autre cours ou note l'abandon d'un seul cours. L'inscription garde sa date d'entrée et, après un transfert, le cours d'origine.
+   - Un cours complet n'est plus proposé dans les dossiers.
+   - Tout changement d'inscription marque la cotisation du foyer « à revoir », sans la recalculer seul. Une cotisation validée garde son statut et porte le signal.
+   - Droit `enrollment.edit`.
+2. **Cours individuels.** Un cours est individuel par un choix explicite, pas parce qu'il n'a pas de capacité. Chaque élève a son heure de passage et sa durée. Deux passages qui se chevauchent, ou un passage hors du créneau, sont signalés sans être refusés.
+3. **Liste d'attente.**
+   - La famille s'y inscrit depuis son dossier quand un cours est complet ; le secrétariat peut aussi y ajouter un élève.
+   - L'ordre est une position explicite, que le secrétariat peut changer.
+   - Quand une place se libère, le secrétariat est prévenu et inscrit le premier de la liste. Rien n'est automatique.
+4. **Calendrier et séances.**
+   - Pour chaque saison : dates de reprise et de fin des cours, et périodes sans cours saisies par l'association. Aucune liste de vacances n'est fournie d'office.
+   - Les séances de chaque cours sont générées à la demande. On peut relancer la génération : elle ne touche ni aux séances passées ni à celles modifiées à la main.
+   - Une séance peut avoir un remplaçant, qui voit les élèves de cette séance et fait l'appel.
+   - **Le professeur déplace, annule ou ajoute ses séances lui-même.** Le changement s'applique tout de suite : la salle est réservée, les familles sont prévenues par email, le secrétariat est notifié et peut revenir en arrière.
+   - Le délai jusqu'auquel le professeur peut modifier une séance est un réglage de l'association, sans valeur par défaut : tant qu'il n'est pas fixé, il n'y a pas de limite.
+   - Le créneau habituel d'un cours reste au secrétariat.
+   - **Plannings** par salle, par professeur et par site : la semaine type, ou une semaine réelle avec ses annulations.
+   - **Agendas à s'abonner (`.ics`)** pour chaque compte, par une adresse secrète que le titulaire peut régénérer :
+     - un professeur y trouve ses séances et ses remplacements ;
+     - une famille, les séances de ses enfants et leurs heures de passage.
+     - Aucun nom d'élève dans les événements. Les calendriers ne relisent ces adresses que toutes les quelques heures : une annulation du jour passe donc aussi par email.
+5. **Agendas des salles (Google Workspace, facultatif).**
+   - Une salle peut être reliée à l'agenda d'une ressource Workspace, partagé avec un compte de service. Pas de délégation sur tout le domaine.
+   - Avant d'enregistrer un cours ou de déplacer une séance, l'appli lit l'occupation de la salle chez Google. Une réunion Workspace apparaît comme un chevauchement.
+   - Chaque séance devient un événement de l'agenda de la salle, avec un identifiant tiré de la séance : relancer l'envoi ne crée jamais de doublon.
+   - Les envois passent par une file réessayée. Si Google ne répond pas, l'appli continue en le signalant.
+   - **Salles lues dans Workspace :** l'écran « Synchroniser avec Workspace » liste les bâtiments et les salles de l'organisation. Il montre un aperçu avant d'écrire : salles nouvelles, renommées ou disparues. Une salle déjà saisie peut être reliée au lieu d'être recréée.
+     - L'adresse de l'agenda sert de clé de correspondance, et la capacité de la salle est reprise.
+     - Une salle disparue est signalée et on propose de l'archiver. Rien n'est supprimé, et les salles hors Workspace restent possibles.
+     - Pour lister les salles, le compte de service reçoit un rôle d'administration personnalisé limité à la lecture des ressources d'agenda. Pas de délégation sur tout le domaine : une fuite de la clé ne donne accès qu'aux salles.
+     - L'écran montre les salles dont l'agenda n'est pas encore partagé avec le compte de service.
+   - Le lien avec Google est un module à part, derrière une interface « agenda de salle » : sans configuration, rien ne change, et d'autres serveurs d'agenda pourront s'y brancher.
+6. **Présences.**
+   - Le professeur fait l'appel sur ses séances, depuis son téléphone : présent, absent ou excusé.
+   - Pas de motif d'absence en texte libre : il révélerait vite des données de santé.
+   - Le professeur peut corriger l'appel pendant 7 jours, ensuite seul le secrétariat le peut.
+   - Le secrétariat voit les absences répétées, avec un seuil qu'il règle.
+   - Les familles voient le statut des séances de leurs enfants dans leur espace. Ce réglage est actif par défaut et l'association peut le couper.
+   - Les présences suivent la durée de conservation des données.
 
 ### Import depuis un logiciel de gestion
 
@@ -81,8 +128,7 @@ Pour une association qui remplace son logiciel de gestion : un dernier import co
 
 ### Laissé de côté pour l'instant
 
-- **Inscriptions :** liste d'attente, heure de passage d'un élève dans un cours individuel.
-- **Catalogue :** remplaçant et accompagnateur d'un cours.
+- **Catalogue :** accompagnateur d'un cours.
 - **Espace adhérent :** la modification de ses coordonnées, qui passe par le dossier d'inscription ou par le secrétariat.
 - **Comptes :** la suppression d'un compte ; en attendant, un compte se coupe.
 - **Déconnexion :** Front-Channel Logout, plus fragile et inutile si chaque appli reçoit les avis.

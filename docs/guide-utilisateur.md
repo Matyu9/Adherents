@@ -213,6 +213,8 @@ Un cours complet accepte quand même l'élève, avec un avertissement.
 
 **Séances d'un cours** (page du cours → **Séances**) : déplacer, annuler, ajouter, nommer un **remplaçant** pour une séance, ou **revenir en arrière** sur un changement fait par un professeur. Les familles sont prévenues à chaque fois.
 
+**Salles de l'organisation** (si l'association relie son Google Workspace) : **Catalogue → Disciplines, niveaux et lieux → Salles de l'organisation** reprend les salles de l'organisation, avec un aperçu avant d'écrire. Les séances sont ensuite réservées dans l'agenda de chaque salle, et une réunion déjà posée sur une salle apparaît quand on déplace une séance.
+
 **Menu → Planning** : l'emploi du temps par salle, par professeur ou par site, en semaine type ou semaine par semaine.
 
 ### Préparer une nouvelle saison

@@ -219,6 +219,8 @@ ACCESS = {
         for name in (
             "create_course",
             "edit_course",
+            "workspace_rooms",
+            "workspace_push",
             "delete_course",
             "copy",
             "teacher_disciplines",

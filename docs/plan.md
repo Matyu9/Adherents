@@ -53,7 +53,7 @@ Adhérents a deux missions :
 | Campagnes d'inscription | Fait | [inscriptions.md](inscriptions.md) |
 | Espace adhérent | Fait | Foyer, cours, dossiers, matériel prêté |
 | Tarifs et cotisations | Fait | [tarifs.md](tarifs.md) |
-| Gestion des cours | En cours : effectifs, inscriptions en cours de saison, cours individuels, liste d'attente, séances, plannings et agendas faits | [cours.md](cours.md), et ci-dessous |
+| Gestion des cours | En cours : effectifs, inscriptions en cours de saison, cours individuels, liste d'attente, séances, plannings, agendas et salles Google Workspace faits | [cours.md](cours.md), et ci-dessous |
 | Import depuis un logiciel de gestion | À faire | Voir ci-dessous |
 | Règlements | À faire | Voir ci-dessous |
 | Bascule | À faire | Voir ci-dessous |
@@ -87,7 +87,7 @@ La vie d'un cours pendant la saison, une fois le catalogue construit. Chaque ét
      - un professeur y trouve ses séances et ses remplacements ;
      - une famille, les séances de ses enfants et leurs heures de passage.
      - Aucun nom d'élève dans les événements. Les calendriers ne relisent ces adresses que toutes les quelques heures : une annulation du jour passe donc aussi par email.
-5. **Agendas des salles (Google Workspace, facultatif).**
+5. **Agendas des salles (Google Workspace, facultatif)** (fait, à essayer sur un vrai Workspace).
    - Une salle peut être reliée à l'agenda d'une ressource Workspace, partagé avec un compte de service. Pas de délégation sur tout le domaine.
    - Avant d'enregistrer un cours ou de déplacer une séance, l'appli lit l'occupation de la salle chez Google. Une réunion Workspace apparaît comme un chevauchement.
    - Chaque séance devient un événement de l'agenda de la salle, avec un identifiant tiré de la séance : relancer l'envoi ne crée jamais de doublon.

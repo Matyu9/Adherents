@@ -163,6 +163,41 @@ Le jeton est montré **une seule fois**, à sa création ; seule son empreinte (
 
 Les calendriers relisent ces adresses toutes les quelques heures (jusqu'à 24 h chez Google) : c'est pourquoi un changement de séance passe aussi par notification et email.
 
+## Agendas des salles (Google Workspace)
+
+Facultatif : sans `GOOGLE_SERVICE_ACCOUNT_FILE`, rien de cette partie n'est actif et l'appli se comporte comme avant. Le code est dans `app/services/room_calendars.py`, et ne parle à Google que par `app/services/google_workspace.py` (un client de quelques fonctions, sans dépendance de plus). Un autre serveur d'agenda (Microsoft 365, CalDAV) pourrait remplacer ce second module.
+
+| Colonne / table | Rôle |
+|---|---|
+| `room.calendar_id` | adresse de l'agenda de la salle (`…@resource.calendar.google.com`), unique |
+| `room.capacity` | places de la salle ; un cours dont l'effectif maximum les dépasse est signalé |
+| `site.external_id` | identifiant du bâtiment dans l'organisation, unique |
+| `room_calendar_job` | envois en attente : agenda, identifiant de l'événement, `put` ou `delete`, contenu, essais, prochaine tentative, dernière erreur |
+
+**Lire l'occupation.** Avant de déplacer ou d'ajouter une séance, l'appli lit l'agenda de chaque salle reliée sur le créneau. Une réunion de l'organisation apparaît comme salle « réservée 14:00-15:30 », dans la liste des salles et dans les avertissements. Ne comptent pas : les événements posés par l'appli (déjà connus comme séances), ceux marqués « disponible », ceux annulés. Si Google ne répond pas ou si l'agenda n'est pas partagé, la salle est marquée « agenda illisible » : rien n'est bloqué, on vérifie à la main.
+
+**Réserver.** Chaque séance prévue dans une salle reliée devient un événement de son agenda :
+
+- identifiant `adherents<id de la séance>`, choisi par l'appli : renvoyer remplace l'événement, sans doublon ;
+- titre : le cours et le professeur (ou le remplaçant). **Jamais de nom d'élève** : toute l'organisation voit ces agendas ;
+- une séance déplacée vers une autre salle quitte l'agenda de l'ancienne ; annulée ou supprimée, son événement est retiré ;
+- l'appli écrit directement dans l'agenda de la salle, sans l'inviter : il n'y a donc pas de refus automatique de la salle en cas de conflit, d'où la lecture de l'occupation avant chaque enregistrement.
+
+Les envois passent par la file `room_calendar_job`, envoyée par `flask run-tasks` (service scheduler). Un seul envoi en attente par événement : le dernier état l'emporte. En cas d'échec, l'envoi est réessayé de plus en plus tard (jusqu'à 6 h d'écart), puis abandonné après 12 essais, avec une ligne au journal.
+
+**Salles de l'organisation** (Catalogue → Disciplines, niveaux et lieux → **Salles de l'organisation**, droit `catalog.edit`). L'écran lit les bâtiments et les salles de l'organisation et montre un aperçu, sans rien écrire :
+
+- **nouvelles salles** à créer (le site est celui du bâtiment, créé au besoin et relié par son identifiant) ;
+- **salles du catalogue à relier**, quand le nom est le même (sans tenir compte des accents ni de la casse) ;
+- **salles du catalogue sans agenda**, à relier à la main ou à laisser hors de l'organisation (une salle municipale) ;
+- **renommées** dans l'organisation ;
+- **disparues** de l'organisation, à archiver si on le souhaite : rien n'est supprimé ;
+- **agenda non partagé** avec le compte de service : à partager, sinon l'appli ne peut ni lire ni réserver.
+
+Le bouton **Envoyer les séances à venir** met en file toutes les séances à venir des salles reliées : à faire à la mise en route, et après avoir relié une salle. L'agenda d'une salle peut aussi se saisir à la main dans sa fiche.
+
+**Mise en place côté Google** : voir [installation.md](installation.md#agendas-des-salles-google-workspace).
+
 ## Droits
 
 | Droit | Donne accès à |
@@ -172,6 +207,7 @@ Les calendriers relisent ces adresses toutes les quelques heures (jusqu'à 24 h 
 | `fee.assess` | indiquer qu'une cotisation à revoir n'a rien à changer |
 | `lesson.manage` | calendrier de la saison, génération, séances de tous les cours, retour en arrière, remplaçants ; reçoit les avis des changements faits par les professeurs |
 | `catalog.view` | les plannings |
+| `catalog.edit` | les salles de l'organisation, l'envoi des séances à venir aux agendas des salles |
 | (professeur du cours) | ses séances : déplacer, annuler, ajouter |
 | (tout compte) | son agenda à s'abonner |
 

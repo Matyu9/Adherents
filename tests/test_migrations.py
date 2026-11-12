@@ -620,3 +620,25 @@ def test_lessons_on_the_real_schema(migrated):
     assert run_sql(migrated, "SELECT count(*) FROM lesson", "SELECT count(*) FROM season_break") == [[(0,)], [(0,)]]
     downgrade(MIGRATIONS, revision="a0000009attente")
     assert run_sql(migrated, "SELECT permissions::text FROM role WHERE key = 'gestionnaire'") == [[("[]",)]]
+
+
+def test_room_calendars_on_the_real_schema(migrated):
+    upgrade(MIGRATIONS)
+    run_sql(
+        migrated,
+        *SEED,
+        *CATALOG,
+        "UPDATE site SET external_id = 'b1'",
+        "UPDATE room SET calendar_id = 'a@resource.calendar.google.com', capacity = 12",
+        "INSERT INTO room_calendar_job (calendar_id, event_id, action, next_try_at, created_at) "
+        "VALUES ('a@resource.calendar.google.com', 'adherents1', 'put', now(), now())",
+    )
+    assert run_sql(migrated, "SELECT attempts FROM room_calendar_job") == [[(0,)]]
+    for statement in (
+        "INSERT INTO room (site_id, name, calendar_id) VALUES (1, 'B', 'a@resource.calendar.google.com')",
+        "INSERT INTO site (name, external_id) VALUES ('Autre', 'b1')",
+        "UPDATE room_calendar_job SET action = 'move'",
+    ):
+        assert_fails(migrated, statement)
+    downgrade(MIGRATIONS, revision="a0000010seances")
+    assert run_sql(migrated, "SELECT to_regclass('room_calendar_job') IS NULL") == [[(True,)]]

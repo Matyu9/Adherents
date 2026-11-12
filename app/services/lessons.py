@@ -448,6 +448,7 @@ def set_substitute(lesson, teacher, user=None):
     db.session.flush()
     who = teacher.person.full_name if teacher else "personne"
     log("lesson.substitute", f"Remplaçant de {describe(lesson)} : {who}", user=user)
+    _after_change(lesson, lesson.room_id)  # le nom du professeur figure dans l'agenda de la salle
     if teacher is not None and teacher.person.account is not None:
         from . import notify
 

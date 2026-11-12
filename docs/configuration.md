@@ -11,7 +11,9 @@ Le nom, le sous-titre, la couleur et le logo se règlent directement dans **Para
 | `SECRET_KEY` | aucun | Signe les cookies et les empreintes de la limitation des tentatives, et chiffre les secrets de double authentification. **Obligatoire en production** : l'appli refuse de démarrer sans elle, ou avec la valeur d'exemple. **La changer rend inutilisables toutes les doubles authentifications et tous les codes de secours** : chaque personne devra la reconfigurer après une réinitialisation par un responsable, et le premier administrateur passera par `flask create-admin`. Sauvegardez-la à part de la base. |
 | `BASE_URL` | `http://localhost:8001` | Adresse publique, utilisée dans les emails. En `https://`, elle active aussi les cookies `Secure`. |
 | `ASSO_NAME` | `Mon association` | Nom par défaut, tant qu'aucun n'est défini dans Paramètres → Apparence. |
-| `TIMEZONE` | `Europe/Paris` | Fuseau des horaires de cours, pour les agendas à s'abonner (.ics). |
+| `TIMEZONE` | `Europe/Paris` | Fuseau des horaires de cours, pour les agendas à s'abonner (.ics) et les agendas des salles. |
+| `GOOGLE_SERVICE_ACCOUNT_FILE` | (vide) | Chemin de la clé JSON du compte de service Google qui lit et réserve les agendas des salles. Vide : agendas des salles désactivés. La clé reste hors du dépôt et hors de la base. |
+| `GOOGLE_WORKSPACE_CUSTOMER` | `my_customer` | Organisation dont on lit les salles : `my_customer` désigne celle du compte de service. |
 | `DATA_DIR` | `./data` (`/data` dans Docker) | Dossier des fichiers envoyés (logo) et du marqueur du planificateur. La base est dans PostgreSQL. |
 | `OIDC_ISSUER` | `BASE_URL` | Identité du serveur OIDC, inscrite dans les jetons. **À choisir avant de brancher une appli :** la changer oblige à reconfigurer toutes les applis, qui ne reconnaîtraient plus leurs comptes. Un avertissement apparaît au démarrage si elle n'est pas en `https://`, sauf sur `localhost`. |
 | `DATABASE_URL` | `postgresql+psycopg:///adherents` | Adresse de la base PostgreSQL (base `adherents` de la machine, par défaut). Avec docker-compose, elle est construite à partir de `POSTGRES_PASSWORD`. |

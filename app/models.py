@@ -747,6 +747,8 @@ class Site(ArchivableMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False, unique=True)
     address = db.Column(db.String(255))
+    # Identifiant du bâtiment dans l'agenda de l'organisation (Google Workspace), s'il vient de là.
+    external_id = db.Column(db.String(255), unique=True)
 
     rooms = db.relationship("Room", back_populates="site", order_by="Room.name")
 
@@ -761,6 +763,9 @@ class Room(ArchivableMixin, db.Model):
     # Un site qui a des salles ne se supprime pas.
     site_id = db.Column(db.ForeignKey("site.id", ondelete="RESTRICT"), nullable=False, index=True)
     name = db.Column(db.String(80), nullable=False)
+    # Adresse de l'agenda de la salle (ressource Google Workspace, « …@resource.calendar.google.com »).
+    calendar_id = db.Column(db.String(255), unique=True)
+    capacity = db.Column(db.Integer)  # places, d'après l'agenda de l'organisation ou saisies
 
     site = db.relationship("Site", back_populates="rooms")
 
@@ -907,6 +912,25 @@ class Lesson(db.Model):
 
     def __repr__(self):
         return f"<Lesson {self.course_id} {self.day}>"
+
+
+class RoomCalendarJob(db.Model):
+    """Envoi en attente vers l'agenda d'une salle : créer ou mettre à jour l'événement d'une séance (`put`), ou le
+    retirer (`delete`). Réessayé par `flask run-tasks` jusqu'à réussite. Voir docs/cours.md."""
+
+    PUT = "put"
+    DELETE = "delete"
+    __table_args__ = (db.CheckConstraint("action IN ('put', 'delete')", name="ck_room_calendar_job_action"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    calendar_id = db.Column(db.String(255), nullable=False)
+    event_id = db.Column(db.String(64), nullable=False)
+    action = db.Column(db.String(10), nullable=False)
+    payload = db.Column(db.JSON)
+    attempts = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    next_try_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    last_error = db.Column(db.String(300))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
 
 class TeacherDiscipline(db.Model):

@@ -232,15 +232,35 @@ class SiteForm(FlaskForm):
 class RoomForm(FlaskForm):
     site_id = Choice("Site", coerce=_optional_int, validators=[DataRequired("Choisissez le site.")])
     name = StringField("Nom", validators=[DataRequired(), Length(max=80)], filters=[_strip])
+    capacity = IntegerField("Places", validators=[Optional(), NumberRange(min=1, max=5000, message="Entre 1 et 5000.")])
+    calendar_id = StringField(
+        "Agenda de la salle",
+        validators=[Optional(), Length(max=255)],
+        filters=[_strip],
+        description="Adresse de la ressource dans l'agenda de l'organisation (…@resource.calendar.google.com).",
+    )
 
     def __init__(self, *args, room=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self._room = room
         self.site_id.choices = [("", "—")] + [
             (str(s.id), s.name) for s in _with(catalog.sites(), room.site if room else None)
         ]
 
+    def validate_calendar_id(self, field):
+        if not field.data:
+            return
+        other = db.session.scalar(db.select(Room).filter_by(calendar_id=field.data))
+        if other is not None and other is not self._room:
+            raise ValidationError(f"Cet agenda est déjà celui de {other.label}.")
+
     def values(self):
-        return {"site_id": self.site_id.data, "name": self.name.data}
+        return {
+            "site_id": self.site_id.data,
+            "name": self.name.data,
+            "capacity": self.capacity.data,
+            "calendar_id": _blank(self.calendar_id.data),
+        }
 
 
 # Chaque liste de référence : modèle, formulaire, libellés, et champ qui doit être unique (avec sa portée).
@@ -262,7 +282,13 @@ REFERENCES = {
     },
     "niveaux": {"model": Level, "form": LevelForm, "one": "niveau", "title": "Niveaux", "fields": ("name", "position")},
     "sites": {"model": Site, "form": SiteForm, "one": "site", "title": "Sites", "fields": ("name", "address")},
-    "salles": {"model": Room, "form": RoomForm, "one": "salle", "title": "Salles", "fields": ("site_id", "name")},
+    "salles": {
+        "model": Room,
+        "form": RoomForm,
+        "one": "salle",
+        "title": "Salles",
+        "fields": ("site_id", "name", "capacity", "calendar_id"),
+    },
 }
 
 
@@ -333,6 +359,11 @@ def _save_course(course, form, season):
     others = db.session.scalars(catalog.course_query(season, weekday=course.weekday)).all()
     for other, reason in catalog.conflicts(course, others):
         flash(f"Chevauchement ({reason}) avec {catalog.describe(other)}.", "warning")
+    if course.room and course.room.capacity and course.capacity and course.capacity > course.room.capacity:
+        flash(
+            f"L'effectif maximum ({course.capacity}) dépasse les places de {course.room.label} ({course.room.capacity}).",
+            "warning",
+        )
     return changes
 
 
@@ -690,6 +721,69 @@ def enroll_from_waitlist(entry_id):
 
 
 # ---------------------------------------------------------------------------
+# Salles de l'organisation (Google Workspace)
+# ---------------------------------------------------------------------------
+
+
+@bp.route("/salles-workspace", methods=["GET", "POST"])
+@require("catalog.edit")
+def workspace_rooms():
+    """GET : aperçu, sans rien écrire. POST : les choix cochés."""
+    from ..services import google_workspace, room_calendars
+
+    if not room_calendars.enabled():
+        abort(404)
+    if request.method == "POST":
+        try:
+            done = room_calendars.apply_sync(
+                create=set(request.form.getlist("create")),
+                rename={int(v) for v in request.form.getlist("rename") if v.isdigit()},
+                link={
+                    int(key.removeprefix("link-")): value
+                    for key, value in request.form.items()
+                    if key.startswith("link-") and key.removeprefix("link-").isdigit() and value
+                },
+                archive={int(v) for v in request.form.getlist("archive") if v.isdigit()},
+            )
+        except google_workspace.GoogleError as exc:
+            db.session.rollback()
+            flash(f"Google ne répond pas comme prévu : {exc}. Rien n'a été changé.", "error")
+            return redirect(url_for(".workspace_rooms"))
+        db.session.commit()
+        flash(", ".join(f"{n} salle(s) {label}" for label, n in done.items() if n) or "Rien à changer.", "success")
+        if done["créées"] or done["reliées"]:
+            flash("Pensez à envoyer les séances à venir aux agendas des salles reliées.", "info")
+        return redirect(url_for(".workspace_rooms"))
+    try:
+        plan = room_calendars.sync_plan()
+    except google_workspace.GoogleError as exc:
+        return render_template(
+            "catalog/workspace.html", plan=None, error=str(exc), pending=room_calendars.pending_count()
+        )
+    return render_template(
+        "catalog/workspace.html",
+        plan=plan,
+        error=None,
+        pending=room_calendars.pending_count(),
+        all_rooms=plan.resources,
+    )
+
+
+@bp.route("/salles-workspace/envoyer", methods=["POST"])
+@require("catalog.edit")
+def workspace_push():
+    from ..services import room_calendars
+
+    if not room_calendars.enabled():
+        abort(404)
+    count = room_calendars.push_upcoming()
+    db.session.commit()
+    sent, failed, dropped = room_calendars.deliver_pending()
+    flash(f"{count} séance(s) à envoyer : {sent} envoi(s) faits, {failed} à réessayer plus tard.", "success")
+    return redirect(url_for(".workspace_rooms"))
+
+
+# ---------------------------------------------------------------------------
 # Copie d'une saison sur la suivante
 # ---------------------------------------------------------------------------
 
@@ -816,7 +910,11 @@ def references():
         "niveaux": catalog.levels(include_archived=True),
         "sites": catalog.sites(include_archived=True),
     }
-    return render_template("catalog/references.html", lists=lists, usage=catalog.usage)
+    from ..services import room_calendars
+
+    return render_template(
+        "catalog/references.html", lists=lists, usage=catalog.usage, workspace=room_calendars.enabled()
+    )
 
 
 def _reference(kind, item_id):

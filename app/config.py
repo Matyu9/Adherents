@@ -39,6 +39,9 @@ class Config:
     ASSO_NAME = os.environ.get("ASSO_NAME", "Mon association")
     # Fuseau des horaires de cours, pour les agendas à s'abonner (.ics).
     TIMEZONE = os.environ.get("TIMEZONE", "Europe/Paris")
+    # Agendas des salles (Google Workspace, facultatif) : clé JSON d'un compte de service, hors dépôt.
+    GOOGLE_SERVICE_ACCOUNT_FILE = os.environ.get("GOOGLE_SERVICE_ACCOUNT_FILE", "")
+    GOOGLE_WORKSPACE_CUSTOMER = os.environ.get("GOOGLE_WORKSPACE_CUSTOMER", "my_customer")
 
     SMTP_HOST = os.environ.get("SMTP_HOST", "")
     SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))

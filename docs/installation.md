@@ -2,7 +2,7 @@
 
 Ce guide s'adresse à la personne qui héberge l'appli.
 
-> **Avant une mise en ligne :** à ce stade (phase 0), l'appli ne sert encore à aucun adhérent, et les comptes ne se créent qu'en ligne de commande. Voir le [plan](plan.md).
+> **Avant une mise en ligne :** lisez la liste [Avant une mise en production](plan.md#avant-une-mise-en-production) de la feuille de route.
 
 ## Ce qu'il faut
 
@@ -78,7 +78,7 @@ rm -f data/adherents.db-wal data/adherents.db-shm
 docker compose up -d
 ```
 
-**Une sauvegarde contient des données personnelles.** Stockez-la chiffrée et hors du serveur. À partir de la phase 3, elle contiendra aussi les clés de signature OIDC.
+**Une sauvegarde contient des données personnelles.** Stockez-la chiffrée et hors du serveur. Elle contient aussi les clés de signature OIDC.
 
 ## Mise à jour
 

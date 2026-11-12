@@ -78,7 +78,7 @@ Le projet est en développement : aucune installation ne sert encore de vrais ad
 | Règlements (prélèvements, paiement en ligne) | À faire |
 | Bascule : l'appli remplace le logiciel de gestion | À faire |
 
-Le détail des phases, les décisions prises et les questions ouvertes sont dans le [plan du projet](docs/plan.md). Les changements sont consignés dans le [journal des versions](CHANGELOG.md).
+Les choix de conception et le détail de ce qui reste sont dans la [feuille de route](docs/plan.md). Les changements sont consignés dans le [journal des versions](CHANGELOG.md).
 
 ## Démarrer en développement
 
@@ -170,7 +170,7 @@ Le socle vient de l'Inventaire, copié et non partagé sous forme de paquet : le
 | Document | Pour qui | Contenu |
 |---|---|---|
 | [Guide d'utilisation](docs/guide-utilisateur.md) | Familles, professeurs, secrétariat, administrateurs | Chaque écran de l'appli |
-| [Plan du projet](docs/plan.md) | Tout le monde | Objectifs, décisions prises, phases, questions ouvertes |
+| [Feuille de route](docs/plan.md) | Tout le monde | Objectifs, choix de conception, ce qui est fait et ce qui reste |
 | [Installation et exploitation](docs/installation.md) | Personne qui héberge l'appli | Docker, reverse proxy, sauvegarde, mise à jour, secours |
 | [Configuration](docs/configuration.md) | Personne qui héberge l'appli | Toutes les variables d'environnement |
 | [Architecture](docs/architecture.md) | Développeurs | Organisation du code, données, droits, sécurité, serveur OIDC |

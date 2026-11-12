@@ -1,6 +1,6 @@
 # Annuaire : modèle de données
 
-Proposition du 8 novembre 2026, complétée le 9, **mise en place le 9 novembre 2026** (phase 1, migration `a0000006annuaire`). Les écarts avec la proposition sont listés [à la fin](#écarts-avec-la-proposition). Elle part des exports décrits pour le logiciel de gestion et de deux décisions du jour :
+Ce document décrit le modèle de l'annuaire et ses raisons. Les écarts avec la proposition d'origine sont listés [à la fin](#écarts-avec-la-proposition). Il part de ce qu'exporte un logiciel de gestion d'association et de deux décisions :
 
 - à terme, Adhérents **remplace** le logiciel de gestion : le modèle doit pouvoir porter les saisons, les inscriptions et les cotisations, même si on ne les construit pas maintenant ;
 - Adhérents **conserve les IBAN**, de façon sécurisée.
@@ -33,7 +33,7 @@ Trois idées le structurent :
 | Colonne | Type | Remarque |
 |---|---|---|
 | `id` | entier | interne, jamais exposé |
-| `uuid` | texte(36), unique | identifiant public : c'est lui que l'Inventaire recevra comme `external_id` (phase 7) |
+| `uuid` | texte(36), unique | identifiant public : c'est lui que l'Inventaire reçoit comme `external_id` |
 | `civility` | texte(10), facultatif | `M.`, `Mme` |
 | `first_name`, `last_name` | texte(80) | recherche sans accents avec `fold_contains()` |
 | `birth_name` | texte(80), facultatif | nom de naissance |
@@ -105,12 +105,12 @@ Une table plutôt qu'une colonne, car une même personne peut avoir deux numéro
 | `category` | scolaire, non scolaire, adulte… |
 | `school_level`, `school_class` | niveau et classe scolaires de la saison |
 
-- **Création :** à l'import, une ligne par élève de l'export des inscriptions, en `withdrawn` en cas d'abandon. En phase 6, la validation d'un dossier crée la ligne de la nouvelle saison.
+- **Création :** à l'import, une ligne par élève de l'export des inscriptions, en `withdrawn` en cas d'abandon. La validation d'un dossier d'inscription crée la ligne de la nouvelle saison.
 - **Historique :** une ligne par saison, jamais supprimée. Un **ancien adhérent** est une personne sans adhésion active sur la saison en cours.
-- **Sans effet sur l'accès :** l'adhésion ne coupe aucun compte (voir le [plan](plan.md#principes-proposés-à-confirmer)).
+- **Sans effet sur l'accès :** l'adhésion ne coupe aucun compte (voir la [feuille de route](plan.md#choix-de-conception)).
 - **Inscriptions aux cours :** table `enrollment`, rattachée à l'adhésion de la saison (voir [inscriptions.md](inscriptions.md)).
 
-**Décidé le 9 novembre 2026 :** chaque élève est adhérent et paie son adhésion. Un élève de moins de 16 ans est représenté à l'assemblée générale par un responsable, qui ne paie pas d'adhésion. La liste des votants se déduit donc des adhésions, de la date de naissance et des responsables, sans table de plus. Reste à savoir quel responsable vote, et si un parent de plusieurs enfants a plusieurs voix.
+**Règle retenue :** chaque élève est adhérent et paie son adhésion. Un élève de moins de 16 ans est représenté à l'assemblée générale par un responsable, qui ne paie pas d'adhésion. La liste des votants se déduit donc des adhésions, de la date de naissance et des responsables, sans table de plus. Reste à savoir quel responsable vote, et si un parent de plusieurs enfants a plusieurs voix.
 
 ### `teacher` : profil de professeur
 
@@ -159,14 +159,14 @@ On ne stocke pas de document de mandat (voir le plan). Le `scheduler` supprimera
 
 **Limite à connaître :** la clé est sur le même serveur que la base. Ce chiffrement protège contre une fuite de la base, d'une sauvegarde ou d'un disque. Il ne protège pas d'une prise de contrôle complète du serveur. Seul un service de clés externe le ferait, ce qui est disproportionné ici.
 
-Le tableau des décisions du [plan](plan.md) prévoyait de supprimer les IBAN après transfert. Cette proposition le remplace.
+Une première idée était de supprimer les IBAN une fois transférés au logiciel de gestion. Ils sont finalement conservés, avec les protections ci-dessus.
 
 ## Plus tard, sans changer ce qui précède
 
 Ces tables se brancheront sur `person`, `household` et `season`, sans retoucher l'annuaire :
 
-- **catalogue** : disciplines, niveaux, cours avec leur horaire, leur salle et leur professeur (fait le 10 novembre 2026, voir [catalogue.md](catalogue.md)) ;
-- **inscriptions** : une personne inscrite à un cours pour une saison, avec son statut (fait le 10 novembre 2026, voir [inscriptions.md](inscriptions.md)) ;
+- **catalogue** : disciplines, niveaux, cours avec leur horaire, leur salle et leur professeur (fait, voir [catalogue.md](catalogue.md)) ;
+- **inscriptions** : une personne inscrite à un cours pour une saison, avec son statut (fait, voir [inscriptions.md](inscriptions.md)) ;
 - **tarifs** : éléments de cotisation et grille **par saison**. Les codes d'éléments changent d'une saison à l'autre, donc aucun code ne sert de clé durable ;
 - **situation fiscale du foyer par saison** : tranche de quotient familial (A, B, C), et le quotient seulement si nécessaire ;
 - **cotisations appelées et règlements**, rattachés au foyer ;
@@ -176,8 +176,8 @@ Ces tables se brancheront sur `person`, `household` et `season`, sans retoucher 
 
 - n° de sécurité sociale ;
 - identifiants et mots de passe de l'extranet du logiciel de gestion ;
-- données de santé (traitements, allergies, médecin) : non reprises pour l'instant (décidé le 8 novembre 2026). Si elles le sont un jour, ce sera dans une table à part, avec son propre droit de lecture ;
-- droit à l'image et autres consentements : ils arrivent avec les campagnes d'inscription (phase 6), datés et rattachés à une saison.
+- données de santé (traitements, allergies, médecin) : non reprises pour l'instant. Si elles le sont un jour, ce sera dans une table à part, avec son propre droit de lecture ;
+- droit à l'image et autres consentements : ils arrivent avec les campagnes d'inscription, datés et rattachés à une saison.
 
 ## Tests prévus
 
@@ -195,13 +195,13 @@ Ces tables se brancheront sur `person`, `household` et `season`, sans retoucher 
 
 ## Écarts avec la proposition
 
-Décidés en écrivant la phase 1, le 9 novembre 2026 :
+Décidés en écrivant l'annuaire :
 
 - **Le lien compte ↔ fiche est `person.account_id`**, et non `account.person_id`. Le choix venait d'une limite de SQLite ; il est resté après le passage à PostgreSQL, car le sens du lien ne change rien : 0 ou 1 compte par fiche, 0 ou 1 fiche par compte.
 - **L'empreinte des IBAN** est dérivée de `BANK_DATA_KEYS` plutôt que d'une troisième clé. Elle change donc à chaque rotation, qui la recalcule ; entre l'ajout d'une clé et la rotation, la recherche d'un même IBAN essaie toutes les clés.
 - **L'affichage masqué** est `•••• •••• 1234` : le pays et la clé de contrôle font partie du chiffré.
 - **Le journal note la fiche concernée** (`activity.person_id`, `activity.household_id`), ce qui donne l'historique de chaque fiche et de chaque foyer.
-- **Compte dès 16 ans** (décidé le 9 novembre 2026) : avant 16 ans, pas de compte, le responsable gère la fiche depuis le sien. À 16 et 17 ans, la personne qui crée le compte confirme qu'un responsable légal a donné son accord, et le journal le note. La gestion des comptes sera retravaillée bientôt.
-- **Professeurs à part** (9 novembre 2026) : la table `teacher` ne change pas, mais on ne devient professeur que depuis l'écran **Professeurs**, avec le droit `teacher.manage`, jamais depuis la fiche d'un adhérent. Un parent ou un élève qui enseigne garde une seule fiche : l'écran Professeurs le cherche dans l'annuaire, parmi les adultes seulement. Le contrat ne s'affiche que dans cet écran ; la fiche de l'annuaire montre seulement un badge. Un professeur qui n'est ni adhérent ni membre d'un foyer n'apparaît pas dans la liste des personnes.
+- **Compte dès 16 ans** : avant 16 ans, pas de compte, le responsable gère la fiche depuis le sien. À 16 et 17 ans, la personne qui crée le compte confirme qu'un responsable légal a donné son accord, et le journal le note. La gestion des comptes sera retravaillée bientôt.
+- **Professeurs à part** : la table `teacher` ne change pas, mais on ne devient professeur que depuis l'écran **Professeurs**, avec le droit `teacher.manage`, jamais depuis la fiche d'un adhérent. Un parent ou un élève qui enseigne garde une seule fiche : l'écran Professeurs le cherche dans l'annuaire, parmi les adultes seulement. Le contrat ne s'affiche que dans cet écran ; la fiche de l'annuaire montre seulement un badge. Un professeur qui n'est ni adhérent ni membre d'un foyer n'apparaît pas dans la liste des personnes.
 - **Fusion** : les deux fiches se mélangent. Un champ rempli d'un seul côté est repris ; quand les deux ont une valeur différente, l'écran demande laquelle garder (sans choix, celle de la fiche gardée). Une différence d'accent ou de casse n'est pas un conflit. Foyers, téléphones, adhésions et notes s'additionnent ; une adhésion en double sur la même saison est abandonnée, et deux fiches qui ont chacune un compte ne fusionnent pas.
 

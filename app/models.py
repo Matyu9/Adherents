@@ -1056,7 +1056,7 @@ class SepaMandate(db.Model):
 
 
 class Regie(ArchivableMixin, db.Model):
-    """Régie qui encaisse : EMHN, OHN… Chaque élément de cotisation relève de l'une d'elles."""
+    """Régie qui encaisse (« École », « Orchestre »…). Chaque élément de cotisation relève de l'une d'elles."""
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(60), nullable=False, unique=True)

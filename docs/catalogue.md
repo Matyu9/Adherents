@@ -1,6 +1,6 @@
 # Catalogue : modèle de données
 
-Mis en place le 10 novembre 2026 (phase 8, migration `a0000002catalogue`). Le catalogue décrit **ce qu'on enseigne, où et par qui**, saison par saison. Les inscriptions des élèves aux cours arrivent avec les campagnes (phase 6) et les tarifs avec la phase 9 : elles se brancheront sur ces tables sans les modifier.
+Le catalogue décrit **ce qu'on enseigne, où et par qui**, saison par saison. Les [inscriptions](inscriptions.md) des élèves aux cours et les [tarifs](tarifs.md) se branchent sur ces tables sans les modifier.
 
 ## Vue d'ensemble
 
@@ -45,7 +45,7 @@ Deux noms qui ne diffèrent que par les accents ou la casse sont refusés à la 
 | `marked_full` | fermé aux inscriptions à la main (le `cours_complet` des exports) |
 | `notes` | non recopiées au journal |
 
-**Cours individuel :** un cours de 17 h à 19 h regroupe plusieurs élèves qui passent à des heures différentes. L'horaire est celui du créneau du professeur ; l'heure de passage de chaque élève ira avec son inscription (phase 6).
+**Cours individuel :** un cours de 17 h à 19 h regroupe plusieurs élèves qui passent à des heures différentes. L'horaire est celui du créneau du professeur ; l'heure de passage de chaque élève ira avec son inscription.
 
 **Cours complet :** `Course.is_full(inscrits)` est vrai si le cours est fermé à la main, ou si le nombre d'inscrits atteint l'effectif maximum. Tant que les inscriptions n'existent pas, seul le premier cas se produit.
 
@@ -91,7 +91,7 @@ Le gestionnaire a les deux. La migration les ajoute aussi à un rôle Gestionnai
 
 ## Plus tard, sans changer ce qui précède
 
-- **Inscriptions** (phase 6) : une adhésion de la saison, un cours, l'heure de passage et la durée pour un cours individuel. Le nombre d'inscrits sera passé à `is_full()`, et un cours complet ne sera plus proposé aux familles.
+- **Inscriptions** : une adhésion de la saison, un cours, l'heure de passage et la durée pour un cours individuel. Le nombre d'inscrits sera passé à `is_full()`, et un cours complet ne sera plus proposé aux familles.
 - **Import** depuis le logiciel de gestion : les colonnes de l'export des cours (saison, site, discipline, niveau, jour, horaires, salle, professeur, cours complet, groupe) ont toutes leur place ici. La correspondance se fera quand les exports seront disponibles.
 - **Professeur remplaçant** et **accompagnateur** d'un cours : non repris pour l'instant.
 - **Un professeur ne voit que ses élèves** : quand les inscriptions existeront, à partir de `course.teacher_id`.

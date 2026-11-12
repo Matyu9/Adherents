@@ -1,6 +1,6 @@
 # Inscriptions : campagnes, dossiers, inscriptions aux cours
 
-Mis en place le 10 novembre 2026 (phase 6, migrations `a0000003inscriptions` et `a0000004conservation`). Les inscriptions s'appuient sur l'[annuaire](annuaire.md) et le [catalogue](catalogue.md).
+Les inscriptions s'appuient sur l'[annuaire](annuaire.md) et le [catalogue](catalogue.md).
 
 ## Le parcours
 
@@ -112,8 +112,8 @@ Le gestionnaire a `registration.view` et `registration.manage` ; la migration le
 
 ## Pas fait
 
-- **Le mandat SEPA** : son lieu de conservation reste à décider (phase 10). L'IBAN du dossier devient un compte bancaire, sans mandat.
-- **Les cotisations** : elles viendront avec les tarifs (phase 9).
+- **Le mandat SEPA** : son lieu de conservation reste à décider, avec les règlements. L'IBAN du dossier devient un compte bancaire, sans mandat.
+- **Les cotisations** : voir [tarifs.md](tarifs.md).
 - **Une liste d'attente** pour les cours complets : le souhait se note en texte libre.
 - **L'heure de passage** d'un élève dans un cours individuel.
 - **L'invitation des responsables** qui n'ont pas de compte : elle se fait depuis la fiche, comme avant. L'invitation en masse viendra avec l'import.

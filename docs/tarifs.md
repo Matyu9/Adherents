@@ -1,12 +1,12 @@
 # Tarifs : éléments, règles et calcul des cotisations
 
-Phase 9 (branche `phase-9-tarifs`, migration `a0000005tarifs`) : moteur (`app/services/pricing.py`), modèle, services (`app/services/fees.py`) et écrans (menu **Tarifs**) écrits. Reste le rejeu d'une saison importée, qui attend les exports.
+Le moteur est dans `app/services/pricing.py`, les services dans `app/services/fees.py`, les écrans dans le menu **Tarifs**. Reste à rejouer une saison importée d'un logiciel de gestion, pour comparer les montants.
 
 L'idée : **partir d'une grille vide** et laisser le gestionnaire construire les tarifs de la saison lui-même, avec des éléments et des règles. Rien n'est figé dans le code : ni la dégressivité, ni le quotient familial, ni les variantes « famille ».
 
 ## Les éléments
 
-Ce qu'on facture : adhésion, formule 30 min, chorale, location… Chacun a un libellé, un **prix de base** (en centimes), une catégorie libre (« Formules », « Pratiques collectives »…) et une régie (EMHN ou OHN).
+Ce qu'on facture : adhésion, formule 30 min, chorale, location… Chacun a un libellé, un **prix de base** (en centimes), une catégorie libre (« Formules », « Pratiques collectives »…) et une régie : l'entité qui encaisse, quand l'association en a plusieurs (« École », « Orchestre »…).
 
 ## Les règles
 
@@ -115,7 +115,7 @@ Les règles sont des données (JSON), vérifiées par `validate_rule` avant tout
 
 | Table | Rôle |
 |---|---|
-| `regie` | EMHN, OHN… ; elle s'archive au lieu de se supprimer |
+| `regie` | Entité qui encaisse (« École », « Orchestre »…) ; elle s'archive au lieu de se supprimer |
 | `fee_item` | Élément d'une saison : libellé (unique dans la saison), prix de base en centimes, catégorie, régie, code du logiciel de gestion pour information |
 | `fee_rule` | Règle d'une saison : position, nom, conditions, cible et effet (JSON vérifié par le moteur), groupe exclusif, active ou en brouillon |
 | `fee_season` | Réglages de la saison : moteur (classement, arrondi), tranches de QF avec leurs plafonds, tranche par défaut, communes résidentes |
@@ -204,4 +204,4 @@ Les montants s'écrivent en euros (« -12,50 »), les pourcentages tels quels (�
 ## Reste à faire
 
 - Rejeu d'une saison importée et comparaison avec les montants appelés par le logiciel de gestion (critère de réussite du plan), quand les exports seront là.
-- Affichage des cotisations dans l'espace adhérent (phase 7), puis règlements (phase 10).
+- Affichage des cotisations dans l'espace adhérent, puis règlements.

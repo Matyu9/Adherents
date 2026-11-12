@@ -72,7 +72,7 @@
   <form method="post" action="{{ url_for('fees.create_regie') }}" class="inline-form">
     {{ csrf() }}
     <input type="hidden" name="saison" value="{{ season.id }}">
-    <input name="name" maxlength="60" aria-label="Nom de la nouvelle régie" placeholder="EMHN, OHN…">
+    <input name="name" maxlength="60" aria-label="Nom de la nouvelle régie" placeholder="École, Orchestre…">
     <button type="submit" class="secondary">Ajouter</button>
   </form>
 </section>

@@ -51,7 +51,7 @@ Il n'y a aucune étape de build. Pico et HTMX sont copiés dans `static/vendor/`
 | `app_setting` | Réglages modifiables dans l'appli (nom, logo, couleur) |
 | `throttle_event` | Tentatives comptées pour la limitation de débit |
 
-### Annuaire (phase 1)
+### Annuaire
 
 Le modèle est décrit et justifié dans [annuaire.md](annuaire.md). En bref :
 
@@ -64,7 +64,7 @@ Le modèle est décrit et justifié dans [annuaire.md](annuaire.md). En bref :
 | `teacher` | Profil de professeur |
 | `bank_account`, `sepa_mandate` | IBAN chiffrés (`services/bank.py`) et mandats SEPA |
 
-### Catalogue (phase 8)
+### Catalogue
 
 Décrit dans [catalogue.md](catalogue.md) :
 
@@ -76,7 +76,7 @@ Décrit dans [catalogue.md](catalogue.md) :
 
 Les règles (copie de saison, professeur parti, chevauchements) sont dans `services/catalog.py`.
 
-### Inscriptions (phase 6)
+### Inscriptions
 
 Décrites dans [inscriptions.md](inscriptions.md) :
 

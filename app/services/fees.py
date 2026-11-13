@@ -464,7 +464,9 @@ def prepare(household, season):
                 age=age,
                 adult=age >= 18 if age is not None else member.role == HouseholdMember.GUARDIAN,
                 tags=frozenset(membership.fee_tags or ()),
-                disciplines=frozenset(e.course.discipline.name for e in enrollments),
+                disciplines=frozenset(
+                    name for e in enrollments for name in (e.course.discipline.name, e.course.discipline.name_for(e.course.season))
+                ),
                 seniority=seniority,
             )
         )

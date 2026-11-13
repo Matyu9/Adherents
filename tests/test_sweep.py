@@ -146,7 +146,8 @@ ACCESS = {
     },
     **{f"teachers.{name}": TEACHERS for name in ("index", "create", "detail", "edit", "remove", "profile", "availability")},
     "teachers.photo": LOGGED_IN,
-    **{f"catalog.{name}": CAT_VIEW for name in ("index", "teachers", "references")},
+    **{f"catalog.{name}": CAT_VIEW for name in ("index", "teachers", "references", "season_disciplines")},
+    "catalog.season_discipline": CAT_EDIT,
     **{f"campaigns.{name}": REG_VIEW for name in ("index", "detail", "dossiers", "dossier")},
     **{
         f"campaigns.{name}": REG_MANAGE
@@ -364,6 +365,7 @@ ARGUMENTS = {
     "break_id": 999,
     "notification_id": 999,
     "notice_id": 999,
+    "discipline_id": 999,
     "direction": "monter",
 }
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.

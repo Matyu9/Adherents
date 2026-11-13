@@ -310,6 +310,24 @@ def _teaches(teacher, season):
     return teacher.person.archived_at is None and teacher.teaches_during(season)
 
 
+def copy_discipline_settings(source, target):
+    """Recopie les réglages de saison des disciplines (nom, type, description, places, âges) qui manquent à `target`."""
+    from ..models import DisciplineSeason
+
+    for settings in db.session.scalars(db.select(DisciplineSeason).where(DisciplineSeason.season_id == source.id)):
+        if settings.discipline.settings_for(target) is None:
+            db.session.add(
+                DisciplineSeason(
+                    discipline=settings.discipline,
+                    season=target,
+                    **{
+                        key: getattr(settings, key)
+                        for key in ("name", "type_id", "offered", "description", "capacity", "min_age", "max_age")
+                    },
+                )
+            )
+
+
 def copy_season(source, target):
     """Recopie le catalogue de `source` sur `target`, vide. Renvoie le plan suivi."""
     plan = copy_plan(source, target)
@@ -338,6 +356,7 @@ def copy_season(source, target):
         )
     for teacher, discipline in plan.disciplines:
         teacher.taught.append(TeacherDiscipline(season=target, discipline=discipline))
+    copy_discipline_settings(source, target)
     db.session.flush()
     # Un professeur gardé enseigne ses cours recopiés, même si sa discipline n'était pas notée la saison d'avant.
     for course in db.session.scalars(db.select(Course).where(Course.season_id == target.id)):

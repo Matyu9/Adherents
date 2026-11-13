@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "catalog/_season_picker.html" import season_picker, tabs %}
+{% block title %}Disciplines {{ season.label }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Disciplines {{ season.label }}</h1>
+    <p class="muted">Nom, type, description et places propres à cette saison. Un changement ne touche ni les saisons passées ni leur historique.</p>
+  </div>
+  <div class="actions">{{ season_picker(seasons, season, "catalog.season_disciplines") }}</div>
+</div>
+{{ tabs("disciplines", season) }}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Discipline</th><th>Type</th><th>Proposée</th><th>Places</th><th>Âges</th><th>Cours</th>{% if can(current_user, "catalog.edit") %}<th></th>{% endif %}</tr></thead>
+  <tbody>
+  {% for d in disciplines %}{% set st = d.settings_for(season) %}
+  <tr{% if not d.offered_in(season) %} class="muted"{% endif %}>
+    <td data-label="Discipline"><strong>{{ d.name_for(season) }}</strong>{% if d.name_for(season) != d.name %} <small class="muted">({{ d.name }})</small>{% endif %}
+      {% if st and st.description %}<br><small class="muted">{{ st.description | truncate(90) }}</small>{% endif %}</td>
+    <td data-label="Type"><small>{{ d.type_for(season).name if d.type_for(season) else "—" }}</small></td>
+    <td data-label="Proposée">{% if d.offered_in(season) %}<span class="badge badge-ok">oui</span>{% else %}<span class="badge">non</span>{% endif %}</td>
+    <td data-label="Places">{{ st.capacity if st and st.capacity else "—" }}</td>
+    <td data-label="Âges"><small>{% if st and (st.min_age or st.max_age) %}{% if st.min_age %}dès {{ st.min_age }} ans{% endif %}{% if st.min_age and st.max_age %}, {% endif %}{% if st.max_age %}jusqu'à {{ st.max_age }} ans{% endif %}{% else %}—{% endif %}</small></td>
+    <td data-label="Cours">{% if courses.get(d.id) %}<a href="{{ url_for('catalog.index', saison=season.id, discipline=d.id) }}">{{ courses[d.id] }}</a>{% else %}0{% endif %}</td>
+    {% if can(current_user, "catalog.edit") %}<td data-label="" class="actions"><a href="{{ url_for('catalog.season_discipline', discipline_id=d.id, saison=season.id) }}">Modifier</a></td>{% endif %}
+  </tr>
+  {% else %}
+  <tr><td colspan="7" class="muted">Aucune discipline : ajoutez-en dans « Disciplines, niveaux et lieux ».</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

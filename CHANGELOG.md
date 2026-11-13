@@ -4,6 +4,10 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ## Non publié
 
+### Changé : retours du tour complet, disciplines par saison
+
+- **Catalogue → Disciplines de la saison** : chaque discipline garde une seule fiche, avec des réglages propres à chaque saison (nom, type, proposée ou non, description pour les familles, places, âges admis). L'historique garde le nom de l'époque, « Copier une saison » recopie ces réglages, et une discipline qui n'est pas proposée sort du choix des cours de la saison. Migration `a0000019disciplines`.
+
 ### Changé : retours du tour complet, jours fériés et salles
 
 - **Jours fériés calculés** pour la saison, d'un bouton, chacun modifiable ou supprimable.

@@ -166,7 +166,7 @@ La fiche d'une personne montre aussi l'historique de ce qui l'a concernée (jour
 
 ### Le catalogue
 
-**Menu → Catalogue.** Il a trois onglets.
+**Menu → Catalogue.** Il a quatre onglets.
 
 **Disciplines, niveaux et lieux.** Ces listes valent pour toutes les saisons : types de discipline, disciplines, niveaux (dans l'ordre, cycle 1 avant cycle 2), sites et leurs salles.
 
@@ -192,6 +192,8 @@ La fiche d'une personne montre aussi l'historique de ce qui l'a concernée (jour
 - Un cours qui a des élèves ne se supprime pas : cochez **Complet** à la place.
 
 **Professeurs.** Les disciplines enseignées par chaque professeur, saison par saison. Confier un cours à un professeur ajoute sa discipline d'office ; à l'inverse, on ne peut pas lui retirer une discipline dont il a encore un cours.
+
+**Disciplines de la saison.** Pour chaque saison, le nom et le type d'une discipline, si elle est proposée, sa description pour les familles, ses places et les âges admis. Renommer une discipline pour une saison ne change pas son nom dans les saisons passées. La copie d'une saison recopie ces réglages.
 
 ### Les élèves d'un cours
 

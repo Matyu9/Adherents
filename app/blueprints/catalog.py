@@ -124,8 +124,8 @@ class CourseForm(FlaskForm):
             self.color.data = ""
         keep_discipline = course.discipline if course else None
         self.discipline_id.choices = [("", "—")] + [
-            (str(d.id), d.name + (" (archivée)" if d.archived else ""))
-            for d in _with(catalog.disciplines(), keep_discipline)
+            (str(d.id), d.name_for(season) + (" (archivée)" if d.archived else "") + ("" if d.offered_in(season) else " (pas proposée cette saison)"))
+            for d in _with([d for d in catalog.disciplines() if d.offered_in(season)], keep_discipline)
         ]
         self.level_id.choices = [("", "—")] + [
             (str(lv.id), lv.name + (" (archivé)" if lv.archived else ""))
@@ -1024,3 +1024,93 @@ def delete_item(kind, item_id):
         db.session.commit()
         flash("Supprimé.", "success")
     return redirect(url_for(".references") + f"#{kind}")
+
+
+# ---------------------------------------------------------------------------
+# Disciplines de la saison : nom, type, proposée ou non, description, places et âges
+# ---------------------------------------------------------------------------
+
+
+@bp.route("/disciplines")
+@require("catalog.view")
+def season_disciplines():
+    season, seasons = _selected_season()
+    if season is None:
+        return redirect(url_for(".index"))
+    courses = db.session.scalars(db.select(Course).where(Course.season_id == season.id)).all()
+    per_discipline = {}
+    for course in courses:
+        per_discipline[course.discipline_id] = per_discipline.get(course.discipline_id, 0) + 1
+    return render_template(
+        "catalog/season_disciplines.html",
+        season=season,
+        seasons=seasons,
+        disciplines=catalog.disciplines(),
+        courses=per_discipline,
+    )
+
+
+@bp.route("/disciplines/<int:discipline_id>", methods=["GET", "POST"])
+@require("catalog.edit")
+def season_discipline(discipline_id):
+    from ..models import DisciplineSeason, DisciplineType
+
+    discipline = db.session.get(Discipline, discipline_id) or abort(404)
+    season, _ = _selected_season()
+    if season is None:
+        abort(404)
+    settings = discipline.settings_for(season)
+    error = None
+    if request.method == "POST":
+        form = request.form
+
+        def number(name, label):
+            value = (form.get(name) or "").strip()
+            if not value:
+                return None
+            if not value.isdigit() or int(value) <= 0 or int(value) > 999:
+                raise CatalogError(f"{label} : un nombre entier positif.")
+            return int(value)
+
+        try:
+            values = {
+                "name": ((form.get("name") or "").strip()[:80] or None),
+                "type_id": form.get("type_id", type=int) or None,
+                "offered": form.get("offered") == "1",
+                "description": (form.get("description") or "").strip()[:3000] or None,
+                "capacity": number("capacity", "Places"),
+                "min_age": number("min_age", "Âge minimum"),
+                "max_age": number("max_age", "Âge maximum"),
+            }
+            if values["min_age"] and values["max_age"] and values["min_age"] > values["max_age"]:
+                raise CatalogError("L'âge minimum dépasse l'âge maximum.")
+            if values["name"] == discipline.name:
+                values["name"] = None
+            if values["type_id"] and db.session.get(DisciplineType, values["type_id"]) is None:
+                raise CatalogError("Type inconnu.")
+        except CatalogError as exc:
+            error = str(exc)
+        else:
+            if settings is None:
+                settings = DisciplineSeason(discipline=discipline, season=season)
+                db.session.add(settings)
+            changes = diff(settings, tuple(values), values)
+            for key, value in values.items():
+                setattr(settings, key, value)
+            if changes:
+                log(
+                    "discipline.season",
+                    f"Discipline {discipline.name} en {season.label} modifiée",
+                    changes=changes,
+                )
+            db.session.commit()
+            flash("Réglages de la saison enregistrés.", "success")
+            return redirect(url_for(".season_disciplines", saison=season.id))
+    return render_template(
+        "catalog/season_discipline_form.html",
+        discipline=discipline,
+        season=season,
+        settings=settings,
+        types=catalog.discipline_types(),
+        error=error,
+    )

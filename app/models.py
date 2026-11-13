@@ -745,13 +745,59 @@ class DisciplineType(ArchivableMixin, db.Model):
 
 
 class Discipline(ArchivableMixin, db.Model):
-    """Discipline enseignée (« Flûte traversière », « Formation musicale »…), commune à toutes les saisons."""
+    """Discipline enseignée (« Flûte traversière », « Formation musicale »…), commune à toutes les saisons. Son nom,
+    son type et d'autres réglages peuvent changer d'une saison à l'autre (DisciplineSeason) : l'historique garde le nom
+    de l'époque."""
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False, unique=True)
     # Facultatif. Un type qui a des disciplines ne se supprime pas.
     type_id = db.Column(db.ForeignKey("discipline_type.id", ondelete="RESTRICT"), index=True)
 
+    type = db.relationship("DisciplineType")
+    season_settings = db.relationship(
+        "DisciplineSeason", back_populates="discipline", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+    def settings_for(self, season):
+        """Réglages de cette saison, ou None (ceux par défaut)."""
+        season_id = getattr(season, "id", season)
+        return next((s for s in self.season_settings if s.season_id == season_id), None)
+
+    def name_for(self, season):
+        settings = self.settings_for(season) if season is not None else None
+        return (settings.name if settings and settings.name else None) or self.name
+
+    def type_for(self, season):
+        settings = self.settings_for(season) if season is not None else None
+        return (settings.type if settings and settings.type_id else None) or self.type
+
+    def offered_in(self, season):
+        settings = self.settings_for(season)
+        return settings.offered if settings is not None else not self.archived
+
+
+class DisciplineSeason(db.Model):
+    """Réglages d'une discipline pour une saison : nom et type (vides : ceux de la discipline), proposée ou non,
+    description pour les familles, places et âges admis (utiles quand les familles choisissent une discipline)."""
+
+    __table_args__ = (
+        db.CheckConstraint("capacity IS NULL OR capacity > 0", name="ck_discipline_season_capacity"),
+        db.CheckConstraint("min_age IS NULL OR max_age IS NULL OR min_age <= max_age", name="ck_discipline_season_ages"),
+    )
+
+    discipline_id = db.Column(db.ForeignKey("discipline.id", ondelete="CASCADE"), primary_key=True)
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="CASCADE"), primary_key=True)
+    name = db.Column(db.String(80))
+    type_id = db.Column(db.ForeignKey("discipline_type.id", ondelete="SET NULL"))
+    offered = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    description = db.Column(db.Text)
+    capacity = db.Column(db.Integer)
+    min_age = db.Column(db.Integer)
+    max_age = db.Column(db.Integer)
+
+    discipline = db.relationship("Discipline", back_populates="season_settings")
+    season = db.relationship("Season")
     type = db.relationship("DisciplineType")
 
     def __repr__(self):
@@ -876,7 +922,7 @@ class Course(TimestampMixin, db.Model):
 
     @property
     def title(self):
-        parts = [self.discipline.name]
+        parts = [self.discipline.name_for(self.season)]
         if self.level is not None:
             parts.append(self.level.name)
         if self.group_label:

@@ -15,7 +15,7 @@
     <tbody>
     {% for c in rows %}
     <tr>
-      <td data-label="Cours"><strong>{{ c.discipline.name }}</strong>{% if c.level %} · {{ c.level.name }}{% endif %}{% if c.group_label %} · {{ c.group_label }}{% endif %}</td>
+      <td data-label="Cours"><strong>{{ c.discipline.name_for(c.season) }}</strong>{% if c.level %} · {{ c.level.name }}{% endif %}{% if c.group_label %} · {{ c.group_label }}{% endif %}</td>
       <td data-label="Horaire"><small>{% if c.weekday is not none %}{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}{% endif %}{% else %}—{% endif %}</small></td>
       <td data-label="Élément">
         {% if edit %}

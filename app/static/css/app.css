@@ -122,12 +122,6 @@ body.app { display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr)
 .nav-link { display: flex; align-items: center; gap: .65rem; padding: .48rem .6rem; border-radius: var(--radius-sm); color: var(--text-2); font-size: .92rem; }
 .nav-link:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
 .nav-link.active { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
-.sidebar-user { display: flex; align-items: center; gap: .6rem; padding: .75rem .5rem 0; margin-top: 1rem; border-top: 1px solid var(--border); }
-.who { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
-.who strong { font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.who small { color: var(--text-3); font-size: .75rem; }
-a.who { color: inherit; text-decoration: none; }
-a.who:hover strong { text-decoration: underline; }
 .avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2);
           border: 1px solid var(--border); color: var(--text-2); font-size: .78rem; font-weight: 650; flex: none; }
 .avatar.small { width: 32px; height: 32px; }
@@ -298,8 +292,9 @@ form.inline { display: inline; }
 #selected-lines .line span { flex: 1; font-weight: 550; }
 #selected-lines .qty { width: 5rem; margin: 0; padding: .25rem .5rem; height: auto; }
 .notifications { list-style: none; padding: 0; }
-.notifications li { list-style: none; padding: .75rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: .4rem; }
+.notifications li { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; list-style: none; padding: .75rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: .4rem; }
 .notifications li.unread { border-left: 3px solid var(--brand); font-weight: 600; }
+.notifications li .button-form { flex: none; font-weight: normal; }
 
 /* Stocks, calendrier, scan */
 #calendar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; box-shadow: var(--shadow); }

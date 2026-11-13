@@ -128,7 +128,7 @@ Un élève **suit une séance** s'il est inscrit au cours ce jour-là (date d'en
 
 Le professeur du cours (pas le remplaçant) déplace, annule ou ajoute une séance depuis **Mes séances**, sans validation :
 
-- **Déplacer** : date, horaire et salle. L'écran montre les salles libres à ce créneau (d'après les autres séances, et l'agenda de la salle s'il est relié), puis signale sans refuser une salle prise, un professeur déjà en cours, un élève qui a un autre cours, un jour pendant une période sans cours.
+- **Modifier la séance** : date, horaire et salle. L'écran montre les salles libres à ce créneau (d'après les autres séances, et l'agenda de la salle s'il est relié), puis signale sans refuser une salle prise, un professeur déjà en cours, un élève qui a un autre cours, un jour pendant une période sans cours.
 - **Annuler** : le motif est obligatoire, il est transmis aux familles.
 - **Ajouter** une séance de rattrapage.
 

@@ -69,10 +69,6 @@
       {% if can(current_user, "activity.view") %}{{ navlink("journal.index", "Journal", "clock", ["journal"]) }}{% endif %}
       {% endif %}
     </nav>
-    <div class="sidebar-user">
-      {{ avatar(current_user) }}
-      <a href="{{ url_for('account.index') }}" class="who"><strong>{{ current_user.full_name }}</strong><small>{{ current_user.role_label }}</small></a>
-    </div>
   </aside>
   <div class="scrim" data-close-nav hidden></div>
 

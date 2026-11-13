@@ -4,6 +4,16 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ## Non publié
 
+### Changé : retours du tour complet, corrections rapides
+
+- **Saison retenue** : la saison choisie dans le catalogue, les tarifs, le calendrier, l'annuaire ou Mes élèves reste la même en passant d'une page à l'autre, jusqu'à la déconnexion.
+- **Annuaire** : par défaut, seules les personnes de la saison choisie s'affichent (son adhésion, même abandonnée, ou celle de quelqu'un de son foyer). Filtre « Toutes les fiches » pour le reste ; une recherche qui trouve des fiches hors saison le signale.
+- **Envoi d'un dossier** : le bouton « Envoyer le dossier » reste grisé tant que l'exactitude n'est pas certifiée.
+- **Séances** : « Déplacer » devient « Modifier la séance ».
+- **Tranches de quotient familial** : bouton « + Ajouter une tranche », sans limite de nombre.
+- **Notifications** : supprimer une notification, ou toutes celles déjà lues. Une relance supprimée n'est pas renvoyée. Migration `a0000014notifications`.
+- **Barre latérale** : le nom en bas à gauche disparaît, il faisait doublon avec le menu du compte en haut à droite.
+
 ### Ajouté : gestion des cours, effectifs et inscriptions en cours de saison
 
 - **Page d'un cours** (Catalogue → un cours) : élèves inscrits avec leurs responsables et leur date d'arrivée, effectif face à la capacité, élèves partis en cours de saison, liste en CSV, lien pour écrire aux familles en copie cachée.

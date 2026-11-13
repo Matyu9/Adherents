@@ -107,7 +107,10 @@ def test_a_mother_registers_her_son_and_the_office_validates(session):
     page.wait_for_url("**/inscription/dossier/*")
     assert "•••• 0189" in page.content()
 
+    send = page.locator("button:has-text('Envoyer le dossier')")
+    assert send.is_disabled()  # grisé tant que l'exactitude n'est pas certifiée
     page.check("#certify")
+    assert send.is_enabled()
     page.click("text=Envoyer le dossier")
     page.wait_for_url("**/inscription/dossier/*")
     assert "Dossier envoyé" in page.content()

@@ -24,7 +24,7 @@
     {% if edit %}
     <td data-label="" class="actions">
       {% if l.day >= today or manager %}
-      {% if not l.cancelled %}<a href="{{ url_for('lessons.edit', lesson_id=l.id) }}">Déplacer</a>
+      {% if not l.cancelled %}<a href="{{ url_for('lessons.edit', lesson_id=l.id) }}">Modifier la séance</a>
       {{ cancel_form(l) }}{% endif %}
       {% if manager and l.previous %}{{ post_button(url_for('lessons.revert', lesson_id=l.id), "Revenir en arrière", "link-button", "Annuler le dernier changement de cette séance ? Les familles seront prévenues.") }}{% endif %}
       {% if manager and not l.cancelled %}

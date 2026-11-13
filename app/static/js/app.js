@@ -85,3 +85,42 @@
     document.querySelectorAll("form").forEach(refresh);
   });
 })();
+
+// <button data-enabled-by="champ"> : désactivé tant que la case « champ » du même formulaire n'est pas cochée (attestation
+// avant un envoi…). Sans JavaScript, le bouton reste actif et le serveur refuse l'envoi.
+(function () {
+  function refresh(form) {
+    form.querySelectorAll("[data-enabled-by]").forEach(function (button) {
+      const box = form.elements[button.dataset.enabledBy];
+      button.disabled = !!box && !box.checked;
+    });
+  }
+  document.addEventListener("change", function (event) {
+    if (event.target.form) refresh(event.target.form);
+  });
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("form").forEach(refresh);
+  });
+})();
+
+// <button data-add-row hidden> : ajoute une ligne au <tbody data-rows> du même bloc, copiée du <template data-row-template>
+// (« __n__ » devient le numéro de ligne, « __label__ » son rang). Sans JavaScript, le bouton reste caché et le
+// formulaire garde ses lignes vides.
+(function () {
+  document.addEventListener("click", function (event) {
+    const button = event.target.closest("[data-add-row]");
+    if (!button) return;
+    const block = button.parentElement;
+    const rows = block.querySelector("[data-rows]");
+    const template = block.querySelector("template[data-row-template]");
+    if (!rows || !template) return;
+    const n = rows.children.length;
+    const html = template.innerHTML.replaceAll("__n__", String(n)).replaceAll("__label__", String(n + 1));
+    rows.insertAdjacentHTML("beforeend", html);
+    const first = rows.lastElementChild && rows.lastElementChild.querySelector("input");
+    if (first) first.focus();
+  });
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-add-row]").forEach(function (button) { button.hidden = false; });
+  });
+})();

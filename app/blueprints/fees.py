@@ -35,11 +35,7 @@ BAND_ROWS = 6
 
 
 def _selected_season():
-    """Saison demandée (?saison=), sinon la saison en cours, sinon la plus récente."""
-    seasons = directory.seasons()
-    wanted = request.values.get("saison", type=int)
-    season = next((s for s in seasons if s.id == wanted), None) if wanted else None
-    return season or directory.current_season() or (seasons[0] if seasons else None), seasons
+    return directory.selected_season()
 
 
 def _season_or_redirect():
@@ -233,7 +229,9 @@ def settings():
     if request.method == "POST":
         form = request.form
         bands = []
-        for k in range(BAND_ROWS + len(current.qf_bands)):
+        # Autant de lignes que le formulaire en envoie : le bouton « + Ajouter une tranche » en ajoute sans limite.
+        rows = sorted({int(key.split("-")[1]) for key in form if re.fullmatch(r"band-\d{1,4}-(label|max)", key)})
+        for k in rows:
             label = (form.get(f"band-{k}-label") or "").strip()
             ceiling = (form.get(f"band-{k}-max") or "").strip()
             if not label and not ceiling:

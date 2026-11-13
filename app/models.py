@@ -1532,6 +1532,8 @@ class Notification(db.Model):
     dedup_key = db.Column(db.String(120), unique=True)
     emailed = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now, server_default=func.now())
+    # Supprimée par son destinataire : cachée, mais gardée pour que sa clé de déduplication empêche de la recréer.
+    dismissed_at = db.Column(db.DateTime)
 
     account = db.relationship("Account")
 

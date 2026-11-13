@@ -284,9 +284,8 @@ def phone_filter(number):
 def index():
     q = (request.args.get("q") or "").strip()
     status = request.args.get("statut")
-    status = status if status in directory.STATUSES else None
-    all_seasons = directory.seasons()
-    season = db.session.get(Season, request.args.get("saison", type=int) or 0) or directory.current_season()
+    status = status if status in directory.STATUSES else directory.DEFAULT_STATUS
+    season, all_seasons = directory.selected_season()
     items, total, page, pages = _page(
         directory.person_query(q, status, season), (Person.last_name, Person.first_name, Person.id)
     )
@@ -294,13 +293,19 @@ def index():
         k: v
         for k, v in (
             ("q", q),
-            ("statut", status),
+            ("statut", status if status != directory.DEFAULT_STATUS else None),
             ("saison", season.id if season and request.args.get("saison") else None),
         )
         if v
     }
+    # Une recherche qui ne trouve pas tout dans la saison : dire combien de fiches restent cachées.
+    hidden = 0
+    if q and status == directory.DEFAULT_STATUS and season is not None:
+        everyone = directory.person_query(q, "toutes", season).with_only_columns(db.func.count(Person.id))
+        hidden = db.session.scalar(everyone) - total
     return render_template(
         "directory/index.html",
+        hidden=hidden,
         items=items,
         total=total,
         page=page,

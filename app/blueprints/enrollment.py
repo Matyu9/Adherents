@@ -640,12 +640,6 @@ def my_students():
         abort(404)
     flask_g.write_lock = True
     guard.count_read()
-    seasons = directory.seasons()
-    wanted = request.args.get("saison", type=int)
-    season = (
-        next((s for s in seasons if s.id == wanted), None)
-        or directory.current_season()
-        or (seasons[0] if seasons else None)
-    )
+    season, seasons = directory.selected_season()
     rows = registration.students_of(teacher, season) if season else []
     return render_template("enrollment/my_students.html", season=season, seasons=seasons, rows=rows)

@@ -3,6 +3,8 @@
 import re
 from datetime import datetime
 
+from flask import request, session
+
 from ..extensions import db, fold, fold_contains
 from ..models import (
     Account,
@@ -43,7 +45,14 @@ PERSON_FIELDS = (
 )
 ADDRESS_FIELDS = ("address_recipient", "address_street", "postal_code", "city", "country")
 # Filtres de la liste des personnes.
-STATUSES = {"eleves": "Élèves de la saison", "anciens": "Anciens adhérents", "archives": "Archivées"}
+STATUSES = {
+    "saison": "Personnes de la saison",
+    "eleves": "Élèves de la saison",
+    "toutes": "Toutes les fiches",
+    "anciens": "Anciens adhérents",
+    "archives": "Archivées",
+}
+DEFAULT_STATUS = "saison"
 
 
 class DirectoryError(ValueError):
@@ -106,6 +115,23 @@ def current_season():
     return db.session.get(Season, int(setting.value)) if setting and setting.value.isdigit() else None
 
 
+SELECTED_SEASON_KEY = "saison"
+
+
+def selected_season():
+    """Saison affichée : celle demandée (?saison=), sinon la dernière choisie pendant la session, sinon la saison en
+    cours, sinon la plus récente. Le choix est retenu d'une page à l'autre (catalogue, tarifs, calendrier…).
+    Renvoie (saison, toutes les saisons)."""
+    all_seasons = seasons()
+    by_id = {s.id: s for s in all_seasons}
+    wanted = request.values.get("saison", type=int)
+    if wanted in by_id:
+        session[SELECTED_SEASON_KEY] = wanted
+        return by_id[wanted], all_seasons
+    season = by_id.get(session.get(SELECTED_SEASON_KEY)) or current_season() or (all_seasons[0] if all_seasons else None)
+    return season, all_seasons
+
+
 def set_current_season(season):
     setting = db.session.get(AppSetting, CURRENT_SEASON_KEY)
     if setting is None:
@@ -117,6 +143,20 @@ def set_current_season(season):
 def active_in(season):
     """Condition « la personne a une adhésion active sur cette saison »."""
     return Person.memberships.any(db.and_(Membership.season_id == season.id, Membership.status == Membership.ACTIVE))
+
+
+def in_season(season):
+    """Condition « la personne concerne cette saison » : elle y a une adhésion (même abandonnée), ou elle fait partie
+    d'un foyer dont quelqu'un y a une adhésion (ses responsables, par exemple)."""
+    member = Person.memberships.any(Membership.season_id == season.id)
+    household = Person.household_links.any(
+        HouseholdMember.household.has(
+            Household.members.any(
+                HouseholdMember.person.has(Person.memberships.any(Membership.season_id == season.id))
+            )
+        )
+    )
+    return db.or_(member, household)
 
 
 # ---------------------------------------------------------------------------
@@ -149,6 +189,8 @@ def person_query(text=None, status=None, season=None):
     if status == "archives":
         return query.where(Person.archived_at.is_not(None))
     query = query.where(Person.archived_at.is_(None), ~staff_only())
+    if status == "saison":
+        return query.where(in_season(season)) if season is not None else query
     if status == "eleves" and season is not None:
         query = query.where(active_in(season))
     elif status == "eleves":

@@ -79,11 +79,7 @@ def _optional_int(value):
 
 
 def _selected_season():
-    """Saison demandée (?saison=), sinon la saison en cours, sinon la plus récente."""
-    seasons = directory.seasons()
-    wanted = request.args.get("saison", type=int)
-    season = next((s for s in seasons if s.id == wanted), None) if wanted else None
-    return season or directory.current_season() or (seasons[0] if seasons else None), seasons
+    return directory.selected_season()
 
 
 # ---------------------------------------------------------------------------

@@ -342,6 +342,21 @@ def test_reglages(client, manager, school):
     assert 'value="1200"' in html and '<option value="age_desc" selected' in html
 
 
+def test_as_many_qf_bands_as_wanted(client, manager, school):
+    """Plus de lignes que le formulaire n'en affiche : le bouton « + Ajouter une tranche » en ajoute côté navigateur."""
+    s = school["season"]
+    data = {"ranking": "price_desc", "rounding": "none", "rounding_scope": "line"}
+    for k in range(12):
+        data[f"band-{k}-label"] = f"T{k + 1}"
+        if k < 11:
+            data[f"band-{k}-max"] = str(100 * (k + 1))
+    assert client.post(f"/tarifs/reglages?saison={s.id}", data=data).status_code == 302
+    bands = fees.season_settings(s).qf_bands
+    assert len(bands) == 12 and bands[-1] == {"label": "T12", "max": None}
+    html = page(client.get(f"/tarifs/reglages?saison={s.id}"))
+    assert 'name="band-13-label"' in html and "data-add-row" in html  # deux lignes vides, et le bouton
+
+
 @pytest.mark.parametrize(
     "data, message",
     [

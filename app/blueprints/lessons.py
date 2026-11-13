@@ -21,10 +21,7 @@ bp = Blueprint("lessons", __name__, url_prefix="/seances")
 
 
 def _season():
-    seasons = directory.seasons()
-    wanted = request.values.get("saison", type=int)
-    season = next((s for s in seasons if s.id == wanted), None) if wanted else None
-    return season or directory.current_season() or (seasons[0] if seasons else None), seasons
+    return directory.selected_season()
 
 
 def _flash_all(messages, category="warning"):

@@ -12,7 +12,6 @@
 <form method="get" class="filters">
   <input type="search" name="q" value="{{ q }}" placeholder="Nom, prénom ou email" aria-label="Recherche">
   <select name="statut" aria-label="Statut" data-autosubmit>
-    <option value="">Toutes les fiches</option>
     {% for key, label in statuses.items() %}<option value="{{ key }}" {{ "selected" if status == key }}>{{ label }}</option>{% endfor %}
   </select>
   {% if seasons %}
@@ -22,6 +21,7 @@
   {% endif %}
   <noscript><button type="submit">Filtrer</button></noscript>
 </form>
+{% if hidden %}<p class="small"><a href="{{ url_for('directory.index', q=q, statut='toutes') }}">Voir aussi {{ hidden }} fiche{{ "s" if hidden > 1 }} hors de la saison {{ season.label }}</a></p>{% endif %}
 <div class="overflow-auto"><table class="striped responsive">
   <thead><tr><th>Nom</th><th>Naissance</th><th>Email</th><th>Foyers</th><th>Saison</th></tr></thead>
   <tbody>

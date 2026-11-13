@@ -57,7 +57,7 @@ def test_calendar_lessons_and_planning(session, scheme):
     page.goto(f"/seances/cours/{course_id}")
     shot(page, f"seances-cours-{scheme}")
     row = page.locator("tbody tr").filter(has_not=page.locator(".badge")).last
-    row.locator("text=Déplacer").click()
+    row.locator("text=Modifier la séance").click()
     page.wait_for_url("**/modifier")
     page.click("text=Voir les salles libres à ce créneau")
     page.select_option("#room_id", label="Auditorium (Maison e2e) — libre")

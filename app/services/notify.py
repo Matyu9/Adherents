@@ -43,6 +43,8 @@ def unread_count():
         return 0
     return db.session.scalar(
         db.select(db.func.count(Notification.id)).where(
-            Notification.account_id == current_user.id, Notification.read.is_(False)
+            Notification.account_id == current_user.id,
+            Notification.read.is_(False),
+            Notification.dismissed_at.is_(None),
         )
     )

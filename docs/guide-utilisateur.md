@@ -123,7 +123,7 @@ Vous ne voyez que vos élèves, et rien d'autre de l'annuaire. Un professeur qui
 
 **Menu → Mes séances** : vos séances d'aujourd'hui, des huit semaines à venir et de la semaine passée, y compris celles où vous remplacez un collègue.
 
-- **Déplacer** : choisissez la date et l'horaire, puis **Voir les salles libres à ce créneau**, et la salle. Ce qui gêne (salle prise, élève qui a un autre cours…) est signalé.
+- **Modifier la séance** : choisissez la date et l'horaire, puis **Voir les salles libres à ce créneau**, et la salle. Ce qui gêne (salle prise, élève qui a un autre cours…) est signalé.
 - **Annuler** : indiquez le motif, il est transmis aux familles.
 - **Toutes les séances → + Ajouter une séance** : un rattrapage.
 
@@ -150,7 +150,7 @@ Le rôle **Gestionnaire** gère l'annuaire, le catalogue et les inscriptions. Il
 
 **Annuaire → Personnes** et **Foyers.** Une personne a **une seule fiche**, quels que soient ses rôles (élève, responsable, professeur). Le **foyer** est le payeur : adresse, IBAN et cotisations s'y rattachent.
 
-- **Rechercher** : nom, prénom ou email, sans se soucier des accents. Les filtres montrent les élèves de la saison, les anciens adhérents ou les fiches archivées.
+- **Rechercher** : nom, prénom ou email, sans se soucier des accents. Par défaut, la liste montre les personnes de la saison choisie : les élèves, même partis en cours d'année, et les membres de leurs foyers. Les filtres montrent aussi les seuls élèves, toutes les fiches, les anciens adhérents ou les fiches archivées. Une recherche qui trouve des fiches hors saison propose de les voir. La saison choisie reste la même d'une page à l'autre (catalogue, tarifs, calendrier).
 - **Un foyer** a un responsable 1, éventuellement un responsable 2, et des personnes à charge. Un adulte seul est le responsable 1 de son propre foyer.
 - **Doublons** : **Fusionner un doublon**, depuis l'une des deux fiches. L'écran montre les différences et demande quoi garder ; foyers, téléphones, adhésions, cours et consentements s'additionnent.
 - **Archiver** plutôt que supprimer : une fiche archivée sort des listes, son historique reste.
@@ -375,7 +375,7 @@ Le même écran supprime les **anciens dossiers d'inscription** des campagnes tr
 | Annuaire : consulter, modifier, fusionner | | | ✓ | ✓ |
 | Catalogue : consulter, modifier, copier une saison | | | ✓ | ✓ |
 | Élèves d'un cours : inscrire, changer de cours, noter un abandon | | | ✓ | ✓ |
-| Déplacer, annuler, ajouter une séance | | ✓ (ses cours) | ✓ | ✓ |
+| Modifier, annuler, ajouter une séance | | ✓ (ses cours) | ✓ | ✓ |
 | Calendrier, génération des séances, remplaçants, retour en arrière | | | ✓ | ✓ |
 | Agenda à s'abonner | ✓ | ✓ | ✓ | ✓ |
 | Faire l'appel | | ✓ (7 jours) | ✓ | ✓ |

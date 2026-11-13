@@ -342,11 +342,21 @@ def test_status_filters(client, admin, family):
         page = client.get("/annuaire?" + query).get_data(as_text=True)
         return {n for n in ("Zoé", "Anne", "Marc", "Paul", "Parti", "Ancienne") if f" {n}</a>" in page}
 
+    # Par défaut : les personnes de la saison choisie, avec leur foyer (Anne, responsable de Zoé).
     assert names("") == {"Zoé", "Anne", "Marc"}
+    seul = person("Seul", "Ancien")
+    db.session.add(Membership(person=seul, season=old))
+    db.session.commit()
+    assert names("") == {"Zoé", "Anne", "Marc"}  # Seul n'est que de l'ancienne saison
+    assert " Seul</a>" in client.get(f"/annuaire?saison={old.id}").get_data(as_text=True)
+    assert " Seul</a>" in client.get("/annuaire").get_data(as_text=True)  # saison retenue d'une page à l'autre
+    page = client.get(f"/annuaire?saison={current.id}&q=seul").get_data(as_text=True)
+    assert " Seul</a>" not in page and "Voir aussi 1 fiche hors de la saison" in page
+    assert " Seul</a>" in client.get("/annuaire?statut=toutes&q=seul").get_data(as_text=True)
     assert names("statut=eleves") == {"Zoé"}
     assert names(f"statut=eleves&saison={old.id}") == {"Anne"}
     assert names("statut=anciens") == {"Anne", "Marc"}  # Marc a abandonné cette saison
-    assert names("statut=professeurs") == {"Zoé", "Anne", "Marc"}  # filtre retiré : ignoré
+    assert names("statut=professeurs") == {"Zoé", "Anne", "Marc"}  # filtre retiré : ignoré, retour au filtre par défaut
     assert names("statut=archives") == {"Ancienne"}
     assert prof and gone
 
@@ -807,7 +817,6 @@ def test_messages_can_be_dismissed_and_stay_in_view(client, admin, family):
     [
         "/annuaire/personnes/99999999999999999999",
         "/annuaire/foyers/99999999999999999999",
-        "/annuaire?saison=99999999999999999999",
         "/professeurs/99999999999999999999",
         "/annuaire/personnes/nouvelle?foyer=99999999999999999999",
     ],
@@ -815,3 +824,8 @@ def test_messages_can_be_dismissed_and_stay_in_view(client, admin, family):
 def test_numbers_too_large_are_a_clean_404(client, admin, url):
     """PostgreSQL refuse un entier hors limites : l'appli répond « introuvable », jamais une erreur 500."""
     assert client.get(url).status_code == 404
+
+
+def test_an_unknown_season_is_ignored(client, admin):
+    """Saison inconnue ou hors limites dans l'adresse : la saison par défaut, sans erreur."""
+    assert client.get("/annuaire?saison=99999999999999999999").status_code == 200

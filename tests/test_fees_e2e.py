@@ -41,6 +41,10 @@ def test_tarifs_de_bout_en_bout(session):
     page.fill("input[name=band-0-label]", "A")
     page.fill("input[name=band-0-max]", "600")
     page.fill("input[name=band-1-label]", "C")
+    rows = page.locator("[data-rows] tr").count()
+    page.click("text=+ Ajouter une tranche")
+    assert page.locator("[data-rows] tr").count() == rows + 1
+    assert page.locator(f"input[name=band-{rows}-label]").is_visible()
     page.click("text=Enregistrer les réglages")
     page.wait_for_url("**/tarifs/reglages*")
     shot(page, "tarifs-reglages")

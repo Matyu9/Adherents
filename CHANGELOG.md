@@ -4,6 +4,15 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ## Non publié
 
+### Changé : retours du tour complet, jours fériés et salles
+
+- **Jours fériés calculés** pour la saison, d'un bouton, chacun modifiable ou supprimable.
+- **Import de vacances et fermetures** depuis un fichier `.ics` (calendrier scolaire officiel, export d'agenda) ou CSV, avec un aperçu (nouvelle, déjà là, hors saison) avant tout ajout.
+- **Nature d'une période** (jour férié, vacances, fermeture) et **cours maintenus** : la période reste affichée sans retirer de séance. Migration `a0000018feries`.
+- **Calendriers** : jours fériés et vacances visibles dans le planning (semaine et mois) et le calendrier d'un cours, séances annulées barrées.
+- **Séance d'un professeur pendant une période sans cours** : le secrétariat est prévenu, avec le nom de la période.
+- **Menu → Salles** : salles par site, places, agenda relié, occupation de la semaine, cours réguliers.
+
 ### Changé : retours du tour complet, professeurs et séances
 
 - **Menu d'un professeur** : sans famille ni adhésion, plus de « Ma famille » ni d'« Inscriptions ».

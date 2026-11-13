@@ -78,6 +78,7 @@
     {% for week in calendar.weeks %}{% for cell in week %}
     <div class="pl-cell{{ ' is-outside' if cell.outside }}{{ ' is-past' if cell.past }}{{ ' is-today' if cell.today }}">
       <span class="pl-daynum">{{ cell.date.day }}</span>
+      {% if cell.off %}<span class="pl-off" title="{{ cell.off.kind_label }}">{{ cell.off.label }}</span>{% endif %}
       {% for e in cell.events %}
       <a href="{{ e.link }}" class="pl-pill course-{{ e.color }}{{ ' is-past' if e.past }}{{ ' is-cancelled' if e.cancelled }}" title="{{ e.starts_at.strftime('%H:%M') }}–{{ e.ends_at.strftime('%H:%M') }}{% if e.cancelled %} · annulée{% elif e.edited %} · modifiée{% endif %}">
         <span class="pl-dot"></span><span class="pl-time">{{ e.starts_at.strftime("%H:%M") }}</span>{% if e.cancelled %} <span class="pl-title">annulée</span>{% elif e.edited %} <span class="pl-title">modifiée</span>{% endif %}

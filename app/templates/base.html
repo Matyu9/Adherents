@@ -53,6 +53,7 @@
       {% if can(current_user, "catalog.view") %}
       {{ navlink("catalog.index", "Catalogue", "layers", ["catalog"]) }}
       {{ navlink("lessons.planning", "Planning", "calendar") }}
+      {{ navlink("lessons.rooms", "Salles", "home") }}
       {% endif %}
       {% if can(current_user, "lesson.manage") %}{{ navlink("lessons.calendar", "Calendrier", "clock") }}{{ navlink("lessons.absences", "Absences", "user-check") }}{% endif %}
       {% if can(current_user, "registration.view") %}{{ navlink("campaigns.index", "Campagnes", "calendar", ["campaigns"]) }}{% endif %}

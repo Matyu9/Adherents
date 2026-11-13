@@ -62,6 +62,7 @@
     {% for week in layout %}{% for cell in week %}
     <div class="pl-cell{{ ' is-outside' if cell.outside }}{{ ' is-past' if cell.past }}{{ ' is-today' if cell.today }}">
       <a class="pl-daynum" href="{{ keep({'mode': 'semaine', 'date': cell.date.isoformat()}) }}" aria-label="Semaine du {{ cell.date | date_fr }}">{{ cell.date.day }}</a>
+      {% if cell.off %}<span class="pl-off" title="{{ cell.off.kind_label }}{{ ' (cours maintenus)' if cell.off.keep_lessons }}">{{ cell.off.label }}</span>{% endif %}
       {% for e in cell.events[:4] %}
       {% if e.link %}<a href="{{ e.link }}"{% else %}<span{% endif %} class="pl-pill course-{{ e.color }}{{ ' is-past' if e.past }}{{ ' is-cancelled' if e.cancelled }}" title="{{ e.starts_at.strftime('%H:%M') }}–{{ e.ends_at.strftime('%H:%M') }} {{ e.title }}{% for line in e.details %} · {{ line }}{% endfor %}">
         <span class="pl-dot"></span><span class="pl-time">{{ e.starts_at.strftime("%H:%M") }}</span> <span class="pl-title">{{ e.title }}</span>
@@ -77,8 +78,9 @@
   <div class="pl-week pl-days-{{ layout.days | length }}">
     <div class="pl-corner"></div>
     {% for d in layout.days %}
-    <div class="pl-dayhead{{ ' is-today' if d.today }}{{ ' is-past' if d.past }}">
+    <div class="pl-dayhead{{ ' is-today' if d.today }}{{ ' is-past' if d.past }}{{ ' is-off' if d.off }}">
       {% if d.date %}<span>{{ d.short }}</span> <strong>{{ d.date.day }}</strong>{% else %}<strong>{{ d.name }}</strong>{% endif %}
+      {% if d.off %}<span class="pl-off" title="{{ d.off.kind_label }}{{ ' (cours maintenus)' if d.off.keep_lessons }}">{{ d.off.label }}</span>{% endif %}
     </div>
     {% endfor %}
     <div class="pl-gutter pl-rows-{{ layout.rows }}">

@@ -156,7 +156,7 @@ class Week:
     now_day: int | None
 
 
-def week_layout(events, monday=None, now=None, typical=False):
+def week_layout(events, monday=None, now=None, typical=False, offs=None):
     """Une semaine en grille. Les heures montrées vont de la première séance à la dernière (9 h - 18 h au moins).
     Le dimanche n'apparaît que s'il a des séances."""
     now = now or datetime.now()
@@ -186,6 +186,7 @@ def week_layout(events, monday=None, now=None, typical=False):
                 "lanes": lanes,
                 "today": day == now.date(),
                 "past": day is not None and day < now.date(),
+                "off": (offs or {}).get(day) if day else None,
             }
         )
     now_row = None
@@ -204,7 +205,7 @@ def week_layout(events, monday=None, now=None, typical=False):
     )
 
 
-def month_layout(year, month, events, now=None):
+def month_layout(year, month, events, now=None, offs=None):
     """Un mois en calendrier : des semaines de lundi à dimanche, chaque jour avec ses séances dans l'ordre."""
     now = now or datetime.now()
     by_day = {}
@@ -220,6 +221,7 @@ def month_layout(year, month, events, now=None):
                     "outside": day.month != month,
                     "today": day == now.date(),
                     "past": day < now.date(),
+                    "off": (offs or {}).get(day),
                 }
                 for day in week
             ]

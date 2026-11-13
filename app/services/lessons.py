@@ -67,7 +67,7 @@ def set_window(season, lessons_from, lessons_until):
     db.session.flush()
 
 
-def add_break(season, label, starts_on, ends_on):
+def add_break(season, label, starts_on, ends_on, kind=SeasonBreak.CLOSURE):
     label = (label or "").strip()
     if not label:
         raise LessonError("Donnez un nom à la période (« Vacances de la Toussaint », « 11 novembre »…).")
@@ -78,16 +78,35 @@ def add_break(season, label, starts_on, ends_on):
         raise LessonError("La période finit avant de commencer.")
     if ends_on < season.starts_on or starts_on > season.ends_on:
         raise LessonError(f"La période doit toucher la saison {season.label}.")
-    record = SeasonBreak(season=season, label=label[:80], starts_on=starts_on, ends_on=ends_on)
+    kind = kind if kind in SeasonBreak.KINDS else SeasonBreak.CLOSURE
+    record = SeasonBreak(season=season, label=label[:80], starts_on=starts_on, ends_on=ends_on, kind=kind)
     db.session.add(record)
     db.session.flush()
     return record
 
 
 def off_days(season):
-    """Fonction qui dit si un jour tombe dans une période sans cours."""
-    periods = [(b.starts_on, b.ends_on) for b in season.breaks]
+    """Fonction qui dit si un jour tombe dans une période sans cours (hors « cours maintenus »)."""
+    periods = [(b.starts_on, b.ends_on) for b in season.breaks if not b.keep_lessons]
     return lambda day: any(a <= day <= b for a, b in periods)
+
+
+def break_on(season, day):
+    """La période sans cours qui couvre ce jour (hors « cours maintenus »), ou None."""
+    return next((b for b in season.breaks if not b.keep_lessons and b.covers(day)), None)
+
+
+def breaks_between(start, end):
+    """{jour: période} des périodes sans cours (toutes saisons) entre deux dates, pour les calendriers."""
+    found = {}
+    for record in db.session.scalars(
+        db.select(SeasonBreak).where(SeasonBreak.starts_on <= end, SeasonBreak.ends_on >= start)
+    ):
+        day = max(record.starts_on, start)
+        while day <= min(record.ends_on, end):
+            found.setdefault(day, record)
+            day += timedelta(days=1)
+    return found
 
 
 def scheduled_days(course):
@@ -391,7 +410,7 @@ def move(lesson, day, starts_at, ends_at, room=None, reason=None, user=None, now
     message = f"Séance de {before} déplacée : {day_label(day)} {starts_at:%H:%M}-{ends_at:%H:%M}" + (
         f", {room.label}" if room else ""
     )
-    _announce(lesson, message, user, by_teacher)
+    _announce(lesson, message, user, by_teacher, off=break_on(season, day))
     _after_change(lesson, old_room)
     return warnings
 
@@ -433,7 +452,7 @@ def add_extra(course, day, starts_at, ends_at, room=None, reason=None, user=None
     _record(lesson, user, now)
     db.session.flush()
     warnings = conflicts(lesson, day, starts_at, ends_at, room)
-    _announce(lesson, f"Séance ajoutée : {describe(lesson)}", user, by_teacher)
+    _announce(lesson, f"Séance ajoutée : {describe(lesson)}", user, by_teacher, off=break_on(course.season, day))
     _after_change(lesson, None)
     return lesson, warnings
 
@@ -523,9 +542,9 @@ def family_contacts(lesson):
     return list(accounts.values()), list(emails.values())
 
 
-def _announce(lesson, message, user, by_teacher):
+def _announce(lesson, message, user, by_teacher, off=None):
     """Au journal ; aux familles (notification, et email pour celles sans compte) ; au secrétariat si c'est le
-    professeur qui a fait le changement."""
+    professeur qui a fait le changement, en signalant un jour férié ou une période sans cours (`off`)."""
     from . import mailer, notify
 
     log("lesson.change", message, user=user)
@@ -536,9 +555,10 @@ def _announce(lesson, message, user, by_teacher):
         for address in emails:
             mailer.send_in_background(address, *mailer.render(None, subject, message, "", None))
     if by_teacher:
+        warning = f". Attention : {off.kind_label.lower()} « {off.label} »" if off is not None else ""
         notify.notify(
             [a for a in notify.holders("lesson.manage") if a != user],
-            f"{user.full_name} : {message}",
+            f"{user.full_name} : {message}{warning}",
             _link("lessons.course", course_id=lesson.course_id),
         )
 

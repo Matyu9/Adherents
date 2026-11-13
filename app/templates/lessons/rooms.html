@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Salles{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Salles</h1>
+    <p class="muted">Occupation de la semaine du {{ monday | date_fr }}{% if season %}, et cours réguliers de la saison {{ season.label }}{% endif %}. Un nom ouvre le planning de la salle.</p>
+  </div>
+  {% if can(current_user, "catalog.edit") %}
+  <div class="actions">
+    <a href="{{ url_for('catalog.create_item', kind='salles') }}" role="button" class="secondary">+ Nouvelle salle</a>
+  </div>
+  {% endif %}
+</div>
+{% for site in sites %}
+{% set rooms = site.rooms | rejectattr("archived") | list %}
+<section class="card settings-block">
+  <h2>{{ site.name }}{% if site.address %} <small class="muted">{{ site.address }}</small>{% endif %}</h2>
+  {% if rooms %}
+  <div class="overflow-auto"><table class="striped responsive">
+    <thead><tr><th>Salle</th><th>Places</th><th>Agenda</th><th>Cette semaine</th><th>Cours réguliers</th>{% if can(current_user, "catalog.edit") %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for r in rooms %}
+    <tr>
+      <td data-label="Salle"><a href="{{ url_for('lessons.planning', vue='salle', id=r.id) }}">{{ r.name }}</a></td>
+      <td data-label="Places">{{ r.capacity or "—" }}</td>
+      <td data-label="Agenda">{% if r.calendar_id %}<span class="badge badge-ok">relié</span>{% else %}<small class="muted">—</small>{% endif %}</td>
+      <td data-label="Cette semaine">{% if count[r.id] %}{{ count[r.id] }} séance{{ "s" if count[r.id] > 1 }} · {{ "%.1f" | format(hours[r.id]) | replace(".", ",") }} h{% else %}<small class="muted">libre</small>{% endif %}</td>
+      <td data-label="Cours réguliers">{{ regular[r.id] or "—" }}</td>
+      {% if can(current_user, "catalog.edit") %}<td data-label="" class="actions"><a href="{{ url_for('catalog.edit_item', kind='salles', item_id=r.id) }}">Modifier</a></td>{% endif %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="muted">Aucune salle sur ce site.</p>{% endif %}
+</section>
+{% else %}
+<p class="empty">Aucun site pour l'instant.{% if can(current_user, "catalog.edit") %} <a href="{{ url_for('catalog.create_item', kind='sites') }}">Ajouter un site</a>.{% endif %}</p>
+{% endfor %}
+{% endblock %}

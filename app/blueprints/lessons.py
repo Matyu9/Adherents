@@ -41,6 +41,7 @@ class WindowForm(FlaskForm):
 
 class BreakForm(FlaskForm):
     label = StringField("Nom", validators=[DataRequired("Donnez un nom à la période."), Length(max=80)])
+    kind = SelectField("Nature", choices=list(SeasonBreak.KINDS.items()), default=SeasonBreak.VACATION)
     starts_on = DateField("Du", validators=[DataRequired("Indiquez le premier jour.")])
     ends_on = DateField("Au (inclus)", validators=[Optional()])
 
@@ -95,7 +96,7 @@ def add_break(season_id):
     form = BreakForm()
     if form.validate_on_submit():
         try:
-            service.add_break(season, form.label.data, form.starts_on.data, form.ends_on.data)
+            service.add_break(season, form.label.data, form.starts_on.data, form.ends_on.data, form.kind.data)
         except LessonError as exc:
             flash(str(exc), "error")
         else:
@@ -104,6 +105,80 @@ def add_break(season_id):
     else:
         _flash_all([e for errors in form.errors.values() for e in errors], "error")
     return redirect(url_for(".calendar", saison=season.id) + "#periodes")
+
+
+@bp.route("/calendrier/<int:season_id>/feries", methods=["POST"])
+@require("lesson.manage")
+def add_holidays(season_id):
+    """Ajoute les jours fériés de la saison qui manquent : chacun reste modifiable ou supprimable ensuite."""
+    from ..services import holidays
+
+    season = db.session.get(Season, season_id) or abort(404)
+    added = holidays.apply(season, holidays.holidays_plan(season), SeasonBreak.HOLIDAY)
+    db.session.commit()
+    flash(
+        f"{added} jour(s) férié(s) ajouté(s). Relancez la génération pour retirer les séances concernées."
+        if added
+        else "Les jours fériés de la saison sont déjà là.",
+        "success",
+    )
+    return redirect(url_for(".calendar", saison=season.id) + "#periodes")
+
+
+@bp.route("/calendrier/<int:season_id>/importer", methods=["GET", "POST"])
+@require("lesson.manage")
+def import_breaks(season_id):
+    """Vacances et fermetures depuis un fichier .ics (calendrier scolaire, export d'agenda) ou CSV : aperçu, puis
+    ajout des lignes cochées."""
+    from ..services import holidays
+
+    season = db.session.get(Season, season_id) or abort(404)
+    rows, error = None, None
+    if request.method == "POST" and request.form.get("action") == "confirmer":
+        wanted = set(request.form.getlist("ligne"))
+        kind = request.form.get("kind") if request.form.get("kind") in SeasonBreak.KINDS else SeasonBreak.VACATION
+        picked = []
+        for key in wanted:
+            try:
+                start, end, label = key.split("|", 2)
+                picked.append(holidays.Row(label[:80], date.fromisoformat(start), date.fromisoformat(end)))
+            except ValueError:
+                abort(400)
+        added = holidays.apply(season, holidays.plan(season, picked), kind)
+        db.session.commit()
+        flash(f"{added} période(s) ajoutée(s). Relancez la génération pour retirer les séances concernées.", "success")
+        return redirect(url_for(".calendar", saison=season.id) + "#periodes")
+    if request.method == "POST":
+        upload = request.files.get("fichier")
+        if not upload or not upload.filename:
+            error = "Choisissez un fichier .ics ou .csv."
+        else:
+            try:
+                rows = holidays.plan(season, holidays.parse(upload.filename, upload.read(holidays.MAX_FILE + 1)))
+            except holidays.ImportError_ as exc:
+                error = str(exc)
+            else:
+                if not rows:
+                    error = "Aucune période trouvée dans ce fichier."
+    return render_template(
+        "lessons/import_breaks.html", season=season, rows=rows, error=error, kinds=SeasonBreak.KINDS
+    )
+
+
+@bp.route("/periodes/<int:break_id>/maintenir", methods=["POST"])
+@require("lesson.manage")
+def keep_break(break_id):
+    """« Cours maintenus » : la période reste affichée, mais ne retire plus de séance (ou l'inverse)."""
+    record = db.session.get(SeasonBreak, break_id) or abort(404)
+    record.keep_lessons = not record.keep_lessons
+    db.session.commit()
+    flash(
+        f"« {record.label} » : "
+        + ("cours maintenus." if record.keep_lessons else "plus de cours.")
+        + " Relancez la génération pour mettre les séances à jour.",
+        "success",
+    )
+    return redirect(url_for(".calendar", saison=record.season_id) + "#periodes")
 
 
 @bp.route("/periodes/<int:break_id>/supprimer", methods=["POST"])
@@ -199,8 +274,9 @@ def course(course_id):
             for lesson in lessons
         ]
         prev_month, next_month = planning.shift_month(year, month, -1), planning.shift_month(year, month, 1)
+        start, end = planning.month_bounds(year, month)
         calendar_data = {
-            "weeks": planning.month_layout(year, month, events, now),
+            "weeks": planning.month_layout(year, month, events, now, offs=service.breaks_between(start, end)),
             "title": planning.month_title(year, month),
             "prev": f"{prev_month[0]}-{prev_month[1]:02d}",
             "next": f"{next_month[0]}-{next_month[1]:02d}",
@@ -518,14 +594,21 @@ def _render_planning(events, mode, day, personal, **context):
     now = datetime.now()
     monday, _ = service.week_of(day)
     if mode == "mois":
-        layout = planning.month_layout(day.year, day.month, events, now)
+        start, end = planning.month_bounds(day.year, day.month)
+        layout = planning.month_layout(day.year, day.month, events, now, offs=service.breaks_between(start, end))
         title = planning.month_title(day.year, day.month)
         year, month = planning.shift_month(day.year, day.month, -1)
         previous = date(year, month, 1)
         year, month = planning.shift_month(day.year, day.month, 1)
         following = date(year, month, 1)
     else:
-        layout = planning.week_layout(events, monday, now, typical=mode == "type")
+        layout = planning.week_layout(
+            events,
+            monday,
+            now,
+            typical=mode == "type",
+            offs=service.breaks_between(monday, monday + timedelta(days=6)) if mode != "type" else None,
+        )
         title = "Semaine type" if mode == "type" else planning.week_title(monday)
         previous, following = monday - timedelta(days=7), monday + timedelta(days=7)
     return render_template(
@@ -673,3 +756,41 @@ def feed(token):
     response.headers["Cache-Control"] = "private, max-age=300"
     response.headers["Content-Disposition"] = 'inline; filename="cours.ics"'
     return response
+
+
+# ---------------------------------------------------------------------------
+# Salles
+# ---------------------------------------------------------------------------
+
+
+@bp.route("/salles")
+@require("catalog.view")
+def rooms():
+    """Les salles par site : places, agenda relié, heures occupées cette semaine et cours réguliers de la saison."""
+    from collections import defaultdict
+
+    season, _ = _season()
+    monday, sunday = service.week_of(date.today())
+    week = service.week_lessons(monday, sunday)
+    hours, count = defaultdict(float), defaultdict(int)
+    for lesson in week:
+        if lesson.room_id and not lesson.cancelled:
+            count[lesson.room_id] += 1
+            hours[lesson.room_id] += (
+                datetime.combine(lesson.day, lesson.ends_at) - datetime.combine(lesson.day, lesson.starts_at)
+            ).seconds / 3600
+    regular = defaultdict(int)
+    if season is not None:
+        for course in db.session.scalars(db.select(Course).where(Course.season_id == season.id)):
+            if course.room_id:
+                regular[course.room_id] += 1
+    sites = db.session.scalars(db.select(Site).where(Site.archived_at.is_(None)).order_by(Site.name)).all()
+    return render_template(
+        "lessons/rooms.html",
+        sites=sites,
+        season=season,
+        monday=monday,
+        hours=hours,
+        count=count,
+        regular=regular,
+    )

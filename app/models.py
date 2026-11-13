@@ -629,7 +629,11 @@ class Season(db.Model):
 
 
 class SeasonBreak(db.Model):
-    """Période sans cours d'une saison (vacances, jour férié), saisie par l'association : rien n'est fourni d'office."""
+    """Période sans cours d'une saison : jour férié (calculé sur demande), vacances (saisies ou importées d'un
+    fichier) ou fermeture. Avec « cours maintenus », elle reste affichée dans les calendriers sans retirer de séance."""
+
+    HOLIDAY, VACATION, CLOSURE = "ferie", "vacances", "fermeture"
+    KINDS = {HOLIDAY: "Jour férié", VACATION: "Vacances", CLOSURE: "Fermeture"}
 
     __table_args__ = (db.CheckConstraint("ends_on >= starts_on", name="ck_season_break_dates"),)
 
@@ -638,6 +642,12 @@ class SeasonBreak(db.Model):
     label = db.Column(db.String(80), nullable=False)
     starts_on = db.Column(db.Date, nullable=False)
     ends_on = db.Column(db.Date, nullable=False)
+    kind = db.Column(db.String(12), nullable=False, default=CLOSURE, server_default=CLOSURE)
+    keep_lessons = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+
+    @property
+    def kind_label(self):
+        return self.KINDS.get(self.kind, self.kind)
 
     season = db.relationship("Season", back_populates="breaks")
 

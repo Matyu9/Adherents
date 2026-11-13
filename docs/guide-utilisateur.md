@@ -219,7 +219,11 @@ Un cours complet accepte quand même l'élève, avec un avertissement.
 **Menu → Calendrier.**
 
 1. **Dates des cours** : reprise et fin, si elles diffèrent de celles de la saison.
-2. **Périodes sans cours** : vacances, jours fériés, fermetures. Aucune n'est fournie d'office : saisissez celles de votre association (un jour férié est une période d'un jour).
+2. **Périodes sans cours** : jours fériés, vacances, fermetures. Rien n'est ajouté d'office.
+   - **Ajouter les jours fériés de la saison** les calcule (Pâques, Ascension et Pentecôte compris) ; un clic de plus n'ajoute pas de doublon.
+   - **Importer un fichier** : un `.ics` (le calendrier scolaire officiel de votre zone, un export de Google Agenda ou d'Outlook) ou un `.csv` (`nom ; premier jour ; dernier jour`). Un aperçu dit ce qui est nouveau, déjà là ou hors saison ; seules les lignes cochées sont ajoutées.
+   - **Maintenir les cours** : la période reste affichée dans les calendriers, mais ne retire plus de séance (un jour férié où l'école reste ouverte, par exemple).
+   - Les périodes apparaissent dans tous les calendriers (planning, Mon planning, séances d'un cours), hachurées avec leur nom. Si un professeur place une séance pendant une période sans cours, le secrétariat est prévenu.
 3. **Générer les séances** : l'aperçu dit combien seront créées. Relancez-la après avoir changé un horaire ou ajouté une période : les séances passées et celles modifiées à la main ne bougent pas.
 4. **Délai** (facultatif) : en deçà de ce nombre d'heures avant une séance, le professeur ne la modifie plus lui-même.
 
@@ -228,6 +232,8 @@ Un cours complet accepte quand même l'élève, avec un avertissement.
 **Salles de l'organisation** (si l'association relie son Google Workspace) : **Catalogue → Disciplines, niveaux et lieux → Salles de l'organisation** reprend les salles de l'organisation, avec un aperçu avant d'écrire. Les séances sont ensuite réservées dans l'agenda de chaque salle, et une réunion déjà posée sur une salle apparaît quand on déplace une séance.
 
 **Présences** : le nombre d'appels faits s'affiche dans les séances d'un cours ; le secrétariat corrige un appel à tout moment. **Menu → Absences** liste les élèves qui atteignent le seuil fixé dans le calendrier (aucun tant qu'il n'est pas fixé). Le calendrier règle aussi si les familles voient les présences de leurs enfants (oui par défaut).
+
+**Menu → Salles** : les salles de chaque site, avec leurs places, leur agenda relié, les séances et heures occupées de la semaine et les cours réguliers de la saison. Le nom d'une salle ouvre son planning.
 
 **Menu → Planning** : l'emploi du temps de l'association, en **Semaine** (grille horaire), **Mois** ou **Semaine type**, pour tout ou pour une salle, un professeur ou un site. Les flèches changent de semaine ou de mois, **Aujourd'hui** y revient. Les séances passées sont grisées, les annulées barrées. La couleur d'un cours se choisit dans sa fiche ; sinon, elle dépend de la discipline.
 

@@ -271,6 +271,9 @@ ACCESS = {
             "substitute",
             "absences",
             "save_attendance_settings",
+            "add_holidays",
+            "import_breaks",
+            "keep_break",
         )
     },
     **{
@@ -278,6 +281,7 @@ ACCESS = {
         for name in ("course", "edit", "add", "cancel", "mine", "agenda_page", "roll", "my_planning")
     },
     "lessons.planning": CAT_VIEW,
+    "lessons.rooms": CAT_VIEW,
     "lessons.feed": PUBLIC,
     "directory.merge_person": DIR_MERGE,
     "directory.merge_household": DIR_MERGE,

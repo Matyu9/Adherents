@@ -576,3 +576,6 @@ a.pl-pill:hover { text-decoration: none; filter: brightness(.96); }
 .row-menu ul { min-width: 16rem; }
 .row-menu ul li { text-align: left; direction: ltr; }
 .past-lessons > summary h2 { display: inline; font-size: 1.15rem; }
+/* Jours fériés, vacances et fermetures dans les calendriers */
+.pl-off { display: block; font-size: .7rem; line-height: 1.2; color: var(--text-2, var(--text-3)); background: repeating-linear-gradient(135deg, var(--surface), var(--surface) 4px, var(--border) 4px, var(--border) 5px); border-radius: 3px; padding: .05rem .3rem; margin: .1rem 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-dayhead.is-off { background: repeating-linear-gradient(135deg, transparent, transparent 6px, var(--border) 6px, var(--border) 7px); }

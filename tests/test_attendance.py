@@ -281,9 +281,7 @@ def test_une_famille_previent_d_une_absence(app, client, generated, monkeypatch)
     login(client, generated["anne_account"])
     html = page(client.get("/ma-famille/absences"))
     assert "Flûte" in html and "Sera absent(e)" in html
-    lesson = db.session.scalar(
-        db.select(Lesson).filter_by(course_id=generated["flute"].id, day=date(2026, 10, 14))
-    )
+    lesson = db.session.scalar(db.select(Lesson).filter_by(course_id=generated["flute"].id, day=date(2026, 10, 14)))
     enrollment = alice_enrollment(generated)
     client.post("/ma-famille/absences/prevenir", data={"lesson_id": lesson.id, "enrollment_id": enrollment.id})
     notice = db.session.scalar(db.select(AbsenceNotice))

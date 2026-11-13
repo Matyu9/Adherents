@@ -573,8 +573,7 @@ a.pl-pill:hover { text-decoration: none; filter: brightness(.96); }
 .row-menu { margin: 0; display: inline-block; }
 .row-menu > summary { padding: .2rem .6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-weight: 700; list-style: none; }
 .row-menu > summary::after { display: none; }
-.row-menu ul { min-width: 16rem; }
-.row-menu ul li { text-align: left; direction: ltr; }
+.row-menu ul { min-width: 14rem; }
 .past-lessons > summary h2 { display: inline; font-size: 1.15rem; }
 /* Jours fériés, vacances et fermetures dans les calendriers */
 .pl-off { display: block; font-size: .7rem; line-height: 1.2; color: var(--text-2, var(--text-3)); background: repeating-linear-gradient(135deg, var(--surface), var(--surface) 4px, var(--border) 4px, var(--border) 5px); border-radius: 3px; padding: .05rem .3rem; margin: .1rem 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -627,3 +626,7 @@ label.offer-card { flex-direction: row; align-items: flex-start; gap: .6rem; }
 .dnd-list li { list-style: none; padding: .3rem .5rem; margin-bottom: .25rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: grab; font-size: .88rem; }
 .dnd-list li.dnd-empty { border: 0; background: none; cursor: default; }
 .picker-head .segmented { flex: none; width: auto; }
+/* Le menu d'une ligne s'ouvre dans la ligne : un menu flottant serait coupé par le cadre défilant du tableau. */
+.row-menu > ul { margin: .3rem 0 0; box-shadow: none; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); padding: .3rem .5rem; list-style: none; }
+.row-menu > ul li { list-style: none; padding: .2rem 0; }
+.row-menu { margin-bottom: 0; }

@@ -160,9 +160,7 @@ def import_breaks(season_id):
             else:
                 if not rows:
                     error = "Aucune période trouvée dans ce fichier."
-    return render_template(
-        "lessons/import_breaks.html", season=season, rows=rows, error=error, kinds=SeasonBreak.KINDS
-    )
+    return render_template("lessons/import_breaks.html", season=season, rows=rows, error=error, kinds=SeasonBreak.KINDS)
 
 
 @bp.route("/periodes/<int:break_id>/maintenir", methods=["POST"])

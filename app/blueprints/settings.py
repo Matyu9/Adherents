@@ -149,7 +149,10 @@ def members():
 
     if request.method == "POST":
         options.set_member_editable(request.form.getlist("fields"))
-        log("settings.members", "Coordonnées modifiables par les familles : " + (", ".join(sorted(options.member_editable())) or "aucune"))
+        log(
+            "settings.members",
+            "Coordonnées modifiables par les familles : " + (", ".join(sorted(options.member_editable())) or "aucune"),
+        )
         db.session.commit()
         flash("Réglages enregistrés.", "success")
         return redirect(url_for(".members"))

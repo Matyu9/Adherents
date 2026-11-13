@@ -465,7 +465,9 @@ def prepare(household, season):
                 adult=age >= 18 if age is not None else member.role == HouseholdMember.GUARDIAN,
                 tags=frozenset(membership.fee_tags or ()),
                 disciplines=frozenset(
-                    name for e in enrollments for name in (e.course.discipline.name, e.course.discipline.name_for(e.course.season))
+                    name
+                    for e in enrollments
+                    for name in (e.course.discipline.name, e.course.discipline.name_for(e.course.season))
                 ),
                 seniority=seniority,
                 category=membership.category,
@@ -519,7 +521,9 @@ def _course_facts(enrollment):
         start, end = enrollment.slot_starts_at, enrollment.slot_ends_at
         minutes = (end.hour * 60 + end.minute) - (start.hour * 60 + start.minute)
     elif course.starts_at and course.ends_at:
-        minutes = (course.ends_at.hour * 60 + course.ends_at.minute) - (course.starts_at.hour * 60 + course.starts_at.minute)
+        minutes = (course.ends_at.hour * 60 + course.ends_at.minute) - (
+            course.starts_at.hour * 60 + course.starts_at.minute
+        )
     return {"individual": bool(course.individual), "minutes": minutes, "enrolled_on": enrollment.enrolled_on}
 
 

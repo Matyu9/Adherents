@@ -56,8 +56,10 @@ def test_calendar_lessons_and_planning(session, scheme):
 
     page.goto(f"/seances/cours/{course_id}")
     shot(page, f"seances-cours-{scheme}")
-    row = page.locator("tbody tr").filter(has_not=page.locator(".badge")).last
-    row.locator(".row-menu summary").click()
+    if page.locator(".past-lessons > summary").count():  # les séances passées sont repliées
+        page.click(".past-lessons > summary")
+    row = page.locator("tbody tr").filter(has_not=page.locator(".badge")).filter(has=page.locator(".row-menu")).first
+    row.locator(".row-menu > summary").click()
     row.locator("text=Modifier la séance").click()
     page.wait_for_url("**/modifier")
     page.click("text=Voir les salles libres à ce créneau")
@@ -95,7 +97,7 @@ def test_calendar_lessons_and_planning(session, scheme):
 
 
 def test_roll_call_on_a_phone(session):
-    """L'appel sur un écran de téléphone : un bouton par statut et par élève, sans JavaScript."""
+    """L'appel sur un écran de téléphone : de gros boutons par statut et par élève, qui marchent sans JavaScript."""
     _, course_id = _course()
     with _app["app"].app_context():
         from app.services import courses, lessons
@@ -117,10 +119,10 @@ def test_roll_call_on_a_phone(session):
     page = browser_page.login()
     page.goto(f"/seances/{lesson_id}/appel")
     shot(page, "seances-appel-telephone")
-    page.locator("fieldset", has_text="APPEL Omar").locator("text=Absent").click()
+    page.locator(".roll-row", has_text="APPEL Omar").locator("text=Absent").click()
     page.click("main form[method=post] button[type=submit]")
     page.wait_for_selector("text=Appel enregistré")
     page.goto(f"/seances/{lesson_id}/appel")
-    assert page.locator("fieldset", has_text="APPEL Omar").locator("input[value=absent]").is_checked()
+    assert page.locator(".roll-row", has_text="APPEL Omar").locator("input[value=absent]").is_checked()
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")  # pas de défilement horizontal
     assert not browser_page.problems, browser_page.problems

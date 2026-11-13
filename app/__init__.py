@@ -95,9 +95,9 @@ def create_app(config_class=Config):
     from .cli import register_cli
     from .filters import register_filters
     from .permissions import can, has_staff_rights
-    from .services.registration import is_family
     from .services import logout, oidc_server
     from .services.notify import unread_count
+    from .services.registration import is_family
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)

@@ -366,7 +366,9 @@ class StudentForm(FlaskForm):
     )
     wishes = TextAreaField("Souhaits, contraintes d'horaire", validators=[Optional(), Length(max=2000)])
 
-    def __init__(self, *args, is_guardian=False, full=(), offered=(), already=(), by_discipline=False, proposed=(), **kwargs):
+    def __init__(
+        self, *args, is_guardian=False, full=(), offered=(), already=(), by_discipline=False, proposed=(), **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self._is_guardian, self._full, self._offered, self._already = is_guardian, set(full), set(offered), set(already)
         self._by_discipline, self._proposed = by_discipline, set(proposed)

@@ -175,10 +175,10 @@ def family_lessons(account, today=None, days=NOTICE_DAYS):
         if enrollment.course.season.hidden and not hidden_ok:
             continue
         for lesson in enrollment.course.lessons:
-            if today <= lesson.day <= today + timedelta(days=days) and not lesson.cancelled:
-                if enrollment.attends_on(lesson.day):
-                    notice = next((n for n in lesson.absence_notices if n.enrollment_id == enrollment.id), None)
-                    rows.append((lesson, enrollment, notice))
+            within = today <= lesson.day <= today + timedelta(days=days)
+            if within and not lesson.cancelled and enrollment.attends_on(lesson.day):
+                notice = next((n for n in lesson.absence_notices if n.enrollment_id == enrollment.id), None)
+                rows.append((lesson, enrollment, notice))
     return sorted(rows, key=lambda r: (r[0].day, r[0].starts_at, r[1].membership.person.first_name))
 
 
@@ -188,7 +188,7 @@ def declare_absence(account, lesson, enrollment, today=None):
 
     from .notify import notify
 
-    if not any(l is lesson and e is enrollment for l, e, _ in family_lessons(account, today)):
+    if not any(row is lesson and e is enrollment for row, e, _ in family_lessons(account, today)):
         raise AttendanceError("Cette séance n'est pas celle d'un de vos enfants, ou elle est trop loin.")
     existing = next((n for n in lesson.absence_notices if n.enrollment_id == enrollment.id), None)
     if existing is not None:

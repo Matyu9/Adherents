@@ -5,7 +5,7 @@ from datetime import date, time
 import pytest
 
 from app.extensions import db
-from app.models import Lesson, Notification, SeasonBreak
+from app.models import Notification, SeasonBreak
 from app.services import holidays, lessons
 
 from .conftest import enroll, login
@@ -95,7 +95,11 @@ def test_import_avec_apercu(client, school):
     assert not s.breaks  # rien d'ajouté avant confirmation
     client.post(
         f"/seances/calendrier/{s.id}/importer",
-        data={"action": "confirmer", "kind": "vacances", "ligne": ["2026-10-17|2026-11-01|Vacances de la Toussaint - Zone B"]},
+        data={
+            "action": "confirmer",
+            "kind": "vacances",
+            "ligne": ["2026-10-17|2026-11-01|Vacances de la Toussaint - Zone B"],
+        },
     )
     (record,) = db.session.get(type(s), s.id).breaks
     assert record.kind == "vacances" and record.ends_on == date(2026, 11, 1)
@@ -151,8 +155,7 @@ def test_professeur_sur_un_jour_ferie_previent_le_secretariat(generated):
     lessons.move(lesson, date(2026, 10, 21), time(10), time(11), user=generated["paul_account"], now=BEFORE)
     db.session.commit()
     messages = [
-        n.message
-        for n in db.session.scalars(db.select(Notification).filter_by(account_id=generated["manager"].id))
+        n.message for n in db.session.scalars(db.select(Notification).filter_by(account_id=generated["manager"].id))
     ]
     assert any("Attention : jour férié « Armistice 1918 »" in m for m in messages)
 

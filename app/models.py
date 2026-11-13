@@ -786,7 +786,9 @@ class DisciplineSeason(db.Model):
 
     __table_args__ = (
         db.CheckConstraint("capacity IS NULL OR capacity > 0", name="ck_discipline_season_capacity"),
-        db.CheckConstraint("min_age IS NULL OR max_age IS NULL OR min_age <= max_age", name="ck_discipline_season_ages"),
+        db.CheckConstraint(
+            "min_age IS NULL OR max_age IS NULL OR min_age <= max_age", name="ck_discipline_season_ages"
+        ),
     )
 
     discipline_id = db.Column(db.ForeignKey("discipline.id", ondelete="CASCADE"), primary_key=True)

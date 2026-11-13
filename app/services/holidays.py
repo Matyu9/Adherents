@@ -109,7 +109,7 @@ def parse_ics(text):
             end = start
         elif all_day and end > start:
             end -= timedelta(days=1)
-        label = fields.get("SUMMARY", ("", "Période"))[1].replace("\\,", ",").replace("\;", ";").strip() or "Période"
+        label = fields.get("SUMMARY", ("", "Période"))[1].replace("\\,", ",").replace(r"\;", ";").strip() or "Période"
         rows.append(Row(label[:80], start, max(start, end)))
     if not rows and "BEGIN:VCALENDAR" not in text:
         raise ImportError_("Ce n'est pas un agenda .ics.")

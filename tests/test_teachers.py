@@ -188,7 +188,14 @@ def test_availability(client, admin):
     db.session.commit()
     client.post(
         f"/professeurs/{paul.id}/disponibilites",
-        data={"a-0-day": "2", "a-0-from": "14:00", "a-0-to": "19:00", "a-1-day": "0", "a-1-from": "17:00", "a-1-to": "20:00"},
+        data={
+            "a-0-day": "2",
+            "a-0-from": "14:00",
+            "a-0-to": "19:00",
+            "a-1-day": "0",
+            "a-1-from": "17:00",
+            "a-1-to": "20:00",
+        },
     )
     assert db.session.get(Teacher, paul.id).availability == [
         {"day": 0, "from": "17:00", "to": "20:00"},

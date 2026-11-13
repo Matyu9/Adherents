@@ -27,7 +27,9 @@ def _upcoming():
         if datetime.combine(lesson.day, finish) < now:
             continue
         student = who.membership.person.first_name if who is not None and who != "remplacement" else None
-        rows.append({"lesson": lesson, "begin": begin, "end": finish, "student": student, "substitute": who == "remplacement"})
+        rows.append(
+            {"lesson": lesson, "begin": begin, "end": finish, "student": student, "substitute": who == "remplacement"}
+        )
     return sorted(rows, key=lambda r: (r["lesson"].day, r["begin"]))
 
 

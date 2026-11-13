@@ -522,8 +522,6 @@ def test_a_teacher_sees_his_students_and_their_guardians(client, opened, account
 def test_reinscription_par_discipline(client, parent, manager, opened, accounts):
     from app.models import DisciplineSeason, Membership
 
-    from .conftest import enroll
-
     campaign, new = opened["campaign"], opened["new"]
     campaign.choice = Campaign.DISCIPLINE
     fm = opened["fm_new"].discipline
@@ -580,7 +578,13 @@ def test_une_discipline_non_proposee_est_refusee(client, parent, opened):
     key = dossier.data["students"][0]["key"]
     page = client.post(
         f"/inscription/dossier/{dossier.uuid}/eleves/{key}",
-        data={"enrolled": "y", "first_name": "Zoé", "last_name": "Martin", "birth_date": "2015-05-06", "disciplines": [99999]},
+        data={
+            "enrolled": "y",
+            "first_name": "Zoé",
+            "last_name": "Martin",
+            "birth_date": "2015-05-06",
+            "disciplines": [99999],
+        },
     ).get_data(as_text=True)
     assert "pas proposée" in page
 

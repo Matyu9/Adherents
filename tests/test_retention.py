@@ -122,7 +122,9 @@ def test_retention_screen(client, admin, history):
     assert retention.seasons_kept() == 3
     page = client.get("/parametres/donnees-personnelles").get_data(as_text=True)
     assert "ANCIEN Paul" in page and "ANCIEN Léa" in page and "RÉCENT" not in page
-    client.post("/parametres/donnees-personnelles/anonymiser", data={"personne": [history["lea"].id, history["tom"].id]})
+    client.post(
+        "/parametres/donnees-personnelles/anonymiser", data={"personne": [history["lea"].id, history["tom"].id]}
+    )
     assert history["lea"].anonymized_at is not None
     assert history["tom"].anonymized_at is None  # pas candidat : ignoré
     assert (

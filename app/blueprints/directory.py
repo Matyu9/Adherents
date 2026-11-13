@@ -711,7 +711,12 @@ def attach_account(person_id):
     except DirectoryError as exc:
         flash(str(exc), "error")
     else:
-        log("account.link", f"Compte {account.email} rattaché à la fiche de {person.full_name}", target=account, person=person)
+        log(
+            "account.link",
+            f"Compte {account.email} rattaché à la fiche de {person.full_name}",
+            target=account,
+            person=person,
+        )
         db.session.commit()
         flash(f"Compte {account.email} rattaché à la fiche.", "success")
     return redirect(url_for(".person", person_id=person.id) + "#compte")

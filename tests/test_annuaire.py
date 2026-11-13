@@ -880,7 +880,9 @@ def test_attaching_an_account_from_the_record(client, admin, family):
     anne = family["anne"]
     page = client.get(f"/annuaire/personnes/{anne.id}").get_data(as_text=True)
     assert "martin@famille.test" in page and "même nom" in page and "autre@asso.test" not in page
-    response = client.post(f"/annuaire/personnes/{anne.id}/compte/rattacher", data={"email": "inconnu@x.test"}, follow_redirects=True)
+    response = client.post(
+        f"/annuaire/personnes/{anne.id}/compte/rattacher", data={"email": "inconnu@x.test"}, follow_redirects=True
+    )
     assert "Aucun compte à cette adresse" in response.get_data(as_text=True)
     client.post(f"/annuaire/personnes/{anne.id}/compte/rattacher", data={"email": "AUTRE@asso.test"})
     assert db.session.get(Person, anne.id).account_id == other.id

@@ -169,9 +169,7 @@ def in_season(season):
     member = Person.memberships.any(Membership.season_id == season.id)
     household = Person.household_links.any(
         HouseholdMember.household.has(
-            Household.members.any(
-                HouseholdMember.person.has(Person.memberships.any(Membership.season_id == season.id))
-            )
+            Household.members.any(HouseholdMember.person.has(Person.memberships.any(Membership.season_id == season.id)))
         )
     )
     return db.or_(member, household)

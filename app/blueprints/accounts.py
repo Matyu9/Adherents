@@ -173,7 +173,9 @@ def detail(account_id):
         recovery_left=totp.remaining_recovery_codes(account),
         person_suggestions=(
             directory.suggestions(account)
-            if account.person is None and can(current_user, "directory.edit") and accounts.can_manage(current_user, account)
+            if account.person is None
+            and can(current_user, "directory.edit")
+            and accounts.can_manage(current_user, account)
             else None
         ),
     )

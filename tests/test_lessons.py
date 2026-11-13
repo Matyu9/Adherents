@@ -699,7 +699,7 @@ def test_une_saison_en_preparation_est_cachee_aux_professeurs(app, client, gener
 
 
 def test_fiche_eleve_pour_le_professeur(app, paul_client, generated):
-    from app.models import Enrollment, Notification
+    from app.models import Enrollment
 
     alice = generated["m_alice"].person
     s = generated["season"]
@@ -717,9 +717,12 @@ def test_fiche_eleve_pour_le_professeur(app, paul_client, generated):
     ).active
     assert any("a inscrit Alice Martin à Solfège" in m for m in messages(generated["manager"]))
     # Pas le cours d'un autre professeur, ni un élève qui n'est pas à lui.
-    assert paul_client.post(
-        f"/inscription/mes-eleves/{alice.id}/cours", data={"course_id": generated["piano"].id}
-    ).status_code == 404
+    assert (
+        paul_client.post(
+            f"/inscription/mes-eleves/{alice.id}/cours", data={"course_id": generated["piano"].id}
+        ).status_code
+        == 404
+    )
     lea_client = app.test_client()
     login(lea_client, generated["lea_account"])
     basile_id = db.session.scalar(db.select(Person.id).filter_by(first_name="Basile"))
@@ -743,7 +746,7 @@ def test_page_des_seances_resume_liste_et_calendrier(manager_client, generated, 
     course = generated["flute"]
     html = page(manager_client.get(f"/seances/cours/{course.id}"))
     assert "À venir" in html and "Passées (1)" in html  # la séance du 7 octobre est passée, repliée
-    assert 'class="dropdown row-menu"' in html and "Modifier la séance" in html
+    assert 'class="row-menu"' in html and "Modifier la séance" in html
     assert "Mercredi 17:00-18:00" in html and "Présence" in html
     html = page(manager_client.get(f"/seances/cours/{course.id}?vue=calendrier"))
     assert "Octobre 2026" in html and html.count('class="pl-pill') == 4

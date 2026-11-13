@@ -702,7 +702,9 @@ def _new_criteria_order():
 
     items = {1: pricing.Item(1, "Cours", 30000, "Formules"), 2: pricing.Item(2, "Atelier", 10000, "Formules")}
     students = (
-        pricing.Student(1, "Léa", category="Scolaire", school_level="Collège", courses=2, enrolled_on=date(2026, 9, 10)),
+        pricing.Student(
+            1, "Léa", category="Scolaire", school_level="Collège", courses=2, enrolled_on=date(2026, 9, 10)
+        ),
         pricing.Student(2, "Max", category="Adulte", courses=1, enrolled_on=date(2027, 1, 15)),
     )
     picks = (

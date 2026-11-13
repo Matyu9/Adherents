@@ -144,7 +144,10 @@ ACCESS = {
             "delete_season",
         )
     },
-    **{f"teachers.{name}": TEACHERS for name in ("index", "create", "detail", "edit", "remove", "profile", "availability")},
+    **{
+        f"teachers.{name}": TEACHERS
+        for name in ("index", "create", "detail", "edit", "remove", "profile", "availability")
+    },
     "teachers.photo": LOGGED_IN,
     **{f"catalog.{name}": CAT_VIEW for name in ("index", "teachers", "references", "season_disciplines")},
     "catalog.season_discipline": CAT_EDIT,
@@ -303,7 +306,14 @@ ACCESS = {
     "directory.leave_secure": LOGGED_IN,
     **{
         f"directory.{name}": LINKING
-        for name in ("create_account", "set_login", "attach_account", "unlink_account", "link_account", "person_from_account")
+        for name in (
+            "create_account",
+            "set_login",
+            "attach_account",
+            "unlink_account",
+            "link_account",
+            "person_from_account",
+        )
     },
 }
 HOLDERS = {
@@ -719,7 +729,9 @@ def test_crawl_every_link(app, rich, who):
             problems.append(f"{path} : une donnée n'a pas été échappée")
         for link in LINK.findall(html):
             target = urlsplit(urljoin(path, link.replace("&amp;", "&")))
-            if ("date=" in target.query or "mois=" in target.query) and "/seances/" in target.path:  # plannings sans fin
+            if (
+                "date=" in target.query or "mois=" in target.query
+            ) and "/seances/" in target.path:  # plannings sans fin
                 continue
             if not target.netloc and target.scheme not in ("data", "mailto", "tel"):  # data : QR code intégré
                 queue.append(target.path + (f"?{target.query}" if target.query else ""))

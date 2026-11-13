@@ -12,9 +12,9 @@
   {% if edit %}
   <td data-label="" class="actions">
     {% if l.day >= today or manager %}
-    <details class="dropdown row-menu">
+    <details class="row-menu">
       <summary aria-label="Actions pour la séance du {{ l.day | date_fr }}">⋯</summary>
-      <ul dir="rtl">
+      <ul>
         {% if not l.cancelled %}<li><a href="{{ url_for('lessons.edit', lesson_id=l.id) }}">Modifier la séance</a></li>
         <li>{{ cancel_form(l) }}</li>{% endif %}
         {% if manager and l.previous %}<li>{{ post_button(url_for('lessons.revert', lesson_id=l.id), "Revenir en arrière", "link-button", "Annuler le dernier changement de cette séance ? Les familles seront prévenues.") }}</li>{% endif %}

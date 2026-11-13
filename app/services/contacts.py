@@ -39,7 +39,9 @@ def _phones(form, prefix):
     for k in range(MAX_PHONES):
         number = (form.get(f"{prefix}-phone-{k}") or "").strip()
         if number:
-            rows.append(((form.get(f"{prefix}-label-{k}") or "").strip()[:40] or None, directory.normalize_phone(number)))
+            rows.append(
+                ((form.get(f"{prefix}-label-{k}") or "").strip()[:40] or None, directory.normalize_phone(number))
+            )
     return rows
 
 

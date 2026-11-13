@@ -124,7 +124,12 @@ class CourseForm(FlaskForm):
             self.color.data = ""
         keep_discipline = course.discipline if course else None
         self.discipline_id.choices = [("", "—")] + [
-            (str(d.id), d.name_for(season) + (" (archivée)" if d.archived else "") + ("" if d.offered_in(season) else " (pas proposée cette saison)"))
+            (
+                str(d.id),
+                d.name_for(season)
+                + (" (archivée)" if d.archived else "")
+                + ("" if d.offered_in(season) else " (pas proposée cette saison)"),
+            )
             for d in _with([d for d in catalog.disciplines() if d.offered_in(season)], keep_discipline)
         ]
         self.level_id.choices = [("", "—")] + [
@@ -1183,7 +1188,9 @@ def place(membership_id):
     if course is None or course.season_id != season.id or course.discipline_id != discipline_id:
         abort(400)
     try:
-        _enrollment, warnings = courses.enroll(membership, course, max(date.today(), season.starts_on), user=current_user)
+        _enrollment, warnings = courses.enroll(
+            membership, course, max(date.today(), season.starts_on), user=current_user
+        )
     except courses.CourseError as exc:
         db.session.rollback()
         flash(str(exc), "error")

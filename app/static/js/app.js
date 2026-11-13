@@ -223,7 +223,7 @@
       const search = el("input", { type: "search", placeholder: "Rechercher un élément ou une catégorie…", "aria-label": "Ajouter un élément ou une catégorie visés" });
       const results = el("ul", { class: "chip-results", role: "listbox" });
       function show() {
-        results.innerHTML = "";
+        results.replaceChildren();
         const q = search.value.trim().toLowerCase();
         if (!q) return;
         entries.filter(function (e) { return stateOf(e) === "none" && e.label.toLowerCase().indexOf(q) !== -1; }).slice(0, 8).forEach(function (e) {
@@ -273,7 +273,7 @@
     }
 
     function render() {
-      box.innerHTML = "";
+      box.replaceChildren();
       const head = el("div", { class: "picker-head" });
       head.appendChild(el("label", {}, "Éléments visés"));
       const toggle = el("div", { class: "segmented small", role: "group", "aria-label": "Affichage" });

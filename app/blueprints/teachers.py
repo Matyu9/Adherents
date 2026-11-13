@@ -7,6 +7,7 @@ professeur que depuis cet écran, et son contrat ne se voit qu'avec le droit tea
 from datetime import date
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask_login import login_required
 from flask_wtf import FlaskForm
 from wtforms import DateField, EmailField, SelectField, StringField, TextAreaField
 from wtforms.validators import DataRequired, Length, Optional, ValidationError
@@ -14,14 +15,16 @@ from wtforms.validators import DataRequired, Length, Optional, ValidationError
 from ..extensions import db
 from ..models import Person, Teacher
 from ..permissions import require
-from ..services import catalog, directory
+from ..services import catalog, directory, photos
 from ..services.activity import diff, log
 from ..services.directory import DirectoryError
 from .directory import EMAIL, _blank, _strip, _text
 
 bp = Blueprint("teachers", __name__, url_prefix="/professeurs")
 
-CONTRACT_FIELDS = ("status", "started_on", "left_on", "work_email", "notes")
+CONTRACT_FIELDS = ("status", "started_on", "left_on", "work_email", "diplomas", "notes")
+WEEKDAYS = ("Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche")
+AVAILABILITY_ROWS = 10
 
 
 class ContractForm(FlaskForm):
@@ -35,7 +38,8 @@ class ContractForm(FlaskForm):
     started_on = DateField("Arrivée", validators=[Optional()])
     left_on = DateField("Départ", validators=[Optional()])
     work_email = EmailField("Email professionnel", validators=[Optional(), Length(max=255), EMAIL], filters=[_strip])
-    notes = TextAreaField("Notes", validators=[Optional(), Length(max=5000)])
+    diplomas = TextAreaField("Diplômes", validators=[Optional(), Length(max=2000)])
+    notes = TextAreaField("Notes internes", validators=[Optional(), Length(max=5000)])
 
     def validate_left_on(self, field):
         if field.data and self.started_on.data and field.data < self.started_on.data:
@@ -47,6 +51,7 @@ class ContractForm(FlaskForm):
             "started_on": self.started_on.data,
             "left_on": self.left_on.data,
             "work_email": _blank(self.work_email.data),
+            "diplomas": _blank(self.diplomas.data),
             "notes": _blank(self.notes.data),
         }
 
@@ -169,12 +174,116 @@ def create():
 @require("teacher.manage")
 def detail(person_id):
     person = _teacher(person_id)
-    season = directory.current_season()
+    season, seasons = directory.selected_season()
     courses = catalog.sorted_courses(c for c in person.teacher.courses if season and c.season_id == season.id)
     taught = catalog.disciplines_of(person.teacher, season) if season else []
     return render_template(
-        "teachers/detail.html", person=person, teacher=person.teacher, season=season, courses=courses, taught=taught
+        "teachers/detail.html",
+        person=person,
+        teacher=person.teacher,
+        season=season,
+        seasons=seasons,
+        courses=courses,
+        taught=taught,
+        weekdays=WEEKDAYS,
     )
+
+
+@bp.route("/<int:person_id>/presentation", methods=["GET", "POST"])
+@require("teacher.manage")
+def profile(person_id):
+    """Présentation et photo, montrées aux familles de ses élèves."""
+    person = _teacher(person_id)
+    teacher = person.teacher
+    error = None
+    if request.method == "POST":
+        bio = (request.form.get("bio") or "").strip()[:3000] or None
+        old_photo = teacher.photo
+        upload = request.files.get("photo")
+        try:
+            if upload and upload.filename:
+                teacher.photo = photos.save_portrait(upload)
+            elif request.form.get("remove_photo") == "1":
+                teacher.photo = None
+        except photos.InvalidImage as exc:
+            error = str(exc)
+        if error is None:
+            changed = []
+            if bio != teacher.bio:
+                teacher.bio = bio
+                changed.append("présentation")
+            if teacher.photo != old_photo:
+                changed.append("photo")
+                photos.remove(old_photo)
+            if changed:
+                log("teacher.profile", f"Fiche de {person.full_name} : {', '.join(changed)} modifiée(s)", person=person)
+            db.session.commit()
+            flash("Présentation enregistrée.", "success")
+            return redirect(url_for(".detail", person_id=person.id))
+    return render_template("teachers/profile.html", person=person, teacher=teacher, error=error)
+
+
+def parse_availability(form):
+    """Créneaux saisis : [{"day", "from", "to"}], triés ; lève DirectoryError sur une heure illisible ou à l'envers."""
+    import re
+
+    rows = []
+    for k in range(AVAILABILITY_ROWS):
+        day = form.get(f"a-{k}-day", "")
+        start, end = (form.get(f"a-{k}-from") or "").strip(), (form.get(f"a-{k}-to") or "").strip()
+        if not day and not start and not end:
+            continue
+        if not day.isdigit() or int(day) not in range(7):
+            raise DirectoryError("Choisissez le jour de chaque créneau.")
+        if not re.fullmatch(r"\d{2}:\d{2}", start) or not re.fullmatch(r"\d{2}:\d{2}", end) or start >= end:
+            raise DirectoryError(f"{WEEKDAYS[int(day)]} : l'heure de fin doit suivre l'heure de début.")
+        rows.append({"day": int(day), "from": start, "to": end})
+    return sorted(rows, key=lambda r: (r["day"], r["from"]))
+
+
+@bp.route("/<int:person_id>/disponibilites", methods=["GET", "POST"])
+@require("teacher.manage")
+def availability(person_id):
+    person = _teacher(person_id)
+    teacher = person.teacher
+    error, rows = None, list(teacher.availability or [])
+    if request.method == "POST":
+        try:
+            rows = parse_availability(request.form)
+        except DirectoryError as exc:
+            error = str(exc)
+        else:
+            if rows != (teacher.availability or []):
+                teacher.availability = rows
+                log("teacher.availability", f"Disponibilités de {person.full_name} modifiées", person=person)
+            db.session.commit()
+            flash("Disponibilités enregistrées.", "success")
+            return redirect(url_for(".detail", person_id=person.id))
+    return render_template(
+        "teachers/availability.html",
+        person=person,
+        rows=rows,
+        size=max(AVAILABILITY_ROWS, len(rows)),
+        weekdays=WEEKDAYS,
+        error=error,
+    )
+
+
+@bp.route("/photo/<path:name>")
+@login_required
+def photo(name):
+    """Photo d'un professeur, pour toute personne connectée (familles de ses élèves comprises) : nom aléatoire."""
+    import re
+    from pathlib import Path
+
+    from flask import current_app, send_from_directory
+
+    if not re.fullmatch(r"[0-9a-f]{32}\.jpg", name):
+        abort(404)
+    response = send_from_directory(Path(current_app.config["UPLOAD_DIR"]) / "profs", name)
+    response.cache_control.max_age = 30 * 24 * 3600
+    response.cache_control.private = True
+    return response
 
 
 @bp.route("/<int:person_id>/modifier", methods=["GET", "POST"])

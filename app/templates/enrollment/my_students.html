@@ -19,7 +19,7 @@
     {% for student, guardians, e in students %}
     <tr>
       {% if course.individual %}<td data-label="Passage">{% if e.slot_starts_at %}{{ e.slot_starts_at.strftime("%H:%M") }}-{{ e.slot_ends_at.strftime("%H:%M") }}{% else %}<span class="muted">à fixer</span>{% endif %}</td>{% endif %}
-      <td data-label="Élève">{{ student.sort_name }}</td>
+      <td data-label="Élève"><a href="{{ url_for('enrollment.my_student', person_id=student.id, saison=season.id) }}">{{ student.sort_name }}</a></td>
       <td data-label="Âge"><small>{{ student.age() ~ " ans" if student.birth_date else "—" }}</small></td>
       <td data-label="Responsables"><small>{% for g in guardians %}{{ g.full_name }}{% for p in g.phones[:1] %} · <a href="tel:{{ p.number }}">{{ p.number | phone }}</a>{% endfor %}{% if g.email %} · <a href="mailto:{{ g.email }}">{{ g.email }}</a>{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}{% if student.email %}<a href="mailto:{{ student.email }}">{{ student.email }}</a>{% else %}—{% endif %}{% endfor %}</small></td>
     </tr>

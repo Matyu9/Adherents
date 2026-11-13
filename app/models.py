@@ -682,7 +682,13 @@ class Teacher(db.Model):
     started_on = db.Column(db.Date)
     left_on = db.Column(db.Date)  # un départ n'efface pas la fiche
     work_email = db.Column(db.String(255))
-    notes = db.Column(db.Text)
+    notes = db.Column(db.Text)  # internes : jamais montrées aux familles
+    # Présentation et photo : visibles des familles de ses élèves.
+    bio = db.Column(db.Text)
+    photo = db.Column(db.String(60))  # chemin relatif dans UPLOAD_DIR (« profs/<uuid>.jpg »)
+    diplomas = db.Column(db.Text)  # DE, CA… internes
+    # Créneaux où il peut donner cours, pour préparer la saison : [{"day": 0-6, "from": "HH:MM", "to": "HH:MM"}].
+    availability = db.Column(db.JSON, nullable=False, default=list, server_default="[]")
 
     person = db.relationship("Person", back_populates="teacher")
 
@@ -956,10 +962,12 @@ class Attendance(db.Model):
     PRESENT = "present"
     ABSENT = "absent"
     EXCUSED = "excused"
-    STATUSES = {PRESENT: "Présent", ABSENT: "Absent", EXCUSED: "Excusé"}
+    LATE = "late"  # venu, mais en retard : compte comme une présence
+    STATUSES = {PRESENT: "Présent", ABSENT: "Absent", EXCUSED: "Excusé", LATE: "Retard"}
+    ATTENDED = (PRESENT, LATE)
     __table_args__ = (
         db.UniqueConstraint("lesson_id", "enrollment_id"),
-        db.CheckConstraint("status IN ('present', 'absent', 'excused')", name="ck_attendance_status"),
+        db.CheckConstraint("status IN ('present', 'absent', 'excused', 'late')", name="ck_attendance_status"),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -976,6 +984,22 @@ class Attendance(db.Model):
     @property
     def label(self):
         return self.STATUSES[self.status]
+
+
+class AbsenceNotice(db.Model):
+    """Absence prévenue à l'avance par la famille pour une séance. À l'appel, l'élève est proposé « excusé »."""
+
+    __table_args__ = (db.UniqueConstraint("lesson_id", "enrollment_id"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    lesson_id = db.Column(db.ForeignKey("lesson.id", ondelete="CASCADE"), nullable=False, index=True)
+    enrollment_id = db.Column(db.ForeignKey("enrollment.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    lesson = db.relationship("Lesson", backref=db.backref("absence_notices", passive_deletes=True))
+    enrollment = db.relationship("Enrollment", backref=db.backref("absence_notices", passive_deletes=True))
+    account = db.relationship("Account")
 
 
 class RoomCalendarJob(db.Model):

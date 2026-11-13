@@ -4,6 +4,7 @@
 {% block content %}
 <p><a href="{{ url_for('teachers.index') }}">← Professeurs</a></p>
 <div class="page-head">
+  {% if teacher.photo %}<img src="{{ url_for('teachers.photo', name=teacher.photo.split('/')[-1]) }}" alt="" class="portrait">{% endif %}
   <div>
     <h1>{{ person.civility ~ " " if person.civility }}{{ person.full_name }}</h1>
     <p class="muted"><span class="badge{{ ' badge-ok' if teacher.active }}">{{ "En poste" if teacher.active else "Parti le " ~ (teacher.left_on | date_fr) }}</span></p>
@@ -17,8 +18,21 @@
       <dt>Contrat</dt><dd>{{ teacher.status or "—" }}</dd>
       <dt>Arrivée</dt><dd>{{ teacher.started_on | date_fr if teacher.started_on else "—" }}</dd>
       <dt>Départ</dt><dd>{{ teacher.left_on | date_fr if teacher.left_on else "—" }}</dd>
+      <dt>Diplômes</dt><dd>{{ teacher.diplomas or "—" }}</dd>
     </dl>
     {% if teacher.notes %}<p class="notes">{{ teacher.notes }}</p>{% endif %}
+  </section>
+  <section class="card">
+    <h2>Présentation</h2>
+    {% if teacher.bio %}<p class="notes">{{ teacher.bio }}</p>{% else %}<p class="muted small">Aucune présentation. Elle est montrée, avec la photo, aux familles de ses élèves.</p>{% endif %}
+    <p class="small"><a href="{{ url_for('teachers.profile', person_id=person.id) }}">Modifier la présentation et la photo</a></p>
+  </section>
+  <section class="card">
+    <h2>Disponibilités</h2>
+    {% if teacher.availability %}
+    <ul class="plain-list">{% for a in teacher.availability %}<li>{{ weekdays[a.day] }} {{ a["from"] }}-{{ a["to"] }}</li>{% endfor %}</ul>
+    {% else %}<p class="muted small">Non renseignées.</p>{% endif %}
+    <p class="small"><a href="{{ url_for('teachers.availability', person_id=person.id) }}">Modifier les disponibilités</a></p>
   </section>
   <section class="card">
     <h2>Contact</h2>
@@ -31,13 +45,33 @@
   </section>
 </div>
 {% if season %}
-<section class="card settings-block">
-  <h2>Enseignement en {{ season.label }}</h2>
+<section class="card settings-block" id="enseignement">
+  <div class="page-head">
+    <h2>Enseignement en {{ season.label }}</h2>
+    <div class="actions">{% if seasons | length > 1 %}<form method="get" class="inline-form"><select name="saison" aria-label="Saison" data-autosubmit>{% for s in seasons %}<option value="{{ s.id }}" {{ "selected" if s.id == season.id }}>{{ s.label }}</option>{% endfor %}</select></form>{% endif %}
+    </div>
+  </div>
   <dl class="props">
-    <dt>Disciplines</dt><dd>{{ taught | map(attribute="name") | join(", ") or "—" }}</dd>
-    <dt>Cours</dt><dd>{% for c in courses %}{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}</small>{% endif %}<br>{% else %}—{% endfor %}</dd>
+    <dt>Disciplines</dt><dd>{{ taught | map(attribute="name") | join(", ") or "—" }}
+      {% if can(current_user, "catalog.edit") %} · <a href="{{ url_for('catalog.teacher_disciplines', person_id=person.id, saison=season.id, retour='prof') }}">modifier</a>{% endif %}</dd>
   </dl>
-  {% if can(current_user, "catalog.view") %}<p class="small"><a href="{{ url_for('catalog.index', saison=season.id, prof=person.id) }}">Ses cours dans le catalogue</a></p>{% endif %}
+  {% if courses %}
+  <div class="overflow-auto"><table class="striped responsive">
+    <thead><tr><th>Cours</th><th>Horaire</th><th>Salle</th><th>Élèves</th>{% if can(current_user, "catalog.edit") %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for c in courses %}
+    <tr>
+      <td data-label="Cours">{% if can(current_user, "catalog.view") %}<a href="{{ url_for('catalog.course', course_id=c.id) }}">{{ c.title }}</a>{% else %}{{ c.title }}{% endif %}</td>
+      <td data-label="Horaire"><small>{% if c.weekday is not none %}{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}{% else %}—{% endif %}</small></td>
+      <td data-label="Salle"><small>{{ c.room.label if c.room else "—" }}</small></td>
+      <td data-label="Élèves">{{ c.enrollments | selectattr("status", "equalto", "active") | list | length }}{% if c.capacity %} / {{ c.capacity }}{% endif %}</td>
+      {% if can(current_user, "catalog.edit") %}<td data-label="" class="actions"><a href="{{ url_for('catalog.edit_course', course_id=c.id, retour='prof') }}">Modifier</a></td>{% endif %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="muted">Aucun cours cette saison.</p>{% endif %}
+  {% if can(current_user, "catalog.edit") %}<p><a href="{{ url_for('catalog.create_course', saison=season.id, prof=person.id, retour='prof') }}" role="button" class="secondary small">+ Nouveau cours avec {{ person.first_name }}</a></p>{% endif %}
 </section>
 {% endif %}
 <p class="muted small">Un départ s'indique par sa date : la fiche et l'historique restent. Ne retirez le statut de professeur qu'en cas d'erreur de saisie.</p>

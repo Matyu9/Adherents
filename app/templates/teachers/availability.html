@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Disponibilités de {{ person.full_name }}{% endblock %}
+{% block content %}
+<article class="narrow wide-form">
+  <h1>Disponibilités de {{ person.full_name }}</h1>
+  <p class="muted">Les créneaux où {{ person.first_name }} peut donner cours, pour préparer la saison. Une ligne vide est ignorée.</p>
+  {% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" novalidate>
+    {{ csrf() }}
+    <div class="overflow-auto"><table>
+      <thead><tr><th>Jour</th><th>De</th><th>À</th></tr></thead>
+      <tbody>
+      {% for k in range(size) %}{% set a = rows[k] if k < rows | length else none %}
+      <tr>
+        <td><select name="a-{{ k }}-day" aria-label="Jour du créneau {{ k + 1 }}"><option value="">—</option>{% for d in weekdays %}<option value="{{ loop.index0 }}"{% if a and a.day == loop.index0 %} selected{% endif %}>{{ d }}</option>{% endfor %}</select></td>
+        <td><input type="time" name="a-{{ k }}-from" aria-label="Début du créneau {{ k + 1 }}" value="{{ a['from'] if a else '' }}"></td>
+        <td><input type="time" name="a-{{ k }}-to" aria-label="Fin du créneau {{ k + 1 }}" value="{{ a['to'] if a else '' }}"></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <button type="submit">Enregistrer</button>
+  </form>
+  <p class="small"><a href="{{ url_for('teachers.detail', person_id=person.id) }}">Annuler</a></p>
+</article>
+{% endblock %}

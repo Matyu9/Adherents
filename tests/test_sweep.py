@@ -48,6 +48,9 @@ ACCESS = {
     "oidc.persons": PUBLIC,
     "member.index": LOGGED_IN,
     "member.contacts_form": LOGGED_IN,
+    "member.absences": LOGGED_IN,
+    "member.declare_absence": LOGGED_IN,
+    "member.cancel_absence": LOGGED_IN,
     **{
         f"applications.{name}": CLIENTS
         for name in (
@@ -141,7 +144,8 @@ ACCESS = {
             "delete_season",
         )
     },
-    **{f"teachers.{name}": TEACHERS for name in ("index", "create", "detail", "edit", "remove")},
+    **{f"teachers.{name}": TEACHERS for name in ("index", "create", "detail", "edit", "remove", "profile", "availability")},
+    "teachers.photo": LOGGED_IN,
     **{f"catalog.{name}": CAT_VIEW for name in ("index", "teachers", "references")},
     **{f"campaigns.{name}": REG_VIEW for name in ("index", "detail", "dossiers", "dossier")},
     **{
@@ -203,6 +207,8 @@ ACCESS = {
     "enrollment.index": LOGGED_IN,
     "enrollment.start": LOGGED_IN,
     "enrollment.my_students": LOGGED_IN,
+    "enrollment.my_student": LOGGED_IN,
+    "enrollment.add_my_student": LOGGED_IN,
     # Un dossier s'ouvre par son compte ou par le lien reçu par email : un identifiant inconnu donne 404.
     **{
         f"enrollment.{name}": PUBLIC
@@ -353,6 +359,7 @@ ARGUMENTS = {
     "lesson_id": 999,
     "break_id": 999,
     "notification_id": 999,
+    "notice_id": 999,
     "direction": "monter",
 }
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
@@ -703,7 +710,7 @@ def test_crawl_every_link(app, rich, who):
             problems.append(f"{path} : une donnée n'a pas été échappée")
         for link in LINK.findall(html):
             target = urlsplit(urljoin(path, link.replace("&amp;", "&")))
-            if "date=" in target.query and "/seances/" in target.path:  # le planning va de semaine en semaine sans fin
+            if ("date=" in target.query or "mois=" in target.query) and "/seances/" in target.path:  # plannings sans fin
                 continue
             if not target.netloc and target.scheme not in ("data", "mailto", "tel"):  # data : QR code intégré
                 queue.append(target.path + (f"?{target.query}" if target.query else ""))

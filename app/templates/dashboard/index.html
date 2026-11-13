@@ -28,9 +28,10 @@
       {% endfor %}
     </ul>
     {% else %}<p class="empty">Aucune séance dans les {{ days }} prochains jours.</p>{% endif %}
-    <p class="small"><a href="{{ url_for('lessons.my_planning') }}">Mon planning</a></p>
+    <p class="small"><a href="{{ url_for('lessons.my_planning') }}">Mon planning</a>{% if is_family(current_user) %} · <a href="{{ url_for('member.absences') }}">Prévenir d'une absence</a>{% endif %}</p>
   </section>
   {% endif %}
+  {% if is_family(current_user) or not (current_user.person and current_user.person.teacher) %}
   <section class="card">
     <h2>{{ icon("clipboard", 18) }} Inscriptions</h2>
     {% for campaign, household, dossier in dossiers %}
@@ -42,6 +43,7 @@
     <p class="empty">Aucune campagne d'inscription ouverte pour le moment.</p>
     {% endfor %}
   </section>
+  {% endif %}
   {% if notifications %}
   <section class="card">
     <h2>{{ icon("bell", 18) }} Nouveautés</h2>

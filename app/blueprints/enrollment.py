@@ -643,3 +643,101 @@ def my_students():
     season, seasons = directory.selected_season()
     rows = registration.students_of(teacher, season) if season else []
     return render_template("enrollment/my_students.html", season=season, seasons=seasons, rows=rows)
+
+
+def _my_student(person_id):
+    """(professeur, saison, élève, [ses inscriptions à mes cours]) ; 404 si ce n'est pas un de mes élèves cette saison."""
+    teacher = teacher_of(current_user)
+    if teacher is None:
+        abort(404)
+    season, _ = directory.selected_season()
+    if season is None:
+        abort(404)
+    mine = [
+        e
+        for course, students in registration.students_of(teacher, season)
+        for student, _guardians, e in students
+        if student.id == person_id
+    ]
+    if not mine:
+        abort(404)
+    return teacher, season, mine[0].membership.person, mine
+
+
+@bp.route("/mes-eleves/<int:person_id>")
+@login_required
+def my_student(person_id):
+    """Fiche d'un de mes élèves, en lecture : ses cours de la saison, ses responsables, ses présences à mes cours."""
+    from flask import g as flask_g
+
+    from ..models import Enrollment
+    from ..services import attendance, guard
+
+    teacher, season, student, mine = _my_student(person_id)
+    flask_g.write_lock = True
+    guard.count_read()
+    membership = mine[0].membership
+    all_courses = [e for e in membership.enrollments if e.status == Enrollment.ACTIVE]
+    guardians = list(
+        {
+            link.person.id: link.person
+            for h in student.household_links
+            if h.role == "dependent"
+            for link in h.household.guardians
+        }.values()
+    )
+    enrolled_ids = {e.course_id for e in all_courses}
+    counts = registration.enrolled_counts(season)
+    addable = [
+        c
+        for c in teacher.courses
+        if c.season_id == season.id and c.id not in enrolled_ids and not c.is_full(counts.get(c.id, 0))
+    ]
+    return render_template(
+        "enrollment/my_student.html",
+        student=student,
+        membership=membership,
+        season=season,
+        all_courses=all_courses,
+        mine=mine,
+        guardians=guardians,
+        history={e.id: attendance.history(e) for e in mine},
+        addable=sorted(addable, key=lambda c: c.title),
+        teacher=teacher,
+        can_add=membership.status == membership.ACTIVE,
+    )
+
+
+@bp.route("/mes-eleves/<int:person_id>/cours", methods=["POST"])
+@login_required
+def add_my_student(person_id):
+    """Le professeur inscrit son élève à un autre de ses cours (orchestre, atelier…) ; le secrétariat est prévenu."""
+    from datetime import date
+
+    from ..services import courses, notify
+
+    teacher, season, student, mine = _my_student(person_id)
+    course = next(
+        (c for c in teacher.courses if c.id == request.form.get("course_id", type=int) and c.season_id == season.id),
+        None,
+    )
+    if course is None:
+        abort(404)
+    if course.is_full(registration.enrolled_counts(season).get(course.id, 0)):
+        flash(f"{course.title} est complet : voyez avec le secrétariat.", "error")
+        return redirect(url_for(".my_student", person_id=person_id, saison=season.id))
+    on = max(date.today(), season.starts_on)
+    try:
+        courses.enroll(mine[0].membership, course, on, user=current_user)
+    except courses.CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        notify.notify(
+            notify.holders("enrollment.edit"),
+            f"{current_user.full_name} a inscrit {student.full_name} à {course.title} (à partir du {on:%d/%m/%Y}).",
+            link=url_for("catalog.course", course_id=course.id),
+        )
+        db.session.commit()
+        flash(f"{student.first_name} est inscrit(e) à {course.title}. Le secrétariat est prévenu.", "success")
+    return redirect(url_for(".my_student", person_id=person_id, saison=season.id))

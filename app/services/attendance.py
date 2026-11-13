@@ -2,7 +2,9 @@
 
 - Le professeur du cours ou le remplaçant de la séance fait l'appel à partir du jour de la séance, et peut le
   corriger pendant `TEACHER_DAYS` jours ; ensuite, seul le secrétariat (`lesson.manage`) le peut.
-- Pas de motif en texte libre : seulement présent, absent ou excusé.
+- Pas de motif en texte libre : seulement présent, absent, excusé ou en retard.
+- Une famille peut prévenir d'une absence à l'avance : l'élève est proposé « excusé » à l'appel, et le professeur est
+  prévenu.
 - Les familles voient le statut des séances de leurs enfants, sauf si l'association coupe ce réglage.
 - Les élèves qui cumulent les absences non excusées sont signalés à partir d'un seuil, sans valeur par défaut.
 
@@ -13,12 +15,13 @@ from collections import Counter
 from datetime import date, datetime, timedelta
 
 from ..extensions import db, fold
-from ..models import Attendance, Course, Enrollment, Lesson, Membership
+from ..models import AbsenceNotice, Attendance, Course, Enrollment, Lesson, Membership
 from . import lessons as lesson_service
 from . import options
 from .activity import log
 
 TEACHER_DAYS = 7
+NOTICE_DAYS = 28  # une absence se prévient au plus quatre semaines à l'avance
 
 
 class AttendanceError(ValueError):
@@ -57,7 +60,7 @@ def record(lesson, statuses, user=None, today=None, now=None):
     allowed, reason = may_record(user, lesson, today) if user is not None else (True, None)
     if not allowed:
         raise AttendanceError(reason)
-    expected = {e.id: e for e, _ in sheet(lesson)}
+    expected = {e.id: e for e, _status in sheet(lesson)}
     unknown = set(statuses) - set(expected)
     if unknown:
         raise AttendanceError("Un élève de l'appel ne suit pas ce cours ce jour-là.")
@@ -81,8 +84,8 @@ def record(lesson, statuses, user=None, today=None, now=None):
         counts = Counter(statuses.values())
         log(
             "attendance.record",
-            f"Appel de {lesson_service.describe(lesson)} : {counts['present']} présent(s), {counts['absent']} absent(s), "
-            f"{counts['excused']} excusé(s)",
+            f"Appel de {lesson_service.describe(lesson)} : {counts['present']} présent(s), {counts['late']} en retard, "
+            f"{counts['absent']} absent(s), {counts['excused']} excusé(s)",
             user=user,
         )
     return changed
@@ -138,7 +141,83 @@ def history(enrollment):
 
 
 def forget(person):
-    """Anonymisation : les présences de la personne sont effacées."""
+    """Anonymisation : les présences et les absences prévenues de la personne sont effacées."""
     ids = [e.id for m in person.memberships for e in m.enrollments]
     if ids:
         db.session.execute(db.delete(Attendance).where(Attendance.enrollment_id.in_(ids)))
+        db.session.execute(db.delete(AbsenceNotice).where(AbsenceNotice.enrollment_id.in_(ids)))
+
+
+# ---------------------------------------------------------------------------
+# Absences prévenues à l'avance par les familles
+# ---------------------------------------------------------------------------
+
+
+def notices(lesson):
+    """{id d'inscription: absence prévenue} pour une séance."""
+    return {n.enrollment_id: n for n in lesson.absence_notices}
+
+
+def family_lessons(account, today=None, days=NOTICE_DAYS):
+    """[(séance, inscription, absence prévenue ou None)] des enfants (et de soi) dans les semaines qui viennent,
+    séances annulées exclues : celles dont on peut prévenir l'absence."""
+    from .directory import sees_hidden_seasons
+    from .registration import guarded_households
+
+    today = today or date.today()
+    person = account.person
+    people = {person.id} if person is not None else set()
+    for household in guarded_households(account):
+        people |= {link.person_id for link in household.dependents}
+    hidden_ok = sees_hidden_seasons(account)
+    rows = []
+    for enrollment in lesson_service.attending_enrollments(people):
+        if enrollment.course.season.hidden and not hidden_ok:
+            continue
+        for lesson in enrollment.course.lessons:
+            if today <= lesson.day <= today + timedelta(days=days) and not lesson.cancelled:
+                if enrollment.attends_on(lesson.day):
+                    notice = next((n for n in lesson.absence_notices if n.enrollment_id == enrollment.id), None)
+                    rows.append((lesson, enrollment, notice))
+    return sorted(rows, key=lambda r: (r[0].day, r[0].starts_at, r[1].membership.person.first_name))
+
+
+def declare_absence(account, lesson, enrollment, today=None):
+    """Prévient d'une absence. Renvoie la notice (sans commit) ; le professeur de la séance est notifié."""
+    from flask import url_for
+
+    from .notify import notify
+
+    if not any(l is lesson and e is enrollment for l, e, _ in family_lessons(account, today)):
+        raise AttendanceError("Cette séance n'est pas celle d'un de vos enfants, ou elle est trop loin.")
+    existing = next((n for n in lesson.absence_notices if n.enrollment_id == enrollment.id), None)
+    if existing is not None:
+        return existing
+    notice = AbsenceNotice(lesson=lesson, enrollment=enrollment, account=account)
+    db.session.add(notice)
+    db.session.flush()
+    teacher = lesson.substitute or lesson.course.teacher
+    student = enrollment.membership.person
+    if teacher is not None and teacher.person.account is not None:
+        notify(
+            [teacher.person.account],
+            f"{student.full_name} sera absent(e) au cours {lesson.course.title} du {lesson.day:%d/%m/%Y}.",
+            link=url_for("lessons.roll", lesson_id=lesson.id),
+        )
+    log(
+        "attendance.notice",
+        f"Absence prévenue : {student.full_name}, {lesson_service.describe(lesson)}",
+        user=account,
+        person=student,
+    )
+    return notice
+
+
+def cancel_notice(account, notice, today=None):
+    """Retire une absence prévenue, tant que la séance n'a pas eu lieu."""
+    today = today or date.today()
+    if notice.lesson.day < today:
+        raise AttendanceError("La séance est passée : l'absence ne se retire plus.")
+    if not any(n is notice for _, _, n in family_lessons(account, today)):
+        raise AttendanceError("Cette absence n'est pas celle d'un de vos enfants.")
+    db.session.delete(notice)

@@ -128,3 +128,35 @@
     document.querySelectorAll("[data-add-row]").forEach(function (button) { button.hidden = false; });
   });
 })();
+
+// <form data-roll> : fiche d'appel. Compteur par statut, et « Tous présents » (sauf les absences prévenues).
+(function () {
+  const LABELS = { present: "présent", late: "en retard", absent: "absent", excused: "excusé" };
+  function refresh(form) {
+    const counts = {};
+    form.querySelectorAll("[data-roll-row] input:checked").forEach(function (input) {
+      counts[input.value] = (counts[input.value] || 0) + 1;
+    });
+    const parts = Object.keys(LABELS).filter(function (k) { return counts[k]; }).map(function (k) {
+      return counts[k] + " " + LABELS[k] + (counts[k] > 1 && k !== "late" ? "s" : "");
+    });
+    const output = form.querySelector("[data-roll-count]");
+    if (output) output.textContent = parts.join(" · ");
+  }
+  document.addEventListener("change", function (event) {
+    const form = event.target.closest("form[data-roll]");
+    if (form) refresh(form);
+  });
+  document.addEventListener("click", function (event) {
+    const button = event.target.closest("[data-roll-all]");
+    if (!button) return;
+    const form = button.closest("form[data-roll]");
+    form.querySelectorAll("[data-roll-row]:not([data-notice]) input[value=present]").forEach(function (input) {
+      input.checked = true;
+    });
+    refresh(form);
+  });
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("form[data-roll]").forEach(refresh);
+  });
+})();

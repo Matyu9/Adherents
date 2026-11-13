@@ -15,6 +15,7 @@ from app.models import (
     Lesson,
     Membership,
     Notification,
+    Person,
     Role,
     Room,
     Site,
@@ -695,3 +696,57 @@ def test_une_saison_en_preparation_est_cachee_aux_professeurs(app, client, gener
     login(staff, enroll(generated["manager"]))
     assert "Flûte" in page(staff.get(f"/catalogue?saison={generated['season'].id}"))
     assert "en préparation" in page(staff.get("/annuaire/saisons"))
+
+
+def test_fiche_eleve_pour_le_professeur(app, paul_client, generated):
+    from app.models import Enrollment, Notification
+
+    alice = generated["m_alice"].person
+    s = generated["season"]
+    html = page(paul_client.get(f"/inscription/mes-eleves?saison={s.id}"))
+    assert f"/inscription/mes-eleves/{alice.id}" in html
+    html = page(paul_client.get(f"/inscription/mes-eleves/{alice.id}"))
+    assert "Alice Martin" in html and "Anne Martin" in html and "anne@asso.test" in html
+    assert "Piano" in html and "avec vous" in html  # tous ses cours, dont celui de Léa
+    assert "Présences à vos cours" in html
+    # Ajouter Alice au solfège de Paul : le secrétariat est prévenu.
+    response = paul_client.post(f"/inscription/mes-eleves/{alice.id}/cours", data={"course_id": generated["fm"].id})
+    assert response.status_code == 302
+    assert db.session.scalar(
+        db.select(Enrollment).filter_by(membership_id=generated["m_alice"].id, course_id=generated["fm"].id)
+    ).active
+    assert any("a inscrit Alice Martin à Solfège" in m for m in messages(generated["manager"]))
+    # Pas le cours d'un autre professeur, ni un élève qui n'est pas à lui.
+    assert paul_client.post(
+        f"/inscription/mes-eleves/{alice.id}/cours", data={"course_id": generated["piano"].id}
+    ).status_code == 404
+    lea_client = app.test_client()
+    login(lea_client, generated["lea_account"])
+    basile_id = db.session.scalar(db.select(Person.id).filter_by(first_name="Basile"))
+    assert lea_client.get(f"/inscription/mes-eleves/{basile_id}").status_code == 404
+
+
+def test_menu_d_un_professeur_sans_famille(app, paul_client, generated):
+    html = page(paul_client.get("/"))
+    assert 'href="/ma-famille"' not in html and 'href="/inscription"' not in html
+    assert 'href="/inscription/mes-eleves"' in html and 'href="/seances/mes-seances"' in html
+    parent = app.test_client()
+    login(parent, generated["anne_account"])
+    html = page(parent.get("/"))
+    assert 'href="/ma-famille"' in html and 'href="/inscription"' in html
+
+
+def test_page_des_seances_resume_liste_et_calendrier(manager_client, generated, monkeypatch):
+    from app.blueprints import lessons as lessons_blueprint
+
+    monkeypatch.setattr(lessons_blueprint, "date", _FrozenDate)  # le 10 octobre
+    course = generated["flute"]
+    html = page(manager_client.get(f"/seances/cours/{course.id}"))
+    assert "À venir" in html and "Passées (1)" in html  # la séance du 7 octobre est passée, repliée
+    assert 'class="dropdown row-menu"' in html and "Modifier la séance" in html
+    assert "Mercredi 17:00-18:00" in html and "Présence" in html
+    html = page(manager_client.get(f"/seances/cours/{course.id}?vue=calendrier"))
+    assert "Octobre 2026" in html and html.count('class="pl-pill') == 4
+    html = page(manager_client.get(f"/seances/cours/{course.id}?vue=calendrier&mois=2026-11"))
+    assert "Novembre 2026" in html and html.count('class="pl-pill') == 1  # le 28 octobre, en tête de grille
+    assert manager_client.get(f"/seances/cours/{course.id}?vue=calendrier&mois=2026-13").status_code == 200

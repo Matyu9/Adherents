@@ -30,6 +30,21 @@ def _folder(name):
 
 
 LOGO_SIZE = 256
+PORTRAIT_SIZE = 400
+
+
+def save_portrait(file_storage):
+    """Photo d'un professeur : recadrée au carré, 400 px, en JPEG sans métadonnées. Renvoie le chemin relatif."""
+    image = ImageOps.fit(_open(file_storage), (PORTRAIT_SIZE, PORTRAIT_SIZE), Image.LANCZOS)
+    name = f"{uuid.uuid4().hex}.jpg"
+    image.save(_folder("profs") / name, "JPEG", quality=85, optimize=True)
+    return f"profs/{name}"
+
+
+def remove(relative):
+    """Efface un fichier envoyé (ancienne photo), sans erreur s'il a déjà disparu."""
+    if relative:
+        (Path(current_app.config["UPLOAD_DIR"]) / relative).unlink(missing_ok=True)
 
 
 def save_logo(file_storage):

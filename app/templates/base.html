@@ -35,8 +35,9 @@
       <p class="nav-title">Au quotidien</p>
       {{ navlink("dashboard.index", "Accueil", "home") }}
       {{ navlink("notifications.index", "Notifications", "bell", ["notifications"]) }}
-      {% if current_user.person %}{{ navlink("member.index", "Ma famille", "users") }}{{ navlink("lessons.my_planning", "Mon planning", "calendar") }}{% endif %}
-      {{ navlink("enrollment.index", "Inscriptions", "clipboard") }}
+      {% set family = is_family(current_user) %}
+      {% if current_user.person %}{% if family %}{{ navlink("member.index", "Ma famille", "users") }}{% endif %}{{ navlink("lessons.my_planning", "Mon planning", "calendar") }}{% endif %}
+      {% if family or not (current_user.person and current_user.person.teacher) %}{{ navlink("enrollment.index", "Inscriptions", "clipboard") }}{% endif %}
       {% if current_user.person and current_user.person.teacher %}{{ navlink("enrollment.my_students", "Mes élèves", "music") }}{{ navlink("lessons.mine", "Mes séances", "calendar") }}{% endif %}
       {% if can(current_user, "directory.view") or can(current_user, "teacher.manage") %}
       <p class="nav-title">Annuaire</p>

@@ -4,6 +4,15 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ## Non publié
 
+### Changé : retours du tour complet, professeurs et séances
+
+- **Menu d'un professeur** : sans famille ni adhésion, plus de « Ma famille » ni d'« Inscriptions ».
+- **Fiche élève pour le professeur** (depuis Mes élèves ou l'appel) : cours de la saison, responsables, présences à ses cours ; **+ Ajouter à ce cours** l'inscrit à un autre de ses cours qui a de la place, le secrétariat est prévenu.
+- **Fiche d'un professeur** : présentation et photo (montrées aux familles de ses élèves), diplômes, disponibilités, et ses cours de la saison choisie modifiables depuis sa page. Migration `a0000016profs`.
+- **Fiche d'appel refaite** : gros boutons Présent / Absent / Excusé / **Retard**, « Tous présents », compteur, noms cliquables, pensée pour le téléphone.
+- **Absence prévenue à l'avance** par la famille (Ma famille → Prévenir d'une absence) : le professeur est notifié, l'élève est proposé « excusé » à l'appel. Migration `a0000017retards`.
+- **Séances d'un cours** : résumé (élèves, séances, taux de présence), onglets Liste (à venir, passées repliées) et Calendrier, actions dans un menu « ⋯ ».
+
 ### Changé : retours du tour complet, menu, comptes et accueil
 
 - **Menu** : Saisons passe dans Administration. Conservation devient l'onglet **Données personnelles** des Paramètres, qui ont maintenant des onglets (Général, Adhérents, Données personnelles, État de l'installation).

@@ -95,6 +95,7 @@ def create_app(config_class=Config):
     from .cli import register_cli
     from .filters import register_filters
     from .permissions import can, has_staff_rights
+    from .services.registration import is_family
     from .services import logout, oidc_server
     from .services.notify import unread_count
 
@@ -139,6 +140,7 @@ def create_app(config_class=Config):
         return {
             "can": can,
             "has_staff_rights": has_staff_rights,
+            "is_family": is_family,
             "branding": brand,
             "asso_name": brand.name,
             "unread_notifications": unread_count,

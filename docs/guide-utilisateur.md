@@ -50,6 +50,8 @@ Si, une fois connecté, **Ma famille** n'apparaît pas dans le menu, votre compt
 
 **Menu → Accueil** montre ce qui compte maintenant : les séances des 7 prochains jours (les vôtres et celles de vos enfants), les inscriptions ouvertes et les dernières notifications non lues. Un administrateur y voit aussi le nombre de personnes connectées.
 
+**Prévenir d'une absence** (depuis Ma famille ou l'Accueil) : les séances des quatre semaines à venir, avec **Sera absent(e)** pour chacune. Le professeur est prévenu, et l'absence est notée « excusée » à l'appel. On peut la retirer tant que la séance n'a pas eu lieu.
+
 **Menu → Ma famille.** On y trouve ce que l'association sait de votre foyer. Si l'association l'autorise, **Modifier nos coordonnées** met à jour l'adresse, les téléphones ou les emails (les vôtres et ceux de vos enfants), sauf pendant un dossier d'inscription en cours. Le secrétariat en est prévenu. Vous y trouvez :
 
 - l'**adresse** et les **téléphones** du foyer ;
@@ -119,7 +121,9 @@ Une fois le dossier validé, le secrétariat peut vous créer un compte pour acc
 
 Pour la saison en cours, ou une autre choisie en haut à droite, la page liste **vos cours** et, pour chacun, **les élèves inscrits**, leur âge et leurs **responsables** (nom, téléphone, email), pour les joindre.
 
-Vous ne voyez que vos élèves, et rien d'autre de l'annuaire. Un professeur qui est aussi parent retrouve son foyer dans **Ma famille**.
+Le nom d'un élève ouvre **sa fiche** : ses cours de la saison (y compris ceux d'autres professeurs), ses responsables et ses présences à vos cours. **+ Ajouter à ce cours** l'inscrit à un autre de vos cours qui a encore de la place (orchestre, atelier…) ; le secrétariat est prévenu.
+
+Vous ne voyez que vos élèves, et rien d'autre de l'annuaire. Un professeur qui est aussi parent retrouve son foyer dans **Ma famille** ; un professeur qui n'est que professeur n'a ni **Ma famille** ni **Inscriptions** dans son menu.
 
 **Menu → Mon planning** : vos séances en semaine ou en mois, comme un agenda.
 
@@ -131,7 +135,7 @@ Vous ne voyez que vos élèves, et rien d'autre de l'annuaire. Un professeur qui
 
 Le changement s'applique tout de suite : les familles reçoivent un message, et le secrétariat est prévenu. Une séance déjà commencée ne se modifie plus, et l'association peut fixer un délai avant la séance.
 
-**Faire l'appel** : depuis **Mes séances**, le jour de la séance. Chaque élève est « présent » d'office : touchez **Absent** ou **Excusé** (absence prévenue) pour ceux qui manquent, puis **Enregistrer l'appel**. Vous pouvez le corriger pendant 7 jours ; ensuite, adressez-vous au secrétariat. N'écrivez jamais de motif : il n'y a pas de case pour cela, exprès.
+**Faire l'appel** : depuis **Mes séances**, le jour de la séance. Chaque élève a une ligne avec quatre gros boutons : **Présent** (d'office), **Absent**, **Excusé** et **Retard** (qui compte comme une présence). Une absence prévenue par la famille arrive déjà sur « Excusé », avec sa date. **Tous présents** remet tout le monde présent, sauf les absences prévenues ; le compteur en haut se met à jour. Puis **Enregistrer l'appel**. Vous pouvez le corriger pendant 7 jours ; ensuite, adressez-vous au secrétariat. N'écrivez jamais de motif : il n'y a pas de case pour cela, exprès. Le nom d'un élève ouvre sa fiche.
 
 **Mon agenda** : une adresse à ajouter à votre agenda (Google Agenda : *Autres agendas → + → À partir de l'URL*), avec vos séances à jour. Elle n'est affichée qu'une fois : gardez-la pour vous.
 
@@ -219,7 +223,7 @@ Un cours complet accepte quand même l'élève, avec un avertissement.
 3. **Générer les séances** : l'aperçu dit combien seront créées. Relancez-la après avoir changé un horaire ou ajouté une période : les séances passées et celles modifiées à la main ne bougent pas.
 4. **Délai** (facultatif) : en deçà de ce nombre d'heures avant une séance, le professeur ne la modifie plus lui-même.
 
-**Séances d'un cours** (page du cours → **Séances**) : déplacer, annuler, ajouter, nommer un **remplaçant** pour une séance, ou **revenir en arrière** sur un changement fait par un professeur. Les familles sont prévenues à chaque fois.
+**Séances d'un cours** (page du cours → **Séances**) : en haut, le nombre d'élèves, de séances passées et à venir, et le taux de présence. L'onglet **Liste** montre les séances à venir, puis les passées (repliées) ; l'onglet **Calendrier** les montre mois par mois. Le menu **⋯** de chaque séance sert à la modifier, l'annuler, nommer un **remplaçant** ou **revenir en arrière** sur un changement fait par un professeur. Les familles sont prévenues à chaque fois.
 
 **Salles de l'organisation** (si l'association relie son Google Workspace) : **Catalogue → Disciplines, niveaux et lieux → Salles de l'organisation** reprend les salles de l'organisation, avec un aperçu avant d'écrire. Les séances sont ensuite réservées dans l'agenda de chaque salle, et une réunion déjà posée sur une salle apparaît quand on déplace une séance.
 
@@ -318,7 +322,10 @@ L'administrateur a tous les droits. Les sections ci-dessous concernent ce qui lu
 - **+ Nouveau professeur** crée la fiche et le contrat. Un parent ou un élève adulte qui enseigne garde sa fiche : cherchez-le dans « Il est déjà dans l'annuaire ? ».
 - Le **contrat** (statut, arrivée, départ, email professionnel) n'est visible que d'ici.
 - **Un départ s'indique par sa date** : la fiche et l'historique restent. Le professeur n'est plus proposé pour les saisons suivantes, et la copie de saison laisse ses cours « à trouver ».
-- La fiche d'un professeur montre ses disciplines et ses cours de la saison en cours.
+- Le contrat a aussi ses **diplômes** et des notes internes.
+- **Présentation et photo** : montrées aux familles de ses élèves, dans Ma famille. La photo est recadrée au carré et perd ses métadonnées.
+- **Disponibilités** : les créneaux où il peut donner cours, pour préparer la saison.
+- **Enseignement** : ses disciplines et ses cours de la saison choisie, avec **Modifier** sur chaque cours et **+ Nouveau cours avec…**, qui reviennent sur sa fiche.
 
 ### Coordonnées bancaires
 

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Présentation de {{ person.full_name }}{% endblock %}
+{% block content %}
+<article class="narrow wide-form">
+  <h1>Présentation de {{ person.full_name }}</h1>
+  <p class="muted">Montrée, avec la photo, aux familles de ses élèves dans Ma famille. Les diplômes et les notes restent internes.</p>
+  {% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {{ csrf() }}
+    <label for="bio">Présentation</label>
+    <textarea id="bio" name="bio" rows="6" maxlength="3000">{{ request.form.get('bio', teacher.bio or '') }}</textarea>
+    <label for="photo">Photo</label>
+    {% if teacher.photo %}<img src="{{ url_for('teachers.photo', name=teacher.photo.split('/')[-1]) }}" alt="Photo actuelle" class="portrait">
+    <label class="form-check"><input type="checkbox" name="remove_photo" value="1"> Retirer la photo</label>{% endif %}
+    <input id="photo" name="photo" type="file" accept="image/png,image/jpeg,image/webp">
+    <small class="muted">Recadrée au carré, réduite à 400 px, sans ses métadonnées (dont la position GPS).</small>
+    <button type="submit">Enregistrer</button>
+  </form>
+  <p class="small"><a href="{{ url_for('teachers.detail', person_id=person.id) }}">Annuler</a></p>
+</article>
+{% endblock %}

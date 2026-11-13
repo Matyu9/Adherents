@@ -457,9 +457,27 @@ a.badge:hover { text-decoration: none; border-color: var(--brand); }
 tr.total td { font-weight: 700; border-top: 2px solid var(--border); }
 .condition-param { display: contents; }
 .condition-param[hidden] { display: none; }
-.roll-row { display: flex; flex-wrap: wrap; gap: .25rem 1rem; align-items: center; border-bottom: 1px solid var(--border); padding: .5rem 0; margin: 0; }
-.roll-row legend { flex: 1 1 100%; font-weight: 600; padding: 0; }
-.roll-row label { margin: 0; }
+/* Fiche d'appel : une ligne par élève, gros boutons à toucher */
+.roll-sheet { max-width: 46rem; }
+.roll-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; position: sticky; top: 0; z-index: 2; background: var(--bg, var(--surface)); padding: .5rem 0; }
+.roll-count { margin: 0; font-weight: 600; }
+.roll-list { list-style: none; padding: 0; margin: 0 0 1rem; }
+.roll-row { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding: .6rem 0; margin: 0; list-style: none; }
+.roll-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .5rem; min-width: 0; }
+.segmented { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; }
+.segmented label { margin: 0; cursor: pointer; }
+.segmented input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.segmented span { display: inline-flex; align-items: center; min-height: 44px; padding: 0 .8rem; font-size: .9rem; border-left: 1px solid var(--border); }
+.segmented label:first-child span { border-left: 0; }
+.segmented input:focus-visible + span { outline: 2px solid var(--brand); outline-offset: -2px; }
+.segmented input:checked + span { color: #fff; font-weight: 600; }
+.seg-present input:checked + span { background: #2e7d32; }
+.seg-late input:checked + span { background: #b26a00; }
+.seg-absent input:checked + span { background: #c62828; }
+.seg-excused input:checked + span { background: #546e7a; }
+.segmented input:disabled + span { cursor: default; opacity: .7; }
+.roll-submit { width: 100%; }
+@media (max-width: 560px) { .segmented { width: 100%; } .segmented label { flex: 1; } .segmented span { justify-content: center; padding: 0 .3rem; } }
 
 /* ==========================================================================
    Plannings : semaine en grille horaire, mois en calendrier (placement : planning-grid.css).
@@ -550,3 +568,11 @@ a.pl-pill:hover { text-decoration: none; filter: brightness(.96); }
 .upcoming li { padding: .3rem 0; border-bottom: 1px solid var(--border); }
 .upcoming li:last-child { border-bottom: 0; }
 .upcoming li.cancelled { text-decoration: line-through; color: var(--text-3); }
+.portrait { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; flex: none; }
+.portrait.small { width: 48px; height: 48px; }
+.row-menu { margin: 0; display: inline-block; }
+.row-menu > summary { padding: .2rem .6rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-weight: 700; list-style: none; }
+.row-menu > summary::after { display: none; }
+.row-menu ul { min-width: 16rem; }
+.row-menu ul li { text-align: left; direction: ltr; }
+.past-lessons > summary h2 { display: inline; font-size: 1.15rem; }

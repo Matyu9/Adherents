@@ -57,6 +57,7 @@ def test_calendar_lessons_and_planning(session, scheme):
     page.goto(f"/seances/cours/{course_id}")
     shot(page, f"seances-cours-{scheme}")
     row = page.locator("tbody tr").filter(has_not=page.locator(".badge")).last
+    row.locator(".row-menu summary").click()
     row.locator("text=Modifier la séance").click()
     page.wait_for_url("**/modifier")
     page.click("text=Voir les salles libres à ce créneau")
@@ -65,6 +66,10 @@ def test_calendar_lessons_and_planning(session, scheme):
     page.click("main form[method=post] button[type=submit]")
     page.wait_for_url(f"**/seances/cours/{course_id}")
     assert "Séance déplacée" in page.content() and "modifiée" in page.content()
+    page.click("nav.tabs >> text=Calendrier")
+    page.wait_for_url("**vue=calendrier*")
+    assert page.locator(".pl-pill").count() >= 1
+    shot(page, f"seances-cours-calendrier-{scheme}")
 
     page.goto(f"/seances/planning?mode=type&saison={season_id}")
     assert "Danse e2e" in page.content()

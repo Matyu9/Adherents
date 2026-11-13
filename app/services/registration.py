@@ -119,6 +119,23 @@ def offered_courses(campaign):
 # ---------------------------------------------------------------------------
 
 
+def is_family(account):
+    """Le compte a une famille à suivre : responsable d'un foyer, adhérent lui-même ou auteur d'un dossier. Un
+    professeur qui n'est que professeur n'a ni « Ma famille » ni « Inscriptions »."""
+    from flask import g, has_request_context
+
+    if has_request_context() and getattr(g, "is_family_for", None) == account.id:
+        return g.is_family
+    person = getattr(account, "person", None)
+    result = bool(
+        (person is not None and (person.memberships or guarded_households(account)))
+        or db.session.scalar(db.select(Dossier.id).where(Dossier.account_id == account.id).limit(1))
+    )
+    if has_request_context():
+        g.is_family_for, g.is_family = account.id, result
+    return result
+
+
 def guarded_households(account):
     """Foyers dont le compte est responsable (par sa fiche de l'annuaire)."""
     person = getattr(account, "person", None)

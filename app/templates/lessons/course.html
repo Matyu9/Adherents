@@ -2,52 +2,99 @@
 {% from "directory/_macros.html" import csrf, post_button %}
 {% from "lessons/_macros.html" import when, state, cancel_form %}
 {% block title %}Séances {{ course.title }}{% endblock %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/planning-grid.css') }}">{% endblock %}
+{% macro row(l) %}
+<tr id="s{{ l.id }}"{% if l.day < today %} class="muted"{% endif %}>
+  <td data-label="Séance">{{ when(l) }}</td>
+  <td data-label="Salle"><small>{{ l.room.label if l.room else "—" }}</small></td>
+  <td data-label="État">{{ state(l) }}{% if l.changed_by and manager %}<br><small class="muted">par {{ l.changed_by.full_name }}{% if l.changed_at %} le {{ l.changed_at | date_fr }}{% endif %}</small>{% endif %}</td>
+  <td data-label="Appel">{% if not l.cancelled and l.day <= today %}{% set done, expected = summary(l) %}<a href="{{ url_for('lessons.roll', lesson_id=l.id) }}">{{ done }} / {{ expected }}</a>{% else %}—{% endif %}</td>
+  {% if edit %}
+  <td data-label="" class="actions">
+    {% if l.day >= today or manager %}
+    <details class="dropdown row-menu">
+      <summary aria-label="Actions pour la séance du {{ l.day | date_fr }}">⋯</summary>
+      <ul dir="rtl">
+        {% if not l.cancelled %}<li><a href="{{ url_for('lessons.edit', lesson_id=l.id) }}">Modifier la séance</a></li>
+        <li>{{ cancel_form(l) }}</li>{% endif %}
+        {% if manager and l.previous %}<li>{{ post_button(url_for('lessons.revert', lesson_id=l.id), "Revenir en arrière", "link-button", "Annuler le dernier changement de cette séance ? Les familles seront prévenues.") }}</li>{% endif %}
+        {% if manager and not l.cancelled %}
+        <li>
+          <form method="post" action="{{ url_for('lessons.substitute', lesson_id=l.id) }}" class="inline-form">
+            {{ csrf() }}
+            <select name="teacher_id" aria-label="Remplaçant">
+              <option value="">— pas de remplaçant</option>
+              {% for t in teachers if t != course.teacher %}<option value="{{ t.person_id }}"{% if l.substitute == t %} selected{% endif %}>{{ t.person.sort_name }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="secondary small">OK</button>
+          </form>
+        </li>
+        {% endif %}
+      </ul>
+    </details>
+    {% endif %}
+  </td>
+  {% endif %}
+</tr>
+{% endmacro %}
+{% macro table(rows) %}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Séance</th><th>Salle</th><th>État</th><th>Appel</th>{% if edit %}<th></th>{% endif %}</tr></thead>
+  <tbody>{% for l in rows %}{{ row(l) }}{% endfor %}</tbody>
+</table></div>
+{% endmacro %}
 {% block content %}
 <p>{% if can(current_user, "catalog.view") and can(current_user, "directory.view") %}<a href="{{ url_for('catalog.course', course_id=course.id) }}">← {{ course.title }}</a>{% else %}<a href="{{ url_for('lessons.mine') }}">← Mes séances</a>{% endif %}</p>
 <div class="page-head">
   <div>
     <h1>Séances : {{ course.title }}</h1>
-    <p class="muted">{{ course.season.label }}{% if course.teacher %} · {{ course.teacher.person.full_name }}{% endif %}</p>
+    <p class="muted">{{ course.season.label }}{% if course.weekday is not none %} · {{ course.weekday_name }}{% if course.starts_at %} {{ course.starts_at.strftime("%H:%M") }}-{{ course.ends_at.strftime("%H:%M") }}{% endif %}{% endif %}{% if course.room %} · {{ course.room.label }}{% endif %}{% if course.teacher %} · {{ course.teacher.person.full_name }}{% endif %}</p>
   </div>
   {% if edit %}<div class="actions"><a href="{{ url_for('lessons.add', course_id=course.id) }}" role="button">+ Ajouter une séance</a></div>{% endif %}
 </div>
-{% if lessons %}
-<div class="overflow-auto"><table class="striped responsive">
-  <thead><tr><th>Séance</th><th>Salle</th><th>État</th><th>Appel</th>{% if edit %}<th></th>{% endif %}</tr></thead>
-  <tbody>
-  {% for l in lessons %}
-  <tr id="s{{ l.id }}"{% if l.day < today %} class="muted"{% endif %}>
-    <td data-label="Séance">{{ when(l) }}</td>
-    <td data-label="Salle"><small>{{ l.room.label if l.room else "—" }}</small></td>
-    <td data-label="Appel">{% if not l.cancelled and l.day <= today %}{% set done, expected = summary(l) %}<a href="{{ url_for('lessons.roll', lesson_id=l.id) }}">{{ done }} / {{ expected }}</a>{% else %}—{% endif %}</td>
-    <td data-label="État">{{ state(l) }}{% if l.changed_by and manager %}<br><small class="muted">par {{ l.changed_by.full_name }}{% if l.changed_at %} le {{ l.changed_at | date_fr }}{% endif %}</small>{% endif %}</td>
-    {% if edit %}
-    <td data-label="" class="actions">
-      {% if l.day >= today or manager %}
-      {% if not l.cancelled %}<a href="{{ url_for('lessons.edit', lesson_id=l.id) }}">Modifier la séance</a>
-      {{ cancel_form(l) }}{% endif %}
-      {% if manager and l.previous %}{{ post_button(url_for('lessons.revert', lesson_id=l.id), "Revenir en arrière", "link-button", "Annuler le dernier changement de cette séance ? Les familles seront prévenues.") }}{% endif %}
-      {% if manager and not l.cancelled %}
-      <details>
-        <summary>Remplaçant</summary>
-        <form method="post" action="{{ url_for('lessons.substitute', lesson_id=l.id) }}" class="inline-form">
-          {{ csrf() }}
-          <select name="teacher_id" aria-label="Remplaçant">
-            <option value="">— aucun</option>
-            {% for t in teachers if t != course.teacher %}<option value="{{ t.person_id }}"{% if l.substitute == t %} selected{% endif %}>{{ t.person.sort_name }}</option>{% endfor %}
-          </select>
-          <button type="submit" class="secondary small">OK</button>
-        </form>
-      </details>
-      {% endif %}
-      {% endif %}
-    </td>
-    {% endif %}
-  </tr>
-  {% endfor %}
-  </tbody>
-</table></div>
-{% else %}
+<div class="stats">
+  <div class="stat card"><span class="stat-value">{{ stats.students }}</span><span class="stat-label">Élève{{ "s" if stats.students > 1 }}</span></div>
+  <div class="stat card"><span class="stat-value">{{ stats.done }}</span><span class="stat-label">Séance{{ "s" if stats.done > 1 }} passée{{ "s" if stats.done > 1 }}</span></div>
+  <div class="stat card"><span class="stat-value">{{ stats.left }}</span><span class="stat-label">À venir</span></div>
+  <div class="stat card"><span class="stat-value">{{ (stats.rate ~ " %") if stats.rate is not none else "—" }}</span><span class="stat-label">Présence</span></div>
+</div>
+<nav class="tabs" aria-label="Vue">
+  <a href="{{ url_for('lessons.course', course_id=course.id) }}"{% if view == "liste" %} aria-current="page"{% endif %}>Liste</a>
+  <a href="{{ url_for('lessons.course', course_id=course.id, vue='calendrier') }}"{% if view == "calendrier" %} aria-current="page"{% endif %}>Calendrier</a>
+</nav>
+{% if not lessons %}
 <p class="empty">Aucune séance.{% if manager %} <a href="{{ url_for('lessons.calendar', saison=course.season_id) }}">Générer les séances de la saison</a>.{% endif %}</p>
+{% elif view == "calendrier" %}
+<div class="page-head">
+  <h2>{{ calendar.title }}</h2>
+  <div class="actions">
+    <a href="{{ url_for('lessons.course', course_id=course.id, vue='calendrier', mois=calendar.prev) }}" role="button" class="secondary small" aria-label="Mois précédent">←</a>
+    <a href="{{ url_for('lessons.course', course_id=course.id, vue='calendrier', mois=calendar.next) }}" role="button" class="secondary small" aria-label="Mois suivant">→</a>
+  </div>
+</div>
+<div class="pl-scroll">
+  <div class="pl-month">
+    {% for name in ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"] %}<div class="pl-month-head">{{ name }}</div>{% endfor %}
+    {% for week in calendar.weeks %}{% for cell in week %}
+    <div class="pl-cell{{ ' is-outside' if cell.outside }}{{ ' is-past' if cell.past }}{{ ' is-today' if cell.today }}">
+      <span class="pl-daynum">{{ cell.date.day }}</span>
+      {% for e in cell.events %}
+      <a href="{{ e.link }}" class="pl-pill course-{{ e.color }}{{ ' is-past' if e.past }}{{ ' is-cancelled' if e.cancelled }}" title="{{ e.starts_at.strftime('%H:%M') }}–{{ e.ends_at.strftime('%H:%M') }}{% if e.cancelled %} · annulée{% elif e.edited %} · modifiée{% endif %}">
+        <span class="pl-dot"></span><span class="pl-time">{{ e.starts_at.strftime("%H:%M") }}</span>{% if e.cancelled %} <span class="pl-title">annulée</span>{% elif e.edited %} <span class="pl-title">modifiée</span>{% endif %}
+      </a>
+      {% endfor %}
+    </div>
+    {% endfor %}{% endfor %}
+  </div>
+</div>
+{% else %}
+<h2>À venir</h2>
+{% if upcoming %}{{ table(upcoming) }}{% else %}<p class="muted">Aucune séance à venir.</p>{% endif %}
+{% if past %}
+<details class="past-lessons">
+  <summary><h2>Passées ({{ past | length }})</h2></summary>
+  {{ table(past | reverse | list) }}
+</details>
+{% endif %}
 {% endif %}
 {% endblock %}

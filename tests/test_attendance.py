@@ -5,12 +5,24 @@ from datetime import date, timedelta
 import pytest
 
 from app.extensions import db
-from app.models import Activity, Attendance, Lesson, Membership
+from app.models import Activity, Attendance, Enrollment, Lesson, Membership, Person
 from app.services import attendance, courses, lessons, options, retention
 
 from .conftest import enroll, login
 from .test_annuaire import person
 from .test_lessons import BEFORE, OCT7, OCT14, OCT21, generated, lesson_on, school  # noqa: F401 (fixtures)
+
+
+class _Day(date):
+    @classmethod
+    def today(cls):
+        return date(2026, 10, 10)
+
+
+class _OnTheDay(date):
+    @classmethod
+    def today(cls):
+        return date(2026, 10, 14)
 
 
 def statuses_of(lesson):
@@ -241,7 +253,7 @@ def test_la_famille_voit_les_absences(client, generated):
     assert "1 présence, 1 absence : 14 oct. 2026 (absent)" in html
     options.put(options.FAMILY_ATTENDANCE, "0")
     db.session.commit()
-    assert "absence" not in page(client.get("/ma-famille"))
+    assert "1 absence" not in page(client.get("/ma-famille"))
 
 
 def test_mes_seances_propose_l_appel(client, generated, monkeypatch):
@@ -259,3 +271,57 @@ def test_mes_seances_propose_l_appel(client, generated, monkeypatch):
     login(client, generated["paul_account"])
     html = page(client.get("/seances/mes-seances"))
     assert "Faire l&#39;appel" in html  # expression Jinja : échappée
+
+
+def test_une_famille_previent_d_une_absence(app, client, generated, monkeypatch):
+    """Anne prévient qu'Alice manquera la flûte du 14 : Paul est notifié, et l'appel propose « excusé »."""
+    from app.models import AbsenceNotice, Lesson, Notification
+
+    monkeypatch.setattr(attendance, "date", _Day)
+    login(client, generated["anne_account"])
+    html = page(client.get("/ma-famille/absences"))
+    assert "Flûte" in html and "Sera absent(e)" in html
+    lesson = db.session.scalar(
+        db.select(Lesson).filter_by(course_id=generated["flute"].id, day=date(2026, 10, 14))
+    )
+    enrollment = alice_enrollment(generated)
+    client.post("/ma-famille/absences/prevenir", data={"lesson_id": lesson.id, "enrollment_id": enrollment.id})
+    notice = db.session.scalar(db.select(AbsenceNotice))
+    assert notice.lesson_id == lesson.id and notice.account_id == generated["anne_account"].id
+    assert any(
+        "Alice Martin sera absent(e)" in n.message
+        for n in db.session.scalars(db.select(Notification).filter_by(account_id=generated["paul_account"].id))
+    )
+    # Une deuxième fois : pas de doublon.
+    client.post("/ma-famille/absences/prevenir", data={"lesson_id": lesson.id, "enrollment_id": enrollment.id})
+    assert db.session.scalar(db.select(db.func.count(AbsenceNotice.id))) == 1
+    # Basile n'est pas de sa famille.
+    basile = db.session.scalar(
+        db.select(Enrollment).join(Membership).join(Person).filter(Person.first_name == "Basile")
+    )
+    fm = db.session.scalar(db.select(Lesson).filter_by(course_id=generated["fm"].id, day=date(2026, 10, 14)))
+    response = client.post(
+        "/ma-famille/absences/prevenir", data={"lesson_id": fm.id, "enrollment_id": basile.id}, follow_redirects=True
+    )
+    assert "pas celle d&#39;un de vos enfants" in page(response)
+    # À l'appel, Alice est proposée « excusé ».
+    paul = app.test_client()
+    login(paul, generated["paul_account"])
+    monkeypatch.setattr(attendance, "date", _OnTheDay)
+    html = page(paul.get(f"/seances/{lesson.id}/appel"))
+    assert "absence prévenue le" in html
+    assert f'name="e{enrollment.id}" value="excused" checked' in html
+    # Retirer l'absence avant la séance.
+    monkeypatch.setattr(attendance, "date", _Day)
+    client.post(f"/ma-famille/absences/{notice.id}/retirer")
+    assert db.session.scalar(db.select(db.func.count(AbsenceNotice.id))) == 0
+
+
+def test_le_retard_compte_comme_une_presence(generated):
+    from app.models import Attendance
+
+    lesson = generated["flute"].lessons[0]
+    enrollment = alice_enrollment(generated)
+    attendance.record(lesson, {enrollment.id: Attendance.LATE}, today=lesson.day)
+    db.session.commit()
+    assert lesson.attendance[0].label == "Retard" and Attendance.LATE in Attendance.ATTENDED

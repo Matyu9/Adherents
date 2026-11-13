@@ -384,6 +384,8 @@ def create_course():
     if copy and copy.season_id == season.id:  # « dupliquer » : un autre groupe du même cours
         form = CourseForm(season=season, obj=copy, formdata=None)
         form.marked_full.data = False
+    elif request.method == "GET" and (prof := request.args.get("prof", type=int)):  # depuis la page du professeur
+        form.teacher_id.data = prof
     if form.validate_on_submit():
         course = Course(season=season, discipline_id=form.discipline_id.data)
         db.session.add(course)
@@ -391,8 +393,15 @@ def create_course():
         log("course.create", f"Cours ajouté : {catalog.describe(course)}")
         db.session.commit()
         flash("Cours ajouté.", "success")
-        return redirect(url_for(".index", saison=season.id))
+        return _back_to_teacher(course.teacher_id) or redirect(url_for(".index", saison=season.id))
     return render_template("catalog/course_form.html", form=form, season=season, course=None)
+
+
+def _back_to_teacher(person_id):
+    """?retour=prof : on vient de la page du professeur, on y revient."""
+    if request.args.get("retour") == "prof" and person_id:
+        return redirect(url_for("teachers.detail", person_id=person_id) + "#enseignement")
+    return None
 
 
 def _course(course_id):
@@ -412,7 +421,7 @@ def edit_course(course_id):
                 courses.announce_free_place(course)
         db.session.commit()
         flash("Cours enregistré.", "success")
-        return redirect(url_for(".index", saison=season.id))
+        return _back_to_teacher(course.teacher_id) or redirect(url_for(".index", saison=season.id))
     return render_template("catalog/course_form.html", form=form, season=season, course=course)
 
 
@@ -896,7 +905,7 @@ def teacher_disciplines(person_id):
             )
         db.session.commit()
         flash("Disciplines enregistrées.", "success")
-        return redirect(url_for(".teachers", saison=season.id))
+        return _back_to_teacher(person_id) or redirect(url_for(".teachers", saison=season.id))
     courses = catalog.sorted_courses(c for c in teacher.courses if c.season_id == season.id)
     return render_template("catalog/teacher_form.html", form=form, teacher=teacher, season=season, courses=courses)
 

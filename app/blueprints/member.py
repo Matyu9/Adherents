@@ -112,3 +112,47 @@ def contacts_form(household_id):
         form=request.form if request.method == "POST" else None,
         error=error,
     )
+
+
+@bp.route("/absences")
+@login_required
+def absences():
+    """Séances des quatre semaines à venir, pour prévenir d'une absence (ou la retirer)."""
+    return render_template(
+        "member/absences.html", rows=attendance.family_lessons(current_user), days=attendance.NOTICE_DAYS
+    )
+
+
+@bp.route("/absences/prevenir", methods=["POST"])
+@login_required
+def declare_absence():
+    from ..models import Enrollment, Lesson
+
+    lesson = db.session.get(Lesson, request.form.get("lesson_id", type=int) or 0) or abort(404)
+    enrollment = db.session.get(Enrollment, request.form.get("enrollment_id", type=int) or 0) or abort(404)
+    try:
+        attendance.declare_absence(current_user, lesson, enrollment)
+    except attendance.AttendanceError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+        flash("Absence prévenue : le professeur en est informé.", "success")
+    return redirect(url_for(".absences"))
+
+
+@bp.route("/absences/<int:notice_id>/retirer", methods=["POST"])
+@login_required
+def cancel_absence(notice_id):
+    from ..models import AbsenceNotice
+
+    notice = db.session.get(AbsenceNotice, notice_id) or abort(404)
+    try:
+        attendance.cancel_notice(current_user, notice)
+    except attendance.AttendanceError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+        flash("Absence retirée.", "success")
+    return redirect(url_for(".absences"))

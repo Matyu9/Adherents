@@ -2,25 +2,37 @@
 {% from "directory/_macros.html" import csrf %}
 {% block title %}Appel{% endblock %}
 {% block content %}
-<article class="narrow">
+<article class="roll-sheet">
   <h1>Appel : {{ lesson.course.title }}</h1>
   <p class="muted">{{ lesson.day | date_fr }}, {{ lesson.starts_at.strftime("%H:%M") }}-{{ lesson.ends_at.strftime("%H:%M") }}{% if lesson.room %} · {{ lesson.room.label }}{% endif %}{% if lesson.substitute %} · remplacé par {{ lesson.substitute.person.full_name }}{% endif %}</p>
   {% if not allowed %}<p class="flash flash-warning">{{ reason }}</p>{% endif %}
   {% if rows %}
-  <form method="post">
+  <form method="post" data-roll>
     {{ csrf() }}
-    <div class="roll">
-      {% for e, status in rows %}{% set student = e.membership.person %}
-      <fieldset class="roll-row">
-        <legend>{{ student.sort_name }}{% if e.slot_starts_at %} <small class="muted">{{ e.slot_starts_at.strftime("%H:%M") }}</small>{% endif %}</legend>
-        {% for key, label in statuses.items() %}
-        <label><input type="radio" name="e{{ e.id }}" value="{{ key }}"{% if (status or "present") == key %} checked{% endif %}{% if not allowed %} disabled{% endif %}> {{ label }}</label>
-        {% endfor %}
-      </fieldset>
-      {% endfor %}
+    <div class="roll-toolbar">
+      <p class="roll-count" data-roll-count aria-live="polite"></p>
+      {% if allowed %}<button type="button" class="secondary small" data-roll-all>Tous présents</button>{% endif %}
     </div>
-    <p class="small muted">« Excusé » : l'absence était prévenue. Pas de motif à écrire ici.</p>
-    {% if allowed %}<button type="submit">Enregistrer l'appel</button>{% endif %}
+    <ul class="roll-list">
+      {% for e, status in rows %}{% set student = e.membership.person %}{% set notice = notices.get(e.id) %}
+      {% set current = status or ("excused" if notice else "present") %}
+      {% set href = student_link(student) %}
+      <li class="roll-row" data-roll-row{% if notice %} data-notice{% endif %}>
+        <div class="roll-name">
+          {% if href %}<a href="{{ href }}">{{ student.sort_name }}</a>{% else %}<strong>{{ student.sort_name }}</strong>{% endif %}
+          {% if e.slot_starts_at %}<small class="muted">{{ e.slot_starts_at.strftime("%H:%M") }}</small>{% endif %}
+          {% if notice %}<span class="badge">absence prévenue le {{ notice.created_at | date_fr }}</span>{% endif %}
+        </div>
+        <div class="segmented" role="radiogroup" aria-label="Présence de {{ student.full_name }}">
+          {% for key, label in statuses.items() %}
+          <label class="seg-{{ key }}"><input type="radio" name="e{{ e.id }}" value="{{ key }}"{% if current == key %} checked{% endif %}{% if not allowed %} disabled{% endif %}><span>{{ label }}</span></label>
+          {% endfor %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="small muted">« Excusé » : l'absence était prévenue. « Retard » compte comme une présence. Pas de motif à écrire ici.</p>
+    {% if allowed %}<button type="submit" class="roll-submit">Enregistrer l'appel</button>{% endif %}
   </form>
   {% else %}<p class="empty">Aucun élève ne suit ce cours ce jour-là.</p>{% endif %}
 </article>

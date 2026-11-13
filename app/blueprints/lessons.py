@@ -169,15 +169,54 @@ def _may_view_course(course):
 @bp.route("/cours/<int:course_id>")
 @login_required
 def course(course_id):
+    """Séances d'un cours : un résumé, puis la liste (à venir, passées repliées) ou le calendrier d'un mois."""
+    from ..models import Attendance, Enrollment
+
     record = _course(course_id)
     _may_view_course(record)
+    today = date.today()
+    lessons = record.lessons
+    view = "calendrier" if request.args.get("vue") == "calendrier" else "liste"
+    marks = [a for lesson in lessons for a in lesson.attendance]
+    stats = {
+        "students": sum(1 for e in record.enrollments if e.status == Enrollment.ACTIVE),
+        "done": sum(1 for lesson in lessons if not lesson.cancelled and lesson.day < today),
+        "left": sum(1 for lesson in lessons if not lesson.cancelled and lesson.day >= today),
+        "rate": round(100 * sum(1 for a in marks if a.status in Attendance.ATTENDED) / len(marks)) if marks else None,
+    }
+    calendar_data = None
+    if view == "calendrier":
+        try:
+            year, month = (int(x) for x in request.args.get("mois", "").split("-"))
+            date(year, month, 1)
+        except ValueError:
+            upcoming = next((lesson.day for lesson in lessons if lesson.day >= today), None)
+            anchor = upcoming or (lessons[-1].day if lessons else today)
+            year, month = anchor.year, anchor.month
+        now = datetime.now()
+        events = [
+            planning.from_lesson(lesson, now, link=url_for(".course", course_id=record.id) + f"#s{lesson.id}")
+            for lesson in lessons
+        ]
+        prev_month, next_month = planning.shift_month(year, month, -1), planning.shift_month(year, month, 1)
+        calendar_data = {
+            "weeks": planning.month_layout(year, month, events, now),
+            "title": planning.month_title(year, month),
+            "prev": f"{prev_month[0]}-{prev_month[1]:02d}",
+            "next": f"{next_month[0]}-{next_month[1]:02d}",
+        }
     return render_template(
         "lessons/course.html",
         course=record,
-        lessons=record.lessons,
+        lessons=lessons,
+        upcoming=[lesson for lesson in lessons if lesson.day >= today],
+        past=[lesson for lesson in lessons if lesson.day < today],
+        view=view,
+        stats=stats,
+        calendar=calendar_data,
         edit=service.can_edit(current_user, record),
         manager=service.is_manager(current_user),
-        today=date.today(),
+        today=today,
         teachers=catalog.teachers_for(record.season) if service.is_manager(current_user) else [],
         summary=attendance_service.summary,
     )
@@ -365,13 +404,23 @@ def roll(lesson_id):
             if service.is_manager(current_user):
                 return redirect(url_for(".course", course_id=lesson.course_id))
             return redirect(url_for(".mine"))
+    teacher = service.teacher_of(current_user)
     return render_template(
         "lessons/roll.html",
         lesson=lesson,
         rows=rows,
+        notices=attendance_service.notices(lesson),
         allowed=allowed,
         reason=reason,
         statuses=attendance_service.Attendance.STATUSES,
+        # Le nom mène à la fiche que la personne peut ouvrir : la fiche élève du professeur, ou l'annuaire.
+        student_link=(
+            (lambda person: url_for("directory.person", person_id=person.id))
+            if can(current_user, "directory.view")
+            else (lambda person: url_for("enrollment.my_student", person_id=person.id, saison=lesson.course.season_id))
+            if teacher is not None and teacher == lesson.course.teacher
+            else (lambda person: None)
+        ),
     )
 
 

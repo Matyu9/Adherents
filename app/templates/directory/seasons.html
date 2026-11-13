@@ -14,7 +14,7 @@
   <tbody>
   {% for s in seasons %}
   <tr>
-    <td data-label="Saison"><strong>{{ s.label }}</strong>{% if current and current.id == s.id %} <span class="badge badge-ok">en cours</span>{% endif %}</td>
+    <td data-label="Saison"><strong>{{ s.label }}</strong>{% if current and current.id == s.id %} <span class="badge badge-ok">en cours</span>{% endif %}{% if s.hidden %} <span class="badge">en préparation</span>{% endif %}</td>
     <td data-label="Dates"><small>du {{ s.starts_on | date_fr }} au {{ s.ends_on | date_fr }}</small></td>
     <td data-label="Adhésions">{{ counts.get(s.id, 0) }}</td>
     <td data-label="Cours">{% if can(current_user, "catalog.view") %}<a href="{{ url_for('catalog.index', saison=s.id) }}">{{ courses.get(s.id, 0) }}</a>{% else %}{{ courses.get(s.id, 0) }}{% endif %}</td>

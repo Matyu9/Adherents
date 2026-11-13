@@ -742,7 +742,7 @@ def test_heure_de_passage_chez_le_professeur_et_la_famille(client, lessons):
     lessons["anne"].account = account
     db.session.commit()
     login(client, account)
-    html = page(client.get("/mon-espace"))
+    html = page(client.get("/ma-famille"))
     assert "Mercredi 17:00-17:30" in html and "Mercredi 18:00-18:30" in html
 
 
@@ -970,7 +970,7 @@ def test_attente_visible_dans_mon_espace(client, full):
     full["chloe"].person.account = account
     db.session.commit()
     login(client, account)
-    html = page(client.get("/mon-espace"))
+    html = page(client.get("/ma-famille"))
     assert 'Flûte <span class="badge">liste d\'attente</span>' in html
 
 

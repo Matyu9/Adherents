@@ -82,7 +82,7 @@ Sur la page du cours, les élèves sont rangés par heure de passage, ceux sans 
 - deux élèves qui se chevauchent (un passage qui finit à 17 h 30 et un qui commence à 17 h 30 ne se gênent pas) ;
 - un élève qui a un autre cours le même jour au même moment.
 
-Le professeur voit l'heure de passage dans **Mes élèves**, rangée dans l'ordre de la journée, et la famille dans **Mon espace**, à la place de l'horaire du créneau.
+Le professeur voit l'heure de passage dans **Mes élèves**, rangée dans l'ordre de la journée, et la famille dans **Ma famille**, à la place de l'horaire du créneau.
 
 **Plus tard :** la durée comme condition des règles de tarif (formule 30 ou 45 minutes).
 
@@ -94,7 +94,7 @@ Table `waitlist_entry` : un cours, une adhésion de la même saison, une **posit
 - **Depuis la page du cours :** le secrétariat ajoute un élève de la saison, change l'ordre (↑ ↓, les rangs sont renumérotés), retire une personne ou l'inscrit à une date choisie.
 - **Une place se libère** (abandon, transfert, effectif maximum relevé, cours rouvert) : les comptes qui ont `enrollment.edit` reçoivent une notification avec le premier de la liste. **Rien n'est inscrit d'office.** Le même effectif ne prévient qu'une fois par jour.
 - Inscrire directement un élève en attente clôt son entrée.
-- La famille voit dans **Mon espace** les cours où ses enfants attendent.
+- La famille voit dans **Ma famille** les cours où ses enfants attendent.
 - La fusion de deux fiches garde les inscriptions (avec leurs dates et heures de passage) et les listes d'attente de la fiche abandonnée.
 
 ## Calendrier et séances
@@ -161,7 +161,7 @@ Une séance **passée** reste affichée, grisée ; une séance **annulée** est 
 
 ## Agenda à s'abonner
 
-Chaque compte peut créer une adresse secrète (`/seances/agenda/<jeton>.ics`), depuis **Mon compte**, **Mon espace** ou **Mes séances**, et l'ajouter à Google Agenda, Apple, Outlook… :
+Chaque compte peut créer une adresse secrète (`/seances/agenda/<jeton>.ics`), depuis **Mon compte**, **Ma famille** ou **Mes séances**, et l'ajouter à Google Agenda, Apple, Outlook… :
 
 - un professeur y trouve ses séances et ses remplacements ;
 - un responsable, les séances des enfants de ses foyers (et les siennes), avec l'heure de passage d'un cours individuel ;
@@ -221,7 +221,7 @@ Table `attendance` : une séance, une inscription, un statut (`present`, `absent
 
 **Absences répétées** (Enseignement → **Absences**, `lesson.manage`) : les élèves qui ont au moins N absences non excusées sur la saison, par cours. Le seuil se règle dans le calendrier et n'a **pas de valeur par défaut** : sans seuil, personne n'est signalé.
 
-**Les familles** voient dans **Mon espace**, pour chaque cours de leurs enfants, le nombre de présences et la date de chaque absence (absent ou excusé). Ce réglage (`attendance_family_visible`) est **actif par défaut** ; l'association peut le couper dans le calendrier.
+**Les familles** voient dans **Ma famille**, pour chaque cours de leurs enfants, le nombre de présences et la date de chaque absence (absent ou excusé). Ce réglage (`attendance_family_visible`) est **actif par défaut** ; l'association peut le couper dans le calendrier.
 
 **Conservation** : l'anonymisation d'une fiche efface ses présences.
 

@@ -47,20 +47,20 @@ def family(world, accounts):
 
 def test_a_parent_sees_his_household(client, family):
     login(client, family["account"])
-    page = client.get("/mon-espace").get_data(as_text=True)
+    page = client.get("/ma-famille").get_data(as_text=True)
     assert "Famille Martin" in page and "1 rue Haute" in page and "Zoé Martin" in page
     assert "Flûte · Cycle 1" in page and "2026-2027" in page
     assert "•••• •••• 0189" in page and IBAN not in page and "3000 6000" not in page
     assert "Droit à l&#39;image" in page
     assert "Durand" not in page and "9 rue Secrète" not in page  # l'autre foyer
-    assert "Mon espace" in client.get("/").get_data(as_text=True)
+    assert "Ma famille" in client.get("/").get_data(as_text=True)
 
 
 def test_one_parent_two_households(client, family):
     directory.add_member(family["other"], family["anne"], "guardian")  # famille recomposée
     db.session.commit()
     login(client, family["account"])
-    page = client.get("/mon-espace").get_data(as_text=True)
+    page = client.get("/ma-famille").get_data(as_text=True)
     assert "Famille Martin" in page and "Famille Durand" in page and "Léa Durand" in page
 
 
@@ -69,20 +69,20 @@ def test_a_dependent_with_an_account_sees_only_his_courses(client, family):
     family["zoe"].account = teen
     db.session.commit()
     login(client, teen)
-    page = client.get("/mon-espace").get_data(as_text=True)
+    page = client.get("/ma-famille").get_data(as_text=True)
     assert "Mes cours" in page and "Flûte · Cycle 1" in page
     assert "0189" not in page and "1 rue Haute" not in page and "Anne" not in page
 
 
 def test_an_account_without_a_record(client, accounts):
     login(client, accounts[Role.ADHERENT])
-    page = client.get("/mon-espace").get_data(as_text=True)
+    page = client.get("/ma-famille").get_data(as_text=True)
     assert "pas encore relié à votre fiche" in page
-    assert "Mon espace" not in client.get("/").get_data(as_text=True)
+    assert "Ma famille" not in client.get("/").get_data(as_text=True)
 
 
 def test_anonymous_is_sent_to_login(client):
-    response = client.get("/mon-espace")
+    response = client.get("/ma-famille")
     assert response.status_code == 302 and "/connexion" in response.location
 
 
@@ -150,7 +150,7 @@ def test_instruments_of_the_children(client, family, inventaire):
         }
     )
     login(client, family["account"])
-    page = client.get("/mon-espace").get_data(as_text=True)
+    page = client.get("/ma-famille").get_data(as_text=True)
     assert "Flûte &lt;b&gt;Yamaha&lt;/b&gt;" in page and "en cours depuis le 2026-09-05" in page
     (request,) = opener.requests
     assert request.full_url.startswith("https://inventaire.test/api/v1/annuaire/prets?personne=")
@@ -164,7 +164,7 @@ def test_inventaire_down(client, family, inventaire):
 
     inventaire(error=urllib.error.URLError("refusé"))
     login(client, family["account"])
-    page = client.get("/mon-espace").get_data(as_text=True)
+    page = client.get("/ma-famille").get_data(as_text=True)
     assert "indisponible pour le moment" in page and "Zoé Martin" in page
 
 
@@ -185,7 +185,7 @@ def test_inventaire_needs_https_and_a_token(app):
 
 def test_no_instrument_section_without_inventaire(client, family):
     login(client, family["account"])
-    assert "Matériel prêté" not in client.get("/mon-espace").get_data(as_text=True)
+    assert "Matériel prêté" not in client.get("/ma-famille").get_data(as_text=True)
 
 
 # ---------------------------------------------------------------------------
@@ -253,7 +253,7 @@ def test_a_teacher_with_an_account_sees_both_spaces(client, family):
     db.session.commit()
     login(client, family["account"])
     home_page = client.get("/").get_data(as_text=True)
-    assert "Mon espace" in home_page and "Mes élèves" in home_page
+    assert "Ma famille" in home_page and "Mes élèves" in home_page
 
 
 def test_enrollment_withdrawn_is_not_listed(client, family):
@@ -261,5 +261,124 @@ def test_enrollment_withdrawn_is_not_listed(client, family):
     membership.enrollments[0].status = Enrollment.WITHDRAWN
     db.session.commit()
     login(client, family["account"])
-    assert "Flûte · Cycle 1" not in client.get("/mon-espace").get_data(as_text=True)
+    assert "Flûte · Cycle 1" not in client.get("/ma-famille").get_data(as_text=True)
     assert db.session.scalar(sa.select(sa.func.count(Membership.id))) == 1
+
+
+# ---------------------------------------------------------------------------
+# Coordonnées modifiées par la famille
+# ---------------------------------------------------------------------------
+
+
+def _allow(*fields):
+    from app.services import options
+
+    options.set_member_editable(fields)
+    db.session.commit()
+
+
+def test_contacts_are_read_only_by_default(client, family):
+    login(client, family["account"])
+    household = family["household"]
+    assert "Modifier nos coordonnées" not in client.get("/ma-famille").get_data(as_text=True)
+    assert client.get(f"/ma-famille/coordonnees/{household.id}").status_code == 404
+
+
+def test_a_parent_updates_address_phones_and_child_email(client, family, accounts):
+    from app.models import Activity, Notification
+
+    _allow("adresse", "telephones", "email")
+    login(client, family["account"])
+    household, anne, zoe = family["household"], family["anne"], family["zoe"]
+    assert "Modifier nos coordonnées" in client.get("/ma-famille").get_data(as_text=True)
+    page = client.get(f"/ma-famille/coordonnees/{household.id}").get_data(as_text=True)
+    assert f'name="p{anne.id}-email"' in page and f'name="p{zoe.id}-email"' in page
+    response = client.post(
+        f"/ma-famille/coordonnees/{household.id}",
+        data={
+            "address_street": "3 rue Neuve",
+            "postal_code": "14000",
+            "city": "Caen",
+            "foyer-label-0": "Maison",
+            "foyer-phone-0": "02 31 00 00 00",
+            f"p{anne.id}-email": anne.email or "",
+            f"p{anne.id}-phone-0": "06 12 34 56 78",
+            f"p{zoe.id}-email": "zoe@famille.test",
+        },
+    )
+    assert response.status_code == 302
+    db.session.expire_all()
+    household = db.session.get(type(household), household.id)
+    assert household.city == "Caen" and [p.number for p in household.phones] == ["+33231000000"]
+    assert db.session.get(type(zoe), zoe.id).email == "zoe@famille.test"
+    assert [p.number for p in db.session.get(type(anne), anne.id).phones] == ["+33612345678"]
+    entry = db.session.scalar(db.select(Activity).filter_by(action="member.contacts"))
+    assert entry.household_id == household.id and "adresse" in entry.message
+    admin_messages = [
+        n.message for n in db.session.scalars(db.select(Notification).filter_by(account_id=accounts[Role.ADMIN].id))
+    ]
+    assert any("coordonnées du foyer" in m for m in admin_messages)
+
+
+def test_only_allowed_fields_change(client, family):
+    _allow("telephones")
+    login(client, family["account"])
+    household, zoe = family["household"], family["zoe"]
+    city = household.city
+    client.post(
+        f"/ma-famille/coordonnees/{household.id}",
+        data={"city": "Ailleurs", f"p{zoe.id}-email": "pirate@x.test", "foyer-phone-0": "0612345678"},
+    )
+    db.session.expire_all()
+    assert db.session.get(type(household), household.id).city == city
+    assert db.session.get(type(zoe), zoe.id).email != "pirate@x.test"
+
+
+def test_contacts_of_another_household_are_out_of_reach(client, family):
+    _allow("adresse")
+    login(client, family["account"])
+    assert client.get(f"/ma-famille/coordonnees/{family['other'].id}").status_code == 404
+    assert client.post(f"/ma-famille/coordonnees/{family['other'].id}", data={"city": "X"}).status_code == 404
+    assert db.session.get(type(family["other"]), family["other"].id).city == "Rouen"
+
+
+def test_bad_phone_is_refused_and_nothing_changes(client, family):
+    _allow("adresse", "telephones")
+    login(client, family["account"])
+    household = family["household"]
+    city = household.city
+    page = client.post(
+        f"/ma-famille/coordonnees/{household.id}", data={"city": "Caen", "foyer-phone-0": "12"}
+    ).get_data(as_text=True)
+    assert "invalide" in page
+    db.session.expire_all()
+    assert db.session.get(type(household), household.id).city == city
+
+
+def test_contacts_go_through_an_open_dossier(client, family):
+    from app.models import Dossier
+
+    _allow("adresse")
+    login(client, family["account"])
+    household = family["household"]
+    from app.services import registration
+
+    dossier = registration.dossier_for(family["campaign"], household, None)
+    db.session.commit()
+    assert dossier.status == Dossier.DRAFT
+    page = client.get(f"/ma-famille/coordonnees/{household.id}").get_data(as_text=True)
+    assert "dans le dossier" in page and 'name="city"' not in page
+    response = client.post(f"/ma-famille/coordonnees/{household.id}", data={"city": "Caen"})
+    assert "dossier d&#39;inscription est en cours" in response.get_data(as_text=True)
+    assert db.session.get(type(household), household.id).city == "Rouen"
+
+
+def test_settings_tab_for_member_fields(client, admin):
+    from app.services import options
+
+    page = client.get("/parametres/adherents").get_data(as_text=True)
+    assert "Adresse postale" in page
+    client.post("/parametres/adherents", data={"fields": ["email", "inconnu"]})
+    assert options.member_editable() == {"email"}
+    client.post("/parametres/adherents", data={})
+    assert options.member_editable() == set() and options.get(options.MEMBER_EDITABLE) is None

@@ -46,3 +46,22 @@ def test_catalogue_is_consistent():
     assert all(rights <= set(PERMISSIONS) for rights in DEFAULT_PERMISSIONS.values())
     keys = [key for _, perms in PERMISSION_GROUPS for key, _ in perms]
     assert len(keys) == len(set(keys))
+
+
+def test_member_view_really_reduces_rights(client, admin):
+    """Vue adhérent : les pages d'administration sont refusées, pas seulement cachées du menu."""
+    assert client.get("/comptes").status_code == 200
+    client.post("/mon-compte/vue-adherent")
+    page = client.get("/").get_data(as_text=True)
+    assert "Vue adhérent" in page and "Revenir à mes droits" in page and 'href="/comptes"' not in page
+    assert client.get("/comptes").status_code == 403
+    assert client.get("/roles").status_code in (403, 404)
+    client.post("/mon-compte/vue-adherent")
+    assert client.get("/comptes").status_code == 200
+    assert "Revenir à mes droits" not in client.get("/").get_data(as_text=True)
+
+
+def test_member_view_is_not_offered_to_members(client, member):
+    assert "Passer en vue adhérent" not in client.get("/").get_data(as_text=True)
+    client.post("/mon-compte/vue-adherent")
+    assert "Revenir à mes droits" not in client.get("/").get_data(as_text=True)

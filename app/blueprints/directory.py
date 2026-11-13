@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
-from wtforms import DateField, EmailField, SelectField, StringField, TextAreaField
+from wtforms import BooleanField, DateField, EmailField, SelectField, StringField, TextAreaField
 from wtforms.validators import DataRequired, Length, Optional, Regexp, ValidationError
 
 from ..extensions import db
@@ -156,6 +156,7 @@ class SeasonForm(FlaskForm):
     )
     starts_on = DateField("Début", validators=[DataRequired()])
     ends_on = DateField("Fin", validators=[DataRequired()])
+    hidden = BooleanField("En préparation : invisible des professeurs et des familles")
 
     def __init__(self, *args, current=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -370,6 +371,10 @@ def person(person_id):
         season_count=len(directory.seasons()),
         account_problem=directory.account_problems(person) if can_account else None,
         needs_consent=directory.needs_guardian_consent(person),
+        account_suggestions=directory.account_suggestions(person) if can_account and not person.account else [],
+        account_status=accounts_service.status_of(person.account) if person.account else None,
+        account_statuses=accounts_service.STATUSES,
+        account_managed=bool(person.account) and accounts_service.can_manage(current_user, person.account),
     )
 
 
@@ -662,6 +667,54 @@ def create_account(person_id):
     from .accounts import _grant_access
 
     return _grant_access(account)
+
+
+@bp.route("/personnes/<int:person_id>/connexion", methods=["POST"])
+@require("account.manage")
+@require("directory.edit")
+def set_login(person_id):
+    """Case « Peut se connecter » de la fiche : cochée, le compte est créé et invité (ou rétabli s'il était coupé) ;
+    décochée, il est coupé, jamais supprimé."""
+    from .accounts import cut_account, restore_account
+
+    person = _person(person_id)
+    wanted = request.form.get("connexion") == "1"
+    back = redirect(url_for(".person", person_id=person.id) + "#compte")
+    account = person.account
+    if account is None:
+        return create_account(person_id) if wanted else back
+    if not accounts_service.can_manage(current_user, account):
+        abort(403)
+    if wanted and not account.active:
+        restore_account(account)
+    elif not wanted and account.active:
+        cut_account(account)
+    return back
+
+
+@bp.route("/personnes/<int:person_id>/compte/rattacher", methods=["POST"])
+@require("account.manage")
+@require("directory.edit")
+def attach_account(person_id):
+    """Rattache à la fiche un compte existant sans fiche, choisi parmi les propositions ou par son email."""
+    person = _person(person_id)
+    account = None
+    if account_id := request.form.get("account_id", type=int):
+        account = db.session.get(Account, account_id)
+    elif email := (request.form.get("email") or "").strip().lower():
+        account = db.session.scalar(db.select(Account).filter_by(email=email))
+    if account is None:
+        flash("Aucun compte à cette adresse.", "error")
+        return redirect(url_for(".person", person_id=person.id) + "#compte")
+    try:
+        directory.link(account, person)
+    except DirectoryError as exc:
+        flash(str(exc), "error")
+    else:
+        log("account.link", f"Compte {account.email} rattaché à la fiche de {person.full_name}", target=account, person=person)
+        db.session.commit()
+        flash(f"Compte {account.email} rattaché à la fiche.", "success")
+    return redirect(url_for(".person", person_id=person.id) + "#compte")
 
 
 @bp.route("/personnes/<int:person_id>/compte/detacher", methods=["POST"])
@@ -1125,7 +1178,9 @@ def seasons():
 def create_season():
     form = SeasonForm()
     if form.validate_on_submit():
-        season = Season(label=form.label.data, starts_on=form.starts_on.data, ends_on=form.ends_on.data)
+        season = Season(
+            label=form.label.data, starts_on=form.starts_on.data, ends_on=form.ends_on.data, hidden=form.hidden.data
+        )
         db.session.add(season)
         db.session.flush()
         if directory.current_season() is None:
@@ -1145,8 +1200,13 @@ def edit_season(season_id):
     if form.validate_on_submit():
         changes = diff(
             season,
-            ("label", "starts_on", "ends_on"),
-            {"label": form.label.data, "starts_on": form.starts_on.data, "ends_on": form.ends_on.data},
+            ("label", "starts_on", "ends_on", "hidden"),
+            {
+                "label": form.label.data,
+                "starts_on": form.starts_on.data,
+                "ends_on": form.ends_on.data,
+                "hidden": form.hidden.data,
+            },
         )
         if changes:
             log("season.update", f"Saison modifiée : {season.label}", changes=changes)
@@ -1192,19 +1252,6 @@ def delete_season(season_id):
 # ---------------------------------------------------------------------------
 
 
-@bp.route("/rattachement")
-@require("account.manage")
-@require("directory.edit")
-def link_accounts():
-    rows = [(account, directory.suggestions(account)) for account in directory.unlinked_accounts()]
-    return render_template(
-        "directory/link_accounts.html",
-        rows=rows,
-        status_of=accounts_service.status_of,
-        statuses=accounts_service.STATUSES,
-    )
-
-
 @bp.route("/rattachement/<int:account_id>", methods=["POST"])
 @require("account.manage")
 @require("directory.edit")
@@ -1224,9 +1271,9 @@ def link_account(account_id):
         )
         db.session.commit()
         flash(f"Compte de {account.full_name} rattaché à sa fiche.", "success")
-    return redirect(
-        request.form.get("next") == "fiche" and url_for(".person", person_id=person.id) or url_for(".link_accounts")
-    )
+    if request.form.get("next") == "fiche":
+        return redirect(url_for(".person", person_id=person.id))
+    return redirect(url_for("accounts.detail", account_id=account.id))
 
 
 @bp.route("/rattachement/<int:account_id>/fiche", methods=["POST"])
@@ -1238,7 +1285,7 @@ def person_from_account(account_id):
         person = directory.person_from_account(account)
     except DirectoryError as exc:
         flash(str(exc), "error")
-        return redirect(url_for(".link_accounts"))
+        return redirect(url_for("accounts.detail", account_id=account.id))
     db.session.flush()
     log("person.create", f"Fiche créée depuis le compte {account.email}", target=account, person=person)
     db.session.commit()

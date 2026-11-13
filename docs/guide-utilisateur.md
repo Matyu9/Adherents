@@ -8,7 +8,7 @@ Pour le fonctionnement interne, voir [annuaire.md](annuaire.md), [catalogue.md](
 
 - [Pour les familles](#pour-les-familles)
   - [Se connecter](#se-connecter)
-  - [Mon espace](#mon-espace)
+  - [Accueil et Ma famille](#accueil-et-ma-famille)
   - [Inscrire ou réinscrire ses enfants](#inscrire-ou-réinscrire-ses-enfants)
   - [Nouvelle famille : s'inscrire sans compte](#nouvelle-famille--sinscrire-sans-compte)
 - [Pour les professeurs](#pour-les-professeurs)
@@ -44,11 +44,13 @@ Le compte est créé par le secrétariat, depuis votre fiche d'adhérent. Vous r
 - **Mot de passe oublié ?** Le lien sous le formulaire de connexion envoie un email de réinitialisation.
 - Le même compte ouvre les autres applis de l'association, comme l'Inventaire.
 
-Si, une fois connecté, **Mon espace** n'apparaît pas dans le menu, votre compte n'est pas encore relié à votre fiche : contactez le secrétariat.
+Si, une fois connecté, **Ma famille** n'apparaît pas dans le menu, votre compte n'est pas encore relié à votre fiche : contactez le secrétariat.
 
-### Mon espace
+### Accueil et Ma famille
 
-**Menu → Mon espace.** On y trouve ce que l'association sait de votre foyer :
+**Menu → Accueil** montre ce qui compte maintenant : les séances des 7 prochains jours (les vôtres et celles de vos enfants), les inscriptions ouvertes et les dernières notifications non lues. Un administrateur y voit aussi le nombre de personnes connectées.
+
+**Menu → Ma famille.** On y trouve ce que l'association sait de votre foyer. Si l'association l'autorise, **Modifier nos coordonnées** met à jour l'adresse, les téléphones ou les emails (les vôtres et ceux de vos enfants), sauf pendant un dossier d'inscription en cours. Le secrétariat en est prévenu. Vous y trouvez :
 
 - l'**adresse** et les **téléphones** du foyer ;
 - le **prélèvement** : vos coordonnées bancaires, masquées (seuls les quatre derniers chiffres de l'IBAN), et si un mandat est signé ;
@@ -93,7 +95,7 @@ Pour ajouter un enfant, ou vous inscrire vous-même, utilisez **+ Ajouter un él
 
 - Le secrétariat relit le dossier. Vous êtes prévenu(e) par une notification, et par email si l'envoi d'emails est configuré.
 - S'il manque quelque chose, le dossier revient **à corriger**, avec un message : corrigez, puis renvoyez-le.
-- Une fois **validé**, l'inscription est enregistrée et apparaît dans Mon espace.
+- Une fois **validé**, l'inscription est enregistrée et apparaît dans Ma famille.
 
 Un dossier envoyé ne se modifie plus, sauf s'il vous est renvoyé. Après la clôture de la campagne, il ne se modifie plus du tout : contactez le secrétariat.
 
@@ -107,7 +109,7 @@ Si la campagne accueille les nouvelles familles, le secrétariat diffuse l'adres
 
 Le lien sert autant de fois que nécessaire pendant 30 jours. Si vous en redemandez un, c'est le nouveau qui compte : l'ancien ne sert plus. Pas d'email après quelques minutes ? Regardez dans les courriers indésirables, puis recommencez.
 
-Une fois le dossier validé, le secrétariat peut vous créer un compte pour accéder à Mon espace.
+Une fois le dossier validé, le secrétariat peut vous créer un compte pour accéder à Ma famille.
 
 ---
 
@@ -117,7 +119,7 @@ Une fois le dossier validé, le secrétariat peut vous créer un compte pour acc
 
 Pour la saison en cours, ou une autre choisie en haut à droite, la page liste **vos cours** et, pour chacun, **les élèves inscrits**, leur âge et leurs **responsables** (nom, téléphone, email), pour les joindre.
 
-Vous ne voyez que vos élèves, et rien d'autre de l'annuaire. Un professeur qui est aussi parent retrouve son foyer dans **Mon espace**.
+Vous ne voyez que vos élèves, et rien d'autre de l'annuaire. Un professeur qui est aussi parent retrouve son foyer dans **Ma famille**.
 
 **Menu → Mon planning** : vos séances en semaine ou en mois, comme un agenda.
 
@@ -141,7 +143,7 @@ Le rôle **Gestionnaire** gère l'annuaire, le catalogue et les inscriptions. Il
 
 ### Les saisons
 
-**Annuaire → Saisons.** Une saison (« 2027-2028 ») a une date de début et de fin.
+**Administration → Saisons.** Une saison (« 2027-2028 ») a une date de début et de fin. Cochez **En préparation** pour la cacher aux professeurs et aux familles le temps de la préparer : seuls ceux qui ont accès au catalogue ou à l'annuaire la voient.
 
 - **La saison en cours se choisit à la main** (**Mettre en cours**), elle ne dépend pas de la date : la réinscription à la saison suivante s'ouvre pendant que l'actuelle tourne encore.
 - Une saison qui a des adhésions, des cours ou des campagnes ne se supprime pas.
@@ -204,7 +206,7 @@ Un cours complet accepte quand même l'élève, avec un avertissement.
 
 **Liste d'attente.** Quand un cours est complet, la famille peut demander la liste d'attente dans son dossier, et le secrétariat peut y ajouter un élève depuis la page du cours. L'ordre se change avec ↑ et ↓. Quand une place se libère, vous recevez une notification : rien n'est fait d'office, c'est vous qui inscrivez la personne (**Inscrire**, avec la date de son premier cours) ou qui la retirez.
 
-**Cours individuel.** Sur la page du cours, chaque ligne a une heure de passage et une durée. Les élèves se rangent dans l'ordre de la journée et les plages libres s'affichent en haut. Un passage qui déborde du créneau, qui chevauche celui d'un autre élève ou un autre cours du même élève est signalé en rouge. Le professeur voit ces heures dans **Mes élèves**, la famille dans **Mon espace**.
+**Cours individuel.** Sur la page du cours, chaque ligne a une heure de passage et une durée. Les élèves se rangent dans l'ordre de la journée et les plages libres s'affichent en haut. Un passage qui déborde du créneau, qui chevauche celui d'un autre élève ou un autre cours du même élève est signalé en rouge. Le professeur voit ces heures dans **Mes élèves**, la famille dans **Ma famille**.
 
 **La cotisation n'est jamais recalculée toute seule.** Si celle du foyer était déjà calculée, elle est marquée **à revoir** dans **Tarifs → Cotisations**, avec la liste des changements. Recalculez-la, ou indiquez qu'il n'y a rien à changer.
 
@@ -227,7 +229,7 @@ Un cours complet accepte quand même l'élève, avec un avertissement.
 
 ### Préparer une nouvelle saison
 
-1. **Annuaire → Saisons → + Nouvelle saison** (sans la mettre en cours).
+1. **Administration → Saisons → + Nouvelle saison** (sans la mettre en cours).
 2. **Catalogue → Copier une saison** : choisissez la saison d'origine et la nouvelle. L'aperçu montre ce qui sera repris, laissé de côté ou à compléter, **sans rien écrire**.
    - un cours d'une discipline archivée n'est pas recopié ;
    - un niveau ou une salle archivés sont laissés vides ;
@@ -305,9 +307,9 @@ L'administrateur a tous les droits. Les sections ci-dessous concernent ce qui lu
 
 ### Comptes des familles
 
-- **Créer un compte** : depuis la fiche d'un adulte qui a une adresse email, **Créer son compte et l'inviter**. La personne reçoit l'invitation par email. Pour un élève de 16 ou 17 ans, confirmez qu'un responsable légal a donné son accord.
-- **Relier les comptes existants** : **Annuaire → Rattachement** propose, pour chaque compte sans fiche, les fiches qui lui ressemblent (même email, même nom). Vérifiez avant de valider : l'email seul ne suffit pas, une adresse est souvent partagée dans une famille.
-- Tant qu'un compte n'est pas relié à la fiche d'un responsable, la famille ne voit ni **Mon espace** ni son dossier d'inscription.
+- **Peut se connecter** : sur la fiche d'un adulte qui a une adresse email, cochez la case. Le compte est créé et la personne reçoit l'invitation par email. Décocher la case coupe l'accès sans supprimer le compte ; la recocher le rétablit. Avant 16 ans, la case est grisée et la raison s'affiche ; pour un élève de 16 ou 17 ans, cochez d'abord l'accord du responsable légal.
+- **Relier un compte existant** : la fiche propose les comptes sans fiche qui lui ressemblent (même email, même nom), avec **C'est son compte** ; **Rattacher un autre compte existant** cherche par email. Dans l'autre sens, la page d'un compte sans fiche propose les fiches qui lui ressemblent, et **Comptes → Sans fiche dans l'annuaire** les liste tous. Vérifiez avant de valider : l'email seul ne suffit pas, une adresse est souvent partagée dans une famille.
+- Tant qu'un compte n'est pas relié à la fiche d'un responsable, la famille ne voit ni **Ma famille** ni son dossier d'inscription.
 
 ### Professeurs et contrats
 
@@ -324,7 +326,7 @@ Voir et modifier les IBAN demande le droit « Voir et modifier les coordonnées 
 
 ### Relier l'Inventaire à l'espace adhérent
 
-Pour que les familles voient le matériel prêté dans **Mon espace**, à faire une fois :
+Pour que les familles voient le matériel prêté dans **Ma famille**, à faire une fois :
 
 1. **Ici, Applications → Inventaire → Modifier** : cochez « Peut récupérer la liste des comptes… ». L'Inventaire peut alors lire la liste des personnes de l'annuaire (nom, année de naissance, sans email ni adresse).
 2. **Dans l'Inventaire, Personnes → Rattacher à l'annuaire → Récupérer les personnes depuis Adhérents.** Chaque fiche de l'Inventaire (élève, musicien) est reliée à sa personne d'Adhérents. Seule une fiche déjà reliée au même compte de connexion est cochée d'office ; **un même nom ne suffit pas** : vérifiez (année de naissance, pupitre, classe) avant de cocher.
@@ -335,7 +337,7 @@ Refaites l'étape 2 quand de nouveaux élèves arrivent : les fiches déjà reli
 
 ### Conservation des données
 
-**Annuaire → Conservation** (droit « Fixer la durée de conservation et anonymiser »).
+**Paramètres → Données personnelles** (droit « Fixer la durée de conservation et anonymiser »).
 
 1. **Fixez la durée**, en saisons. Tant qu'elle n'est pas choisie, rien n'est proposé : c'est une décision de l'association, à inscrire au registre des traitements.
 2. L'écran liste alors les **personnes à anonymiser** : sans adhésion depuis ce nombre de saisons, sans compte, sans profil de professeur, et dont aucun membre du foyer n'a d'adhésion récente.
@@ -370,7 +372,7 @@ Le même écran supprime les **anciens dossiers d'inscription** des campagnes tr
 
 | Action | Famille | Professeur | Gestionnaire | Administrateur |
 |---|:-:|:-:|:-:|:-:|
-| Mon espace, son dossier d'inscription | ✓ | ✓ (s'il est parent) | ✓ (s'il est parent) | ✓ (s'il est parent) |
+| Ma famille, son dossier d'inscription | ✓ | ✓ (s'il est parent) | ✓ (s'il est parent) | ✓ (s'il est parent) |
 | Mes élèves | | ✓ | | |
 | Annuaire : consulter, modifier, fusionner | | | ✓ | ✓ |
 | Catalogue : consulter, modifier, copier une saison | | | ✓ | ✓ |
@@ -400,6 +402,6 @@ Ce tableau décrit les rôles de base. Les droits de chaque rôle se cochent dan
 
 **Le dossier d'une nouvelle famille concerne une famille déjà connue.** Validez-le, puis fusionnez les fiches et les foyers en double depuis l'annuaire : adhésions, cours, consentements et dossiers suivent.
 
-**Mon espace dit « Matériel prêté : indisponible ».** L'Inventaire ne répond pas, ou le jeton n'est plus valable. Le reste de la page marche ; voir [Relier l'Inventaire](#relier-linventaire-à-lespace-adhérent).
+**Ma famille dit « Matériel prêté : indisponible ».** L'Inventaire ne répond pas, ou le jeton n'est plus valable. Le reste de la page marche ; voir [Relier l'Inventaire](#relier-linventaire-à-lespace-adhérent).
 
 **Un matériel prêté n'apparaît pas.** La fiche de l'élève dans l'Inventaire n'est pas encore reliée à l'annuaire (**Personnes → Rattacher à l'annuaire**, dans l'Inventaire), ou le prêt n'est pas une garde validée ou en cours.

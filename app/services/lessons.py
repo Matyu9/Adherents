@@ -548,8 +548,11 @@ def _announce(lesson, message, user, by_teacher):
 # ---------------------------------------------------------------------------
 
 
-def upcoming_for(teacher, start, end):
-    """Séances du professeur (ses cours et ses remplacements) entre deux dates, dans l'ordre."""
+def upcoming_for(teacher, start, end, include_hidden=True):
+    """Séances du professeur (ses cours et ses remplacements) entre deux dates, dans l'ordre. `include_hidden` :
+    aussi celles des saisons en préparation."""
+    from ..models import Season
+
     query = (
         db.select(Lesson)
         .join(Course)
@@ -560,6 +563,8 @@ def upcoming_for(teacher, start, end):
         )
         .order_by(Lesson.day, Lesson.starts_at)
     )
+    if not include_hidden:
+        query = query.where(Course.season.has(Season.hidden.is_(False)))
     return db.session.scalars(query).all()
 
 
@@ -600,18 +605,22 @@ def personal_lessons(account, start, end):
     """[(séance, début, fin, pour qui)] d'un compte entre deux dates : ses séances de professeur (pour qui :
     « remplacement » s'il remplace, sinon None), puis celles des élèves qu'il suit (pour qui : l'inscription), avec
     l'heure de passage d'un cours individuel."""
+    from .directory import sees_hidden_seasons
     from .registration import guarded_households
 
     found = []
     person = account.person
+    hidden_ok = sees_hidden_seasons(account)
     if person is not None and person.teacher is not None:
-        for lesson in upcoming_for(person.teacher, start, end):
+        for lesson in upcoming_for(person.teacher, start, end, include_hidden=hidden_ok):
             who = "remplacement" if lesson.substitute == person.teacher else None
             found.append((lesson, lesson.starts_at, lesson.ends_at, who))
     people = {person.id} if person is not None else set()
     for household in guarded_households(account):
         people |= {link.person_id for link in household.dependents}
     for enrollment in attending_enrollments(people):
+        if enrollment.course.season.hidden and not hidden_ok:
+            continue
         for lesson in enrollment.course.lessons:
             if start <= lesson.day <= end and enrollment.attends_on(lesson.day):
                 begin, finish = student_times(enrollment, lesson)

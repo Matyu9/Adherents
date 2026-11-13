@@ -8,6 +8,8 @@
     {{ form.hidden_tag() }}
     {{ field(form.label, placeholder="2026-2027") }}
     <div class="grid"><div>{{ field(form.starts_on) }}</div><div>{{ field(form.ends_on) }}</div></div>
+    <label class="form-check">{{ form.hidden() }} {{ form.hidden.label.text }}</label>
+    <small class="muted">Le temps de préparer la saison : seuls ceux qui ont accès au catalogue ou à l'annuaire la voient. Les campagnes d'inscription ouvertes restent visibles des familles.</small>
     <button type="submit">Enregistrer</button>
   </form>
   <p class="small"><a href="{{ url_for('directory.seasons') }}">Annuler</a></p>

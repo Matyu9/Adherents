@@ -18,6 +18,10 @@
     <option value="">Tous les statuts</option>
     {% for key, label in statuses.items() %}<option value="{{ key }}" {{ "selected" if status == key }}>{{ label }}</option>{% endfor %}
   </select>
+  <select name="fiche" aria-label="Fiche de l'annuaire" data-autosubmit>
+    <option value="">Avec ou sans fiche</option>
+    <option value="sans" {{ "selected" if without_person }}>Sans fiche dans l'annuaire</option>
+  </select>
   {% if all_groups %}
   <select name="groupe" aria-label="Groupe" data-autosubmit>
     <option value="">Tous les groupes</option>

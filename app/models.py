@@ -12,6 +12,9 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from .extensions import db, login_manager
 
+# Clé de session de la vue adhérent (voir Account.member_view).
+MEMBER_VIEW_KEY = "vue_adherent"
+
 
 class TimestampMixin:
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now, server_default=func.now())
@@ -136,7 +139,14 @@ class Account(UserMixin, TimestampMixin, db.Model):
 
     @property
     def is_admin(self):
-        return self.role == Role.ADMIN
+        return self.role == Role.ADMIN and not self.member_view
+
+    @property
+    def member_view(self):
+        """Vue adhérent activée par ce compte pour sa session : ses droits sont alors ceux d'un adhérent."""
+        from flask import has_request_context, session
+
+        return has_request_context() and session.get(MEMBER_VIEW_KEY) == self.id
 
     @property
     def totp_enabled(self):
@@ -603,6 +613,8 @@ class Season(db.Model):
     # Reprise et fin des cours ; vides : les dates de la saison. Voir docs/cours.md.
     lessons_from = db.Column(db.Date)
     lessons_until = db.Column(db.Date)
+    # En préparation : invisible pour qui n'a pas accès au catalogue (professeurs, familles), le temps de la préparer.
+    hidden = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
 
     breaks = db.relationship(
         "SeasonBreak", back_populates="season", cascade="all, delete-orphan", order_by="SeasonBreak.starts_on"

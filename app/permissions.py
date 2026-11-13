@@ -108,7 +108,13 @@ def can(user, action):
         raise KeyError(f"Permission inconnue : {action}")
     if user is None or not getattr(user, "is_authenticated", False):
         return False
-    return action in permissions_of(user.role)
+    role = H if getattr(user, "member_view", False) else user.role
+    return action in permissions_of(role)
+
+
+def has_staff_rights(user):
+    """Le rôle réel du compte donne au moins un droit : la vue adhérent a un sens pour lui."""
+    return bool(user is not None and getattr(user, "is_authenticated", False) and permissions_of(user.role))
 
 
 def require(action):

@@ -422,7 +422,12 @@ def mine():
     if teacher is None:
         abort(404)
     today = date.today()
-    rows = service.upcoming_for(teacher, today - timedelta(days=7), today + timedelta(weeks=8))
+    rows = service.upcoming_for(
+        teacher,
+        today - timedelta(days=7),
+        today + timedelta(weeks=8),
+        include_hidden=directory.sees_hidden_seasons(current_user),
+    )
     return render_template(
         "lessons/mine.html",
         teacher=teacher,

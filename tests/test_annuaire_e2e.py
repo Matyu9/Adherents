@@ -131,7 +131,6 @@ def test_directory_pages_have_no_violation(session, scheme):
         "/annuaire",
         "/annuaire/foyers",
         "/annuaire/saisons",
-        "/annuaire/rattachement",
         "/annuaire/personnes/nouvelle",
         "/annuaire/foyers/nouveau",
         "/annuaire/saisons/nouvelle",

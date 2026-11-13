@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "partials/_icons.html" import icon %}
-{% block title %}Tableau de bord{% endblock %}
+{% block title %}Accueil{% endblock %}
 {% block content %}
 <div class="hello">
   <h1>Bonjour {{ current_user.first_name }}</h1>
@@ -12,15 +12,44 @@
   <div class="stat card">{{ icon("key") }}<span class="stat-value">{{ stats.sessions }}</span><span class="stat-label">Sessions ouvertes</span></div>
 </div>
 {% endif %}
-<section class="card">
-  <h2>{{ icon("clipboard", 18) }} Inscriptions</h2>
-  {% for campaign, household, dossier in dossiers %}
-  <p>{{ campaign.title }}{% if household %} · {{ household.name }}{% endif %} :
-    {% if dossier %}<a href="{{ url_for('enrollment.dossier', uuid=dossier.uuid) }}">{{ dossier.status_label | lower }}</a>
-    {% else %}<a href="{{ url_for('enrollment.index') }}">dossier à commencer</a>{% endif %}
-    <small class="muted">jusqu'au {{ campaign.closes_at | datetime_fr }}</small></p>
-  {% else %}
-  <p class="empty">Aucune campagne d'inscription ouverte pour le moment.</p>
-  {% endfor %}
-</section>
+<div class="detail-grid">
+  {% if upcoming or current_user.person %}
+  <section class="card">
+    <h2>{{ icon("calendar", 18) }} Prochaines séances</h2>
+    {% if upcoming %}
+    <ul class="plain-list upcoming">
+      {% for r in upcoming %}{% set l = r.lesson %}
+      <li{% if l.cancelled %} class="cancelled"{% endif %}>
+        <strong>{{ l.day | date_fr }}</strong> {{ r.begin.strftime("%H:%M") }}-{{ r.end.strftime("%H:%M") }} ·
+        {% if r.student %}{{ r.student }} · {% endif %}{{ l.course.title }}
+        {% if l.room %}<small class="muted">{{ l.room.label }}</small>{% endif %}
+        {% if l.cancelled %}<span class="badge">annulée</span>{% elif r.substitute %}<span class="badge">remplacement</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="empty">Aucune séance dans les {{ days }} prochains jours.</p>{% endif %}
+    <p class="small"><a href="{{ url_for('lessons.my_planning') }}">Mon planning</a></p>
+  </section>
+  {% endif %}
+  <section class="card">
+    <h2>{{ icon("clipboard", 18) }} Inscriptions</h2>
+    {% for campaign, household, dossier in dossiers %}
+    <p>{{ campaign.title }}{% if household %} · {{ household.name }}{% endif %} :
+      {% if dossier %}<a href="{{ url_for('enrollment.dossier', uuid=dossier.uuid) }}">{{ dossier.status_label | lower }}</a>
+      {% else %}<a href="{{ url_for('enrollment.index') }}">dossier à commencer</a>{% endif %}
+      <small class="muted">jusqu'au {{ campaign.closes_at | datetime_fr }}</small></p>
+    {% else %}
+    <p class="empty">Aucune campagne d'inscription ouverte pour le moment.</p>
+    {% endfor %}
+  </section>
+  {% if notifications %}
+  <section class="card">
+    <h2>{{ icon("bell", 18) }} Nouveautés</h2>
+    <ul class="plain-list">
+      {% for n in notifications %}<li><small class="muted">{{ n.created_at | datetime_fr }}</small><br>{% if n.link %}<a href="{{ n.link }}">{{ n.message }}</a>{% else %}{{ n.message }}{% endif %}</li>{% endfor %}
+    </ul>
+    <p class="small"><a href="{{ url_for('notifications.index') }}">Toutes les notifications</a></p>
+  </section>
+  {% endif %}
+</div>
 {% endblock %}

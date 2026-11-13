@@ -47,6 +47,7 @@ ACCESS = {
     "oidc.directory": PUBLIC,
     "oidc.persons": PUBLIC,
     "member.index": LOGGED_IN,
+    "member.contacts_form": LOGGED_IN,
     **{
         f"applications.{name}": CLIENTS
         for name in (
@@ -65,6 +66,7 @@ ACCESS = {
     "auth.logout": LOGGED_IN,
     "auth.password": LOGGED_IN,
     "dashboard.index": LOGGED_IN,
+    "dashboard.old_member_space": LOGGED_IN,
     "account.index": LOGGED_IN,
     "account.display": LOGGED_IN,
     "account.revoke_session": LOGGED_IN,
@@ -76,6 +78,9 @@ ACCESS = {
     "account.totp_disable": LOGGED_IN,
     "notifications.index": LOGGED_IN,
     "notifications.mark_all_read": LOGGED_IN,
+    "notifications.dismiss": LOGGED_IN,
+    "notifications.dismiss_read": LOGGED_IN,
+    "account.member_view": LOGGED_IN,
     "journal.index": JOURNAL,
     **{
         f"accounts.{name}": ACCOUNTS
@@ -105,6 +110,7 @@ ACCESS = {
     "settings.test_email": SETTINGS,
     "settings.run_tasks": SETTINGS,
     "settings.revoke_sessions": SETTINGS,
+    "settings.members": SETTINGS,
     "health.as_json": HIDDEN,
     "health.page": HIDDEN,
     **{f"directory.{name}": DIR_VIEW for name in ("index", "person", "households", "household")},
@@ -283,7 +289,7 @@ ACCESS = {
     "directory.leave_secure": LOGGED_IN,
     **{
         f"directory.{name}": LINKING
-        for name in ("create_account", "unlink_account", "link_accounts", "link_account", "person_from_account")
+        for name in ("create_account", "set_login", "attach_account", "unlink_account", "link_account", "person_from_account")
     },
 }
 HOLDERS = {
@@ -346,6 +352,7 @@ ARGUMENTS = {
     "entry_id": 999,
     "lesson_id": 999,
     "break_id": 999,
+    "notification_id": 999,
     "direction": "monter",
 }
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
@@ -710,7 +717,6 @@ def test_crawl_every_link(app, rich, who):
     assert ("/applications" in seen) == (who == A)
     assert ("/annuaire" in seen) == (who in (A, G)) and ("/annuaire/foyers" in seen) == (who in (A, G))
     assert ("/annuaire/saisons" in seen) == (who in (A, G))
-    assert ("/annuaire/rattachement" in seen) == (who == A)
     assert ("/professeurs" in seen) == (who == A) and any(p.startswith("/professeurs/") for p in seen) == (who == A)
     assert any(p.startswith("/annuaire/personnes/") for p in seen) == (who in (A, G))
     assert any(p.endswith("/afficher") for p in seen) == (who == A)
@@ -731,7 +737,7 @@ def test_crawl_every_link(app, rich, who):
     assert ("/campagnes" in seen) == (who in (A, G))
     assert any(p.startswith("/campagnes/dossiers/") for p in seen) == (who in (A, G))
     assert any(p.startswith("/inscription/dossier/") for p in seen) == (who == H)  # le compte d'Anne, responsable
-    assert ("/mon-espace" in seen) == (who == H)
+    assert ("/ma-famille" in seen) == (who == H)
     assert ("/tarifs" in seen) == (who in (A, G)) and any(p.startswith("/tarifs/regles/") for p in seen) == (
         who in (A, G)
     )

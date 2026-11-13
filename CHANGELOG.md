@@ -4,6 +4,15 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ## Non publié
 
+### Changé : retours du tour complet, menu, comptes et accueil
+
+- **Menu** : Saisons passe dans Administration. Conservation devient l'onglet **Données personnelles** des Paramètres, qui ont maintenant des onglets (Général, Adhérents, Données personnelles, État de l'installation).
+- **Connexion depuis la fiche** : une case **Peut se connecter** crée et invite le compte, le coupe ou le rétablit. La page Rattachement disparaît : la fiche propose les comptes qui lui ressemblent, la page d'un compte sans fiche propose les fiches, et Comptes a un filtre « Sans fiche dans l'annuaire ».
+- **Vue adhérent** : depuis le menu du compte, un administrateur ou un gestionnaire voit l'appli avec les seuls droits d'un adhérent (les pages d'administration sont refusées), avec un bandeau pour revenir.
+- **Accueil** (ex-Tableau de bord) : séances des 7 prochains jours, inscriptions, notifications non lues. **Ma famille** remplace Mon espace (l'ancienne adresse redirige).
+- **Coordonnées modifiables par les familles** en cours d'année, au choix dans Paramètres → Adhérents (adresse, téléphones, emails) : appliquées tout de suite, notées au journal, secrétariat prévenu ; pendant un dossier en cours, tout passe par le dossier.
+- **Saison en préparation** : cachée aux professeurs et aux familles (Mes séances, Mes élèves, plannings, agendas) tant qu'elle n'est pas prête. Migration `a0000015preparation`.
+
 ### Changé : retours du tour complet, corrections rapides
 
 - **Saison retenue** : la saison choisie dans le catalogue, les tarifs, le calendrier, l'annuaire ou Mes élèves reste la même en passant d'une page à l'autre, jusqu'à la déconnexion.

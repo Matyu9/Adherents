@@ -659,3 +659,39 @@ def test_ecran_agenda_et_flux(client, generated):
     client.post("/seances/agenda", data={"action": "supprimer"})
     assert client.get(url.replace("http://localhost", "")).status_code == 404
     assert client.get("/seances/agenda/inconnu.ics").status_code == 404
+
+
+def test_accueil_montre_les_prochaines_seances(app, client, generated, monkeypatch):
+    """Accueil d'Anne le 10 octobre : les séances d'Alice du 14 (flûte, et piano à son heure de passage)."""
+    from app.blueprints import dashboard
+
+    monkeypatch.setattr(dashboard, "date", _FrozenDate)
+    monkeypatch.setattr(dashboard, "datetime", _FrozenDateTime)
+    login(client, generated["anne_account"])
+    html = page(client.get("/"))
+    assert "Prochaines séances" in html and "Alice · Flûte" in html
+    assert "17:30-18:00" in html  # heure de passage du cours individuel
+    assert "Solfège" not in html  # Basile n'est pas de sa famille
+    teacher = app.test_client()
+    login(teacher, generated["paul_account"])
+    html = page(teacher.get("/"))
+    assert "Flûte" in html and "Solfège" in html and "Alice" not in html
+
+
+def test_une_saison_en_preparation_est_cachee_aux_professeurs(app, client, generated, monkeypatch):
+    from app.blueprints import dashboard
+    from app.blueprints import lessons as lessons_blueprint
+
+    monkeypatch.setattr(lessons_blueprint, "date", _FrozenDate)
+    monkeypatch.setattr(dashboard, "date", _FrozenDate)
+    monkeypatch.setattr(dashboard, "datetime", _FrozenDateTime)
+    generated["season"].hidden = True
+    db.session.commit()
+    login(client, generated["paul_account"])
+    assert "Flûte" not in page(client.get("/seances/mes-seances"))
+    assert "Flûte" not in page(client.get("/"))
+    assert "Flûte" not in page(client.get("/inscription/mes-eleves"))
+    staff = app.test_client()
+    login(staff, enroll(generated["manager"]))
+    assert "Flûte" in page(staff.get(f"/catalogue?saison={generated['season'].id}"))
+    assert "en préparation" in page(staff.get("/annuaire/saisons"))

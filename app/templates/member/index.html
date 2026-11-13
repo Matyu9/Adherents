@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Mon espace{% endblock %}
+{% block title %}Ma famille{% endblock %}
 {% macro courses_of(person, seasons) %}
 {% for membership, courses in seasons %}
 <p class="small"><strong>{{ membership.season.label }}</strong>{% if current and membership.season_id == current.id %} <span class="badge badge-ok">saison en cours</span>{% endif %}
@@ -27,7 +27,7 @@
 {% endmacro %}
 {% block content %}
 <div class="page-head">
-  <div><h1>Mon espace</h1><p class="muted">Ce que l'association sait de votre foyer. Pour corriger une information, passez par votre dossier d'inscription ou par le secrétariat.</p></div>
+  <div><h1>Ma famille</h1><p class="muted">Ce que l'association sait de votre foyer. {% if editable %}Vous pouvez mettre à jour certaines coordonnées ; pour le reste, passez par votre dossier d'inscription ou par le secrétariat.{% else %}Pour corriger une information, passez par votre dossier d'inscription ou par le secrétariat.{% endif %}</p></div>
   <a href="{{ url_for('enrollment.index') }}" role="button" class="secondary">Inscriptions</a>
   <a href="{{ url_for('lessons.agenda_page') }}" role="button" class="secondary">Ajouter les cours à mon agenda</a>
 </div>
@@ -39,6 +39,7 @@
 {% set h = block.household %}
 <section class="card settings-block">
   <h2>{{ h.name }}</h2>
+  {% if editable %}<p class="small"><a href="{{ url_for('member.contacts_form', household_id=h.id) }}" role="button" class="secondary small">Modifier nos coordonnées</a></p>{% endif %}
   <div class="detail-grid">
     <div>
       <h3>Adresse</h3>

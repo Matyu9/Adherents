@@ -36,7 +36,7 @@ Elle a deux missions :
 
 ### Pour les familles
 
-- **Mon espace** : le foyer, les adhésions et les cours de chaque membre (avec l'heure de passage, la liste d'attente et les présences), les dossiers d'inscription, les consentements donnés et le matériel prêté (lu dans l'Inventaire).
+- **Ma famille** : le foyer, les adhésions et les cours de chaque membre (avec l'heure de passage, la liste d'attente et les présences), les dossiers d'inscription, les consentements donnés et le matériel prêté (lu dans l'Inventaire).
 - **Agenda** : une adresse à ajouter à Google Agenda, Apple ou Outlook, avec les séances des enfants à jour.
 - **Inscription et réinscription** : un dossier pré-rempli depuis l'annuaire, à corriger et à envoyer. Les nouvelles familles passent par un formulaire public, avec vérification de leur adresse email.
 - **Un seul compte** pour toutes les applis de l'association, avec invitation, mot de passe oublié et double authentification.

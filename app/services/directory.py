@@ -118,17 +118,35 @@ def current_season():
 SELECTED_SEASON_KEY = "saison"
 
 
+def sees_hidden_seasons(account):
+    """Les saisons en préparation se voient avec l'accès au catalogue ou à l'annuaire (l'administration)."""
+    from ..permissions import can
+
+    return can(account, "catalog.view") or can(account, "directory.view")
+
+
+def season_visible(season, account=None):
+    from flask_login import current_user
+
+    return not season.hidden or sees_hidden_seasons(account if account is not None else current_user)
+
+
 def selected_season():
     """Saison affichée : celle demandée (?saison=), sinon la dernière choisie pendant la session, sinon la saison en
     cours, sinon la plus récente. Le choix est retenu d'une page à l'autre (catalogue, tarifs, calendrier…).
     Renvoie (saison, toutes les saisons)."""
-    all_seasons = seasons()
+    all_seasons = [s for s in seasons() if season_visible(s)]
     by_id = {s.id: s for s in all_seasons}
     wanted = request.values.get("saison", type=int)
     if wanted in by_id:
         session[SELECTED_SEASON_KEY] = wanted
         return by_id[wanted], all_seasons
-    season = by_id.get(session.get(SELECTED_SEASON_KEY)) or current_season() or (all_seasons[0] if all_seasons else None)
+    current = current_season()
+    season = (
+        by_id.get(session.get(SELECTED_SEASON_KEY))
+        or (by_id.get(current.id) if current else None)
+        or (all_seasons[0] if all_seasons else None)
+    )
     return season, all_seasons
 
 
@@ -612,6 +630,30 @@ def suggestions(account):
         if fold(person.first_name) == fold(account.first_name) and fold(person.last_name) == fold(account.last_name):
             reasons.append("même nom")
         result.append((person, reasons))
+    return sorted(result, key=lambda item: -len(item[1]))
+
+
+def account_suggestions(person):
+    """Comptes sans fiche qui pourraient être ceux de la personne (même email ou même nom), avec la raison."""
+    conditions = [
+        db.and_(
+            db.func.fold(Account.first_name) == fold(person.first_name),
+            db.func.fold(Account.last_name) == fold(person.last_name),
+        )
+    ]
+    if person.email:
+        conditions.append(Account.email == person.email.strip().lower())
+    candidates = db.session.scalars(
+        db.select(Account).where(~Account.person.has(), db.or_(*conditions)).order_by(Account.last_name)
+    ).all()
+    result = []
+    for account in candidates:
+        reasons = []
+        if same_email(person.email, account.email):
+            reasons.append("même email")
+        if fold(person.first_name) == fold(account.first_name) and fold(person.last_name) == fold(account.last_name):
+            reasons.append("même nom")
+        result.append((account, reasons))
     return sorted(result, key=lambda item: -len(item[1]))
 
 

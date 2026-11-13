@@ -94,7 +94,7 @@ def create_app(config_class=Config):
     from .blueprints.teachers import bp as teachers_bp
     from .cli import register_cli
     from .filters import register_filters
-    from .permissions import can
+    from .permissions import can, has_staff_rights
     from .services import logout, oidc_server
     from .services.notify import unread_count
 
@@ -136,7 +136,13 @@ def create_app(config_class=Config):
     @app.context_processor
     def inject_globals():
         brand = branding.current()
-        return {"can": can, "branding": brand, "asso_name": brand.name, "unread_notifications": unread_count}
+        return {
+            "can": can,
+            "has_staff_rights": has_staff_rights,
+            "branding": brand,
+            "asso_name": brand.name,
+            "unread_notifications": unread_count,
+        }
 
     @app.after_request
     def security_headers(response):

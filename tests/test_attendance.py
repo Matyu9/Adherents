@@ -237,11 +237,11 @@ def test_la_famille_voit_les_absences(client, generated):
     _absences(generated, [OCT7], "present")
     db.session.commit()
     login(client, generated["anne_account"])
-    html = page(client.get("/mon-espace"))
+    html = page(client.get("/ma-famille"))
     assert "1 présence, 1 absence : 14 oct. 2026 (absent)" in html
     options.put(options.FAMILY_ATTENDANCE, "0")
     db.session.commit()
-    assert "absence" not in page(client.get("/mon-espace"))
+    assert "absence" not in page(client.get("/ma-famille"))
 
 
 def test_mes_seances_propose_l_appel(client, generated, monkeypatch):

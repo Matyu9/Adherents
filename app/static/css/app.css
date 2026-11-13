@@ -543,3 +543,10 @@ a.pl-pill:hover { text-decoration: none; filter: brightness(.96); }
 
 .pl-legend { list-style: none; display: flex; flex-wrap: wrap; gap: .4rem 1rem; padding: 0; margin: .9rem 0 0; font-size: .82rem; color: var(--text-2); }
 .pl-legend li { display: inline-flex; align-items: center; gap: .4rem; margin: 0; }
+
+/* Vue adhérent : bandeau tant qu'elle est active */
+.member-view-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; padding: .6rem 1rem; margin-bottom: 1rem; background: var(--brand-soft); border: 1px solid var(--brand); border-radius: var(--radius-sm); }
+.member-view-banner form { margin: 0; }
+.upcoming li { padding: .3rem 0; border-bottom: 1px solid var(--border); }
+.upcoming li:last-child { border-bottom: 0; }
+.upcoming li.cancelled { text-decoration: line-through; color: var(--text-3); }

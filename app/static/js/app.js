@@ -23,7 +23,11 @@
 (function () {
   document.addEventListener("submit", function (event) {
     const question = event.target.dataset ? event.target.dataset.confirm : null;
-    if (question && !window.confirm(question)) event.preventDefault();
+    if (question && !window.confirm(question)) {
+      event.preventDefault();
+      // <form data-reset-on-cancel> : une case cochée par erreur revient à son état si on refuse la confirmation.
+      if ("resetOnCancel" in event.target.dataset) event.target.reset();
+    }
   });
   document.addEventListener("change", function (event) {
     if (event.target.matches("[data-autosubmit]") && event.target.form) event.target.form.requestSubmit();

@@ -86,7 +86,7 @@ Les nouvelles familles sans compte ne sont pas relancées : elles ont leur lien 
 
 ## Conservation et anonymisation
 
-**Annuaire → Conservation**, avec le droit `directory.anonymize` (administrateur par défaut).
+**Paramètres → Données personnelles**, avec le droit `directory.anonymize` (administrateur par défaut).
 
 - **La durée se compte en saisons et n'a pas de valeur par défaut.** C'est une question posée à la direction ; tant qu'elle n'est pas fixée, rien n'est proposé.
 - **Sont proposées** les personnes sans adhésion depuis ce nombre de saisons, sans compte, sans profil de professeur, et dont aucun membre du foyer n'a d'adhésion récente.

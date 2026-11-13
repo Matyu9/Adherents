@@ -2,9 +2,11 @@
 {% from "partials/_icons.html" import icon %}
 {% from "partials/_form.html" import field %}
 {% from "partials/_brand.html" import brand_mark with context %}
+{% from "settings/_tabs.html" import tabs with context %}
 {% block title %}Paramètres{% endblock %}
 {% block content %}
 <h1>Paramètres</h1>
+{{ tabs("general") }}
 <p class="muted">Ces réglages se modifient dans le fichier <code>.env</code> du serveur, puis en redémarrant l'appli.
   L'apparence, plus bas, se règle directement ici.</p>
 <dl class="props">
@@ -12,7 +14,6 @@
   <dt>Emails</dt><dd>{% if smtp %}Activés via {{ cfg.SMTP_HOST }}:{{ cfg.SMTP_PORT }}{% else %}Désactivés : les notifications restent dans l'appli.{% endif %}</dd>
 </dl>
 <div class="actions">
-  <a href="{{ url_for('health.page') }}" role="button" class="secondary">État de l'installation</a>
   <form method="post" action="{{ url_for('settings.test_email') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit" class="secondary" {{ "disabled" if not smtp }}>M'envoyer un email de test</button>

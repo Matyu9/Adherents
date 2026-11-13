@@ -9,7 +9,7 @@
   <p>{{ message }}</p>
   <div class="actions">
     {% if current_user.is_authenticated %}
-    <a role="button" href="{{ url_for('dashboard.index') }}">{{ icon("home", 18) }} Tableau de bord</a>
+    <a role="button" href="{{ url_for('dashboard.index') }}">{{ icon("home", 18) }} Accueil</a>
     {% else %}
     <a role="button" href="{{ url_for('auth.login') }}">Se connecter</a>
     {% endif %}

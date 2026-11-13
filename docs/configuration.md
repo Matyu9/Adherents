@@ -116,7 +116,7 @@ Une appli de l'association voit tous ses comptes. Une appli tierce ne voit que l
 
 ### Espace adhérent : le matériel prêté
 
-Pour que les familles voient dans **Mon espace** le matériel prêté à leurs enfants :
+Pour que les familles voient dans **Ma famille** le matériel prêté à leurs enfants :
 
 1. Sur l'application de l'Inventaire, cochez « Peut récupérer la liste des comptes ». Une appli de l'association peut alors lire aussi `<OIDC_ISSUER>/oidc/personnes` : identifiant public, nom, année de naissance de chaque personne de l'annuaire, et son `sub` si elle a un compte qui entre dans l'appli. Ni email, ni adresse, ni date de naissance complète. Une appli tierce y est refusée.
 2. Dans l'Inventaire, **Personnes → Rattacher à l'annuaire** relie chaque fiche à sa personne, après vérification.

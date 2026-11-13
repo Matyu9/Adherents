@@ -597,3 +597,33 @@ label.offer-card { flex-direction: row; align-items: flex-start; gap: .6rem; }
 .offer-meta { display: flex; flex-wrap: wrap; gap: .25rem .6rem; font-size: .82rem; color: var(--text-3); align-items: center; }
 .offer-warning { font-size: .82rem; color: #b26a00; }
 .offer-card .waitlist-choice { margin: 0 0 0 1.6rem; }
+.template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); gap: 1rem; }
+.template-card { margin: 0; display: flex; flex-direction: column; }
+.template-card h2 { font-size: 1.05rem; margin-bottom: .25rem; }
+.template-card .grid { grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); }
+.template-card button { margin-top: auto; }
+.template-card.is-chosen { border-color: var(--brand); }
+/* Éléments visés d'une règle de tarifs : étiquettes ou glisser-déposer */
+.target-picker { margin: .5rem 0 1rem; }
+.picker-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
+.picker-head label { margin: 0; font-weight: 600; }
+.segmented.small { display: inline-flex; }
+.seg-btn { margin: 0; padding: .25rem .7rem; font-size: .85rem; border-radius: 0; background: var(--surface); color: var(--text); border: 0; border-left: 1px solid var(--border); width: auto; }
+.seg-btn:first-child { border-left: 0; }
+.seg-btn.is-on { background: var(--brand); color: #fff; }
+.chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .5rem; }
+.chip { display: inline-flex; align-items: center; gap: .25rem; padding: .15rem .3rem .15rem .6rem; border-radius: 999px; font-size: .85rem; background: var(--brand-soft); border: 1px solid var(--brand); }
+.chip-out { background: var(--surface); border-style: dashed; border-color: var(--text-3); }
+.chip-btn { margin: 0; padding: 0 .35rem; width: auto; min-height: 0; line-height: 1.4; font-size: .9rem; background: transparent; color: inherit; border: 0; }
+.chip-results { list-style: none; margin: .25rem 0 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); max-height: 14rem; overflow: auto; }
+.chip-results:empty { display: none; }
+.chip-results li { list-style: none; padding: .35rem .6rem; cursor: pointer; }
+.chip-results li:hover, .chip-results li:focus { background: var(--brand-soft); outline: none; }
+.dnd-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; }
+@media (max-width: 640px) { .dnd-grid { grid-template-columns: 1fr; } }
+.dnd-col { border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); padding: .5rem; min-height: 6rem; }
+.dnd-col.is-over { border-color: var(--brand); background: var(--brand-soft); }
+.dnd-list { list-style: none; margin: .35rem 0 0; padding: 0; }
+.dnd-list li { list-style: none; padding: .3rem .5rem; margin-bottom: .25rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: grab; font-size: .88rem; }
+.dnd-list li.dnd-empty { border: 0; background: none; cursor: default; }
+.picker-head .segmented { flex: none; width: auto; }

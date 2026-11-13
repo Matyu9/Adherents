@@ -65,9 +65,9 @@ def test_tarifs_de_bout_en_bout(session):
     assert page.is_visible("#effect_value") and page.is_visible("#effect_base") and not page.is_visible("#effect_item")
     page.select_option("#effect_kind", "add")
     assert page.is_visible("#effect_item") and page.is_visible("#effect_per") and not page.is_visible("#effect_value")
-    assert not page.is_visible("#target_items")
+    assert not page.is_visible("[data-target-picker]")
     page.select_option("#effect_kind", "percent")
-    assert page.is_visible("#target_items")
+    assert page.is_visible("[data-target-picker]") and not page.is_visible("#target_items")  # remplacées
 
     assert not page.is_visible("select[name=c-0-0-param]")
     page.select_option("select[name=c-0-0-field]", "eleve.nb_elements")
@@ -83,7 +83,14 @@ def test_tarifs_de_bout_en_bout(session):
     page.select_option("select[name=c-1-0-op]", "has_any")
     page.fill("input[name=c-1-0-value]", "boursier")
     page.fill("#effect_value", "-30")
-    page.select_option("#target_categories", "Formules")
+    # Éléments visés : en étiquettes (recherche), puis le même choix vu en glisser-déposer.
+    page.fill("[data-target-picker] input[type=search]", "formu")
+    page.click(".chip-results li:has-text('Catégorie Formules')")
+    assert page.locator(".chip").count() == 1
+    page.click(".seg-btn:has-text('Glisser-déposer')")
+    assert page.locator(".dnd-col[data-state=in] li", has_text="Catégorie Formules").count() == 1
+    shot(page, "tarifs-regle-glisser")
+    page.click(".seg-btn:has-text('Étiquettes')")
     shot(page, "tarifs-regle")
     page.press("#name", "Enter")  # Entrée enregistre : elle ne retire pas la première condition
     page.wait_for_url("**/tarifs/regles?saison=*")

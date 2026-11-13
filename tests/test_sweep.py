@@ -183,6 +183,7 @@ ACCESS = {
             "create_regie",
             "toggle_regie",
             "create_rule",
+            "rule_templates",
             "edit_rule",
             "move_rule",
             "toggle_rule",

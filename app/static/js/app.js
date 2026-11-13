@@ -160,3 +160,137 @@
     document.querySelectorAll("form[data-roll]").forEach(refresh);
   });
 })();
+
+// Règles de tarifs : <div data-target-picker> remplace les quatre listes « éléments / catégories visés, sauf… » par
+// une interface au choix, retenue dans ce navigateur : des étiquettes avec recherche, ou un glisser-déposer en trois
+// colonnes. Les listes restent la source de vérité (et l'interface sans JavaScript).
+(function () {
+  const KEY = "adherents.targetPicker";
+  function remember(mode) { try { localStorage.setItem(KEY, mode); } catch (e) { /* stockage indisponible */ } }
+  function recall() { try { return localStorage.getItem(KEY) || "chips"; } catch (e) { return "chips"; } }
+
+  function setup(box) {
+    const form = box.closest("form");
+    const selects = {
+      in: { item: form.elements.target_items, cat: form.elements.target_categories },
+      out: { item: form.elements.target_exclude_items, cat: form.elements.target_exclude_categories },
+    };
+    if (!selects.in.item || !selects.in.cat) return;
+    const entries = [];
+    Array.from(selects.in.cat.options).forEach(function (o) { entries.push({ kind: "cat", value: o.value, label: "Catégorie " + o.textContent }); });
+    Array.from(selects.in.item.options).forEach(function (o) { entries.push({ kind: "item", value: o.value, label: o.textContent }); });
+    function stateOf(entry) {
+      if (option(selects.in[entry.kind], entry.value).selected) return "in";
+      if (selects.out[entry.kind] && option(selects.out[entry.kind], entry.value).selected) return "out";
+      return "none";
+    }
+    function option(select, value) { return Array.from(select.options).find(function (o) { return o.value === value; }); }
+    function set(entry, state) {
+      option(selects.in[entry.kind], entry.value).selected = state === "in";
+      if (selects.out[entry.kind]) option(selects.out[entry.kind], entry.value).selected = state === "out";
+      render();
+    }
+    // Le bloc s'affiche selon l'effet choisi (data-show-when, déjà appliqué) ; les listes d'origine se cachent.
+    form.querySelector(".target-selects").hidden = true;
+    form.querySelector(".target-selects").removeAttribute("data-show-when");
+    let mode = recall();
+
+    function el(tag, attrs, text) {
+      const node = document.createElement(tag);
+      Object.keys(attrs || {}).forEach(function (k) { node.setAttribute(k, attrs[k]); });
+      if (text) node.textContent = text;
+      return node;
+    }
+
+    function chip(entry, state) {
+      const node = el("span", { class: "chip chip-" + state });
+      node.appendChild(el("span", {}, (state === "out" ? "sauf : " : "") + entry.label));
+      const flip = el("button", { type: "button", class: "chip-btn", "aria-label": state === "out" ? "Viser " + entry.label : "Exclure " + entry.label, title: state === "out" ? "Viser" : "Exclure" }, state === "out" ? "+" : "−");
+      flip.addEventListener("click", function () { set(entry, state === "out" ? "in" : "out"); });
+      const remove = el("button", { type: "button", class: "chip-btn", "aria-label": "Retirer " + entry.label }, "×");
+      remove.addEventListener("click", function () { set(entry, "none"); });
+      node.appendChild(flip);
+      node.appendChild(remove);
+      return node;
+    }
+
+    function renderChips(body) {
+      const list = el("div", { class: "chips" });
+      const chosen = entries.filter(function (e) { return stateOf(e) !== "none"; });
+      if (!chosen.length) list.appendChild(el("span", { class: "muted small" }, "Rien de choisi : tous les éléments."));
+      chosen.forEach(function (e) { list.appendChild(chip(e, stateOf(e))); });
+      body.appendChild(list);
+      const search = el("input", { type: "search", placeholder: "Rechercher un élément ou une catégorie…", "aria-label": "Ajouter un élément ou une catégorie visés" });
+      const results = el("ul", { class: "chip-results", role: "listbox" });
+      function show() {
+        results.innerHTML = "";
+        const q = search.value.trim().toLowerCase();
+        if (!q) return;
+        entries.filter(function (e) { return stateOf(e) === "none" && e.label.toLowerCase().indexOf(q) !== -1; }).slice(0, 8).forEach(function (e) {
+          const li = el("li", { role: "option", tabindex: "0" }, e.label);
+          function pick() { set(e, "in"); const again = box.querySelector("input[type=search]"); if (again) again.focus(); }
+          li.addEventListener("click", pick);
+          li.addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); pick(); } });
+          results.appendChild(li);
+        });
+      }
+      search.addEventListener("input", show);
+      search.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter") { ev.preventDefault(); const first = results.querySelector("li"); if (first) first.click(); }
+      });
+      body.appendChild(search);
+      body.appendChild(results);
+    }
+
+    function renderColumns(body) {
+      const grid = el("div", { class: "dnd-grid" });
+      [["none", "Catalogue"], ["in", "Visés"], ["out", "Exclus"]].forEach(function (col) {
+        const zone = el("div", { class: "dnd-col", "data-state": col[0] });
+        zone.appendChild(el("strong", {}, col[1]));
+        const list = el("ul", { class: "dnd-list" });
+        entries.filter(function (e) { return stateOf(e) === col[0]; }).forEach(function (e) {
+          const li = el("li", { draggable: "true", tabindex: "0", title: "Glissez, ou Entrée pour passer à la colonne suivante" }, e.label);
+          li.addEventListener("dragstart", function (ev) { ev.dataTransfer.setData("text/plain", e.kind + ":" + e.value); });
+          li.addEventListener("keydown", function (ev) {
+            if (ev.key === "Enter") { ev.preventDefault(); set(e, { none: "in", in: "out", out: "none" }[col[0]]); }
+          });
+          list.appendChild(li);
+        });
+        if (col[0] === "in" && !list.children.length) list.appendChild(el("li", { class: "muted small dnd-empty" }, "Vide : tous les éléments"));
+        zone.appendChild(list);
+        zone.addEventListener("dragover", function (ev) { ev.preventDefault(); zone.classList.add("is-over"); });
+        zone.addEventListener("dragleave", function () { zone.classList.remove("is-over"); });
+        zone.addEventListener("drop", function (ev) {
+          ev.preventDefault();
+          const raw = ev.dataTransfer.getData("text/plain");
+          const kind = raw.slice(0, raw.indexOf(":")), value = raw.slice(raw.indexOf(":") + 1);
+          const entry = entries.find(function (x) { return x.kind === kind && x.value === value; });
+          if (entry) set(entry, col[0]);
+        });
+        grid.appendChild(zone);
+      });
+      body.appendChild(grid);
+    }
+
+    function render() {
+      box.innerHTML = "";
+      const head = el("div", { class: "picker-head" });
+      head.appendChild(el("label", {}, "Éléments visés"));
+      const toggle = el("div", { class: "segmented small", role: "group", "aria-label": "Affichage" });
+      [["chips", "Étiquettes"], ["dnd", "Glisser-déposer"]].forEach(function (m) {
+        const b = el("button", { type: "button", class: "seg-btn" + (mode === m[0] ? " is-on" : ""), "aria-pressed": String(mode === m[0]) }, m[1]);
+        b.addEventListener("click", function () { mode = m[0]; remember(mode); render(); });
+        toggle.appendChild(b);
+      });
+      head.appendChild(toggle);
+      box.appendChild(head);
+      const body = el("div", { class: "picker-body" });
+      (mode === "dnd" ? renderColumns : renderChips)(body);
+      box.appendChild(body);
+    }
+    render();
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-target-picker]").forEach(setup);
+  });
+})();

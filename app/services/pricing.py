@@ -18,6 +18,7 @@ vérifient avant tout enregistrement. Rien n'est jamais évalué comme du code.
 """
 
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 
@@ -50,6 +51,10 @@ class Student:
     tags: frozenset = frozenset()
     disciplines: frozenset = frozenset()
     seniority: int = 0  # nombre de saisons déjà suivies
+    category: str | None = None  # scolaire, non scolaire, adulte
+    school_level: str | None = None
+    courses: int = 0  # cours suivis cette saison
+    enrolled_on: date | None = None  # première inscription de la saison
 
 
 @dataclass(frozen=True)
@@ -65,7 +70,7 @@ class Order:
 
     household: Household
     students: tuple
-    picks: tuple  # ((student_id, item_id), …)
+    picks: tuple  # ((student_id, item_id), …) ou ((student_id, item_id, infos du cours), …)
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +110,7 @@ def validate_settings(settings):
 # ---------------------------------------------------------------------------
 
 HOUSEHOLD, STUDENT, LINE = "household", "student", "line"
-NUMBER, CHOICE, BOOL, TAGS = "number", "choice", "bool", "tags"
+NUMBER, CHOICE, BOOL, TAGS, DATE = "number", "choice", "bool", "tags", "date"
 
 # champ : (libellé, niveau, type, paramètre attendu)
 FIELDS = {
@@ -121,16 +126,24 @@ FIELDS = {
     "eleve.anciennete": ("Saisons déjà suivies", STUDENT, NUMBER, None),
     "eleve.rang": ("Rang de l'élève dans le foyer", STUDENT, NUMBER, None),
     "eleve.nb_elements": ("Nombre d'éléments de l'élève", STUDENT, NUMBER, "selection"),
+    "eleve.categorie": ("Catégorie de l'élève (scolaire, non scolaire, adulte)", STUDENT, CHOICE, None),
+    "eleve.niveau_scolaire": ("Niveau scolaire de l'élève", STUDENT, CHOICE, None),
+    "eleve.nb_cours": ("Nombre de cours suivis sur la saison", STUDENT, NUMBER, None),
+    "eleve.date_inscription": ("Date de sa première inscription de la saison", STUDENT, DATE, None),
     "ligne.element": ("Élément", LINE, CHOICE, None),
     "ligne.categorie": ("Catégorie de l'élément", LINE, CHOICE, None),
     "ligne.rang_eleve": ("Rang de l'élément dans sa catégorie, chez l'élève", LINE, NUMBER, None),
     "ligne.rang_foyer": ("Rang de l'élément dans sa catégorie, dans le foyer", LINE, NUMBER, None),
+    "ligne.cours_individuel": ("Cours individuel", LINE, BOOL, None),
+    "ligne.duree": ("Durée du cours (minutes)", LINE, NUMBER, None),
+    "ligne.date_inscription": ("Date d'inscription au cours", LINE, DATE, None),
 }
 OPERATORS = {
     NUMBER: {"eq": "=", "ne": "≠", "lt": "<", "le": "≤", "gt": ">", "ge": "≥", "between": "entre"},
     CHOICE: {"in": "parmi", "not_in": "hors de"},
     BOOL: {"is": "est"},
     TAGS: {"has_any": "a l'une de", "has_all": "a toutes", "has_none": "n'a aucune de"},
+    DATE: {"before": "avant le", "from": "à partir du", "between": "entre le"},
 }
 LEVELS = (HOUSEHOLD, STUDENT, LINE)
 
@@ -285,6 +298,18 @@ def _validate_condition(condition, level, items):
         if not isinstance(value, bool):
             raise PricingError(f"« {label} » attend oui ou non.")
         result["value"] = value
+    elif kind == DATE:
+        expected = 2 if op == "between" else 1
+        values = value if isinstance(value, list) else [value]
+        if len(values) != expected:
+            raise PricingError(f"« {label} » : indiquez {'deux dates' if expected == 2 else 'une date'}.")
+        try:
+            days = [date.fromisoformat(v) for v in values]
+        except (TypeError, ValueError):
+            raise PricingError(f"« {label} » : date illisible.") from None
+        if expected == 2 and days[0] > days[1]:
+            raise PricingError(f"« {label} » : bornes inversées.")
+        result["value"] = [d.isoformat() for d in days] if expected == 2 else days[0].isoformat()
     else:
         if not isinstance(value, list) or not value:
             raise PricingError(f"« {label} » : choisissez au moins une valeur.")
@@ -407,6 +432,7 @@ class Line:
     base: int
     amount: int
     position: int  # ordre d'arrivée, pour départager les égalités
+    meta: dict = field(default_factory=dict)  # cours facturé : {"individual", "minutes", "enrolled_on"}
     added_by: str | None = None  # règle qui a ajouté la ligne
     steps: list = field(default_factory=list)
     groups: set = field(default_factory=set)
@@ -435,11 +461,13 @@ def compute(order, items, rules, settings=None):
     settings = validate_settings(settings or {})
     students = {s.id: s for s in order.students}
     lines = []
-    for student_id, item_id in order.picks:
+    for pick in order.picks:
+        student_id, item_id = pick[0], pick[1]
         if student_id not in students:
             raise PricingError("Un élément est attribué à un élève absent du foyer.")
         item = items[item_id]
-        lines.append(Line(student_id, item, item.price, item.price, len(lines)))
+        meta = dict(pick[2]) if len(pick) > 2 and pick[2] else {}
+        lines.append(Line(student_id, item, item.price, item.price, len(lines), meta=meta))
     adjustments = []
     total_delta = 0
     for rule in rules:
@@ -480,7 +508,7 @@ def _apply_add(rule, order, students, items, lines, settings):
     if rule["effect"]["per"] == "household":
         targets = [None]
     else:
-        targets = list(dict.fromkeys(sid for sid, _ in order.picks))  # élèves qui prennent au moins un élément
+        targets = list(dict.fromkeys(pick[0] for pick in order.picks))  # élèves qui prennent au moins un élément
     context = _Context(order, students, lines, settings)
     for student_id in targets:
         if _matches(rule, context, students.get(student_id), None):
@@ -633,6 +661,11 @@ def _check(condition, context, student, line):
         }[op]
     if kind == BOOL:
         return value is expected
+    if kind == DATE:
+        if op == "between":
+            return date.fromisoformat(expected[0]) <= value <= date.fromisoformat(expected[1])
+        limit = date.fromisoformat(expected)
+        return value < limit if op == "before" else value >= limit
     if kind == CHOICE:
         return (value in expected) == (op == "in")
     expected = set(expected)
@@ -656,6 +689,12 @@ def _fact(name, condition, context, student, line):
             return line.item.id
         if name == "ligne.categorie":
             return line.item.category
+        if name == "ligne.cours_individuel":
+            return line.meta.get("individual")
+        if name == "ligne.duree":
+            return line.meta.get("minutes")
+        if name == "ligne.date_inscription":
+            return line.meta.get("enrolled_on")
         return context.line_rank(line, "student" if name == "ligne.rang_eleve" else "household")
     if student is None:
         return None  # élément ajouté pour le foyer : aucun élève
@@ -673,4 +712,12 @@ def _fact(name, condition, context, student, line):
         return context.student_rank(student.id)
     if name == "eleve.nb_elements":
         return context.count(condition["param"], student.id)
+    if name == "eleve.categorie":
+        return student.category
+    if name == "eleve.niveau_scolaire":
+        return student.school_level
+    if name == "eleve.nb_cours":
+        return student.courses
+    if name == "eleve.date_inscription":
+        return student.enrolled_on
     raise PricingError(f"Critère inconnu : {name}.")  # pragma: no cover - validé avant

@@ -4,6 +4,12 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ## Non publié
 
+### Changé : retours du tour complet, tarifs
+
+- **Modèles de règles** : six cas courants en deux ou trois champs (frères et sœurs, quotient familial, n-ième cours, ajout d'un élément, prix fixe pour une étiquette, supplément hors commune). La règle arrive en brouillon dans le formulaire complet.
+- **Éléments visés** au choix en étiquettes avec recherche ou en glisser-déposer, choix retenu dans le navigateur.
+- **Nouveaux critères** : catégorie et niveau scolaire de l'élève, nombre de cours suivis sur la saison, date de première inscription ; pour un cours facturé, cours individuel, durée et date d'inscription. Nouveau type « date » (avant le, à partir du, entre).
+
 ### Changé : retours du tour complet, réinscriptions
 
 - **Cours proposés en cartes**, regroupés par discipline (description de la saison, jour et horaire, professeur, salle, places qui restent, complet et liste d'attente). Corrige l'affichage serré des cours dans le dossier.

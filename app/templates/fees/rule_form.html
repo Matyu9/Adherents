@@ -78,7 +78,8 @@
             <option value="household" {{ "selected" if values.get('effect_per') == "household" }}>Une fois pour le foyer</option>
           </select></div>
       </div>
-      <div class="grid" data-show-when="effect_kind" data-show-value="percent amount fixed free replace">
+      <div class="target-picker" data-target-picker data-show-when="effect_kind" data-show-value="percent amount fixed free replace" hidden></div>
+      <div class="grid target-selects" data-show-when="effect_kind" data-show-value="percent amount fixed free replace">
         <div><label for="target_items">Éléments visés</label>
           <select id="target_items" name="target_items" multiple size="5">{% for item in items %}<option value="{{ item.id }}" {{ selected(values, 'target_items', item.id) }}>{{ item.label }}</option>{% endfor %}</select></div>
         <div><label for="target_categories">Catégories visées</label>

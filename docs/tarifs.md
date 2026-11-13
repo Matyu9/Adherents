@@ -33,10 +33,22 @@ Critères disponibles :
 | Élève | adulte | oui / non |
 | Élève | étiquettes, disciplines | étiquettes |
 | Élève | nombre d'éléments (tous, un élément ou une catégorie) | nombre |
+| Élève | catégorie (scolaire, non scolaire, adulte), niveau scolaire | choix |
+| Élève | nombre de cours suivis sur la saison | nombre |
+| Élève | date de sa première inscription de la saison | date |
 | Élément | élément, catégorie | choix |
 | Élément | rang dans sa catégorie, chez l'élève ou dans le foyer | nombre |
+| Élément | cours individuel | oui / non |
+| Élément | durée du cours, en minutes (heure de passage pour un cours individuel) | nombre |
+| Élément | date d'inscription au cours | date |
 
-Les **étiquettes** se posent à la main sur un foyer ou un élève (« personnel », « boursier »…). Elles couvrent les cas qu'on n'a pas prévus.
+Une **date** se compare par « avant le », « à partir du » ou « entre le … et le … » (dates JJ/MM/AAAA). Les critères de cours (individuel, durée, date d'inscription) ne valent que pour les éléments facturés par un cours ; pour un élément pris à la main, ils sont inconnus.
+
+Les **étiquettes** se posent à la main sur un foyer ou un élève (« personnel », « boursier », « enfant de bénévole »…). Elles couvrent les statuts particuliers et les cas qu'on n'a pas prévus.
+
+**Modèles.** « + Nouvelle règle » propose six modèles en deux ou trois champs : réduction pour les frères et sœurs, selon le quotient familial, à partir du n-ième cours, ajout d'un élément (adhésion, frais de dossier), prix fixe pour une étiquette, supplément hors commune. La règle créée arrive en brouillon dans le formulaire complet, qui reste accessible (« Formulaire avancé »).
+
+**Éléments visés.** Le formulaire les présente au choix en étiquettes (une recherche ajoute un élément ou une catégorie, chaque étiquette passe en « sauf ») ou en glisser-déposer sur trois colonnes (catalogue, visés, exclus). Le choix d'affichage est retenu dans le navigateur. Sans JavaScript, les quatre listes d'origine restent.
 
 Un **fait inconnu** (âge non saisi, tranche non renseignée) ne satisfait aucune condition, sauf « hors de » et « n'a aucune de ».
 

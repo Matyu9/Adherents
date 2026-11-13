@@ -589,3 +589,89 @@ def test_saison_introuvable(client, manager, app):
     assert client.get("/tarifs").status_code == 200
     assert client.get("/tarifs/simulateur").status_code == 302
     assert client.get("/tarifs/foyers/1").status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Modèles de règles
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "key, data, name, effect, conditions",
+    [
+        (
+            "fratrie",
+            {"rank": "2", "percent": "10", "category": "Formules"},
+            "10 % à partir du 2ᵉ élève (Formules)",
+            {"kind": "percent", "value": "-10", "base": "current"},
+            [[{"field": "eleve.rang", "op": "ge", "value": 2}]],
+        ),
+        (
+            "plusieurs",
+            {"rank": "3", "percent": "25,5"},
+            "25.5 % à partir du 3ᵉ élément",
+            {"kind": "percent", "value": "-25.5", "base": "current"},
+            [[{"field": "ligne.rang_eleve", "op": "ge", "value": 3}]],
+        ),
+        (
+            "supplement",
+            {"amount": "15", "category": "Formules"},
+            "Supplément hors commune (Formules)",
+            {"kind": "amount", "value": 1500},
+            [[{"field": "foyer.resident", "op": "is", "value": False}]],
+        ),
+    ],
+)
+def test_modeles_de_regles(client, manager, school, key, data, name, effect, conditions):
+    s = school["season"]
+    assert "Réduction pour les frères et sœurs" in page(client.get(f"/tarifs/regles/modeles?saison={s.id}"))
+    response = client.post(f"/tarifs/regles/modeles?saison={s.id}", data={"modele": key, **data})
+    saved = db.session.scalar(db.select(FeeRule))
+    assert response.status_code == 302 and response.location.endswith(f"/tarifs/regles/{saved.id}/modifier")
+    assert saved.name == name and saved.effect == effect and saved.conditions == conditions and not saved.active
+
+
+def test_modeles_quotient_ajout_etiquette(client, manager, school, bands):
+    s = school["season"]
+    client.post(f"/tarifs/regles/modeles?saison={s.id}", data={"modele": "quotient", "band": "A", "percent": "30"})
+    client.post(
+        f"/tarifs/regles/modeles?saison={s.id}", data={"modele": "ajout", "item": school["adh"].id, "per": "household"}
+    )
+    client.post(
+        f"/tarifs/regles/modeles?saison={s.id}",
+        data={"modele": "etiquette", "tag": "personnel", "item": school["f30"].id, "price": "100"},
+    )
+    rules = {r.name: r for r in db.session.scalars(db.select(FeeRule))}
+    assert rules["Tranche A : 30 %"].conditions == [[{"field": "foyer.tranche_qf", "op": "in", "value": ["A"]}]]
+    assert rules["Adhésion une fois par foyer"].effect == {"kind": "add", "item": school["adh"].id, "per": "household"}
+    fixed = rules["Formule 30 min à prix fixe (personnel)"]
+    assert fixed.effect == {"kind": "fixed", "value": 10000} and fixed.target == {"items": [school["f30"].id]}
+
+
+def test_modele_mal_rempli(client, manager, school):
+    s = school["season"]
+    html = page(client.post(f"/tarifs/regles/modeles?saison={s.id}", data={"modele": "fratrie", "rank": "1"}))
+    assert "2 au moins" in html and db.session.scalar(db.select(db.func.count(FeeRule.id))) == 0
+    html = page(client.post(f"/tarifs/regles/modeles?saison={s.id}", data={"modele": "inconnu"}))
+    assert "Modèle inconnu" in html
+
+
+def test_regle_avec_une_date(client, manager, school):
+    s = school["season"]
+    client.post(
+        f"/tarifs/regles/nouvelle?saison={s.id}",
+        data={
+            "action": "save",
+            "name": "Arrivée en cours d'année",
+            "effect_kind": "percent",
+            "effect_value": "-50",
+            "effect_base": "current",
+            "c-0-0-field": "ligne.date_inscription",
+            "c-0-0-op": "from",
+            "c-0-0-value": "01/02/2027",
+        },
+    )
+    saved = db.session.scalar(db.select(FeeRule))
+    assert saved.conditions == [[{"field": "ligne.date_inscription", "op": "from", "value": "2027-02-01"}]]
+    html = page(client.get(f"/tarifs/regles?saison={s.id}"))
+    assert "à partir du 01/02/2027" in html

@@ -41,12 +41,13 @@
   </select>
   <noscript><button type="submit">Filtrer</button></noscript>
 </form>
+{% set roster = can(current_user, "directory.view") %}
 <div class="overflow-auto"><table class="striped responsive">
   <thead><tr><th>Cours</th><th>Professeur</th><th>Horaire</th><th>Salle</th><th>Effectif</th>{% if can(current_user, "catalog.edit") %}<th></th>{% endif %}</tr></thead>
   <tbody>
   {% for c in items %}
   <tr>
-    <td data-label="Cours"><span><strong>{{ c.discipline.name }}</strong>{% if c.level %} · {{ c.level.name }}{% endif %}{% if c.group_label %} · {{ c.group_label }}{% endif %}
+    <td data-label="Cours"><span>{% if roster %}<a href="{{ url_for('catalog.course', course_id=c.id) }}">{% endif %}<strong>{{ c.discipline.name }}</strong>{% if c.level %} · {{ c.level.name }}{% endif %}{% if c.group_label %} · {{ c.group_label }}{% endif %}{% if roster %}</a>{% endif %}
       {% if c.is_full(enrolled.get(c.id, 0)) %} <span class="badge">complet</span>{% endif %}
       {% for other, reason in conflicts.get(c.id, []) %}<br><small class="error">Chevauchement ({{ reason }}) : {{ other.title }}, {{ other.starts_at.strftime("%H:%M") }}-{{ other.ends_at.strftime("%H:%M") }}</small>{% endfor %}</span></td>
     <td data-label="Professeur">{% if c.teacher %}{{ c.teacher.person.sort_name }}{% if c.teacher.leaves_during(season) %} <span class="badge health-warn">parti le {{ c.teacher.left_on | date_fr }}</span>{% endif %}{% else %}<span class="badge health-warn">à trouver</span>{% endif %}</td>

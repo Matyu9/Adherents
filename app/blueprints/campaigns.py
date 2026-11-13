@@ -24,7 +24,7 @@ from .directory import _blank, _strip
 
 bp = Blueprint("campaigns", __name__, url_prefix="/campagnes")
 
-CAMPAIGN_FIELDS = ("season_id", "title", "opens_at", "closes_at", "allow_new", "instructions")
+CAMPAIGN_FIELDS = ("season_id", "title", "opens_at", "closes_at", "allow_new", "choice", "instructions")
 
 
 @bp.before_request
@@ -70,6 +70,7 @@ class CampaignForm(FlaskForm):
     allow_new = BooleanField(
         "Accueillir aussi les nouvelles familles, par un formulaire public avec vérification de leur adresse email"
     )
+    choice = SelectField("Les familles choisissent", choices=list(Campaign.CHOICES.items()), default=Campaign.COURSE)
     instructions = TextAreaField(
         "Message aux familles",
         validators=[Optional(), Length(max=5000)],
@@ -91,6 +92,7 @@ class CampaignForm(FlaskForm):
             "opens_at": self.opens_at.data,
             "closes_at": self.closes_at.data,
             "allow_new": self.allow_new.data,
+            "choice": self.choice.data if self.choice.data in Campaign.CHOICES else Campaign.COURSE,
             "instructions": _blank(self.instructions.data),
         }
 

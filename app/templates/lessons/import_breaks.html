@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Importer des périodes sans cours{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('lessons.calendar', saison=season.id) }}#periodes">← Calendrier {{ season.label }}</a></p>
+<article class="wide-form">
+  <h1>Importer des périodes sans cours</h1>
+  <p class="muted">Un fichier <strong>.ics</strong> (le calendrier scolaire officiel de votre zone, un export de Google Agenda ou d'Outlook) ou <strong>.csv</strong> (une ligne par période : <code>nom ; premier jour ; dernier jour</code>, dates JJ/MM/AAAA). Un aperçu s'affiche avant tout ajout.</p>
+  {% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+  {% if rows is none or error %}
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {{ csrf() }}
+    <label for="fichier">Fichier</label>
+    <input id="fichier" name="fichier" type="file" accept=".ics,.csv,text/calendar,text/csv" required>
+    <button type="submit">Voir l'aperçu</button>
+  </form>
+  {% else %}
+  <form method="post" novalidate>
+    {{ csrf() }}
+    <input type="hidden" name="action" value="confirmer">
+    <div class="overflow-auto"><table class="striped responsive">
+      <thead><tr><th></th><th>Période</th><th>Dates</th><th>État</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+      <tr{% if r.status != "nouvelle" %} class="muted"{% endif %}>
+        <td><input type="checkbox" name="ligne" value="{{ r.key }}" aria-label="Ajouter {{ r.label }}"{% if r.status == "nouvelle" %} checked{% else %} disabled{% endif %}></td>
+        <td data-label="Période">{{ r.label }}</td>
+        <td data-label="Dates">{{ r.starts_on | date_fr }}{% if r.ends_on != r.starts_on %} au {{ r.ends_on | date_fr }}{% endif %}</td>
+        <td data-label="État"><span class="badge{{ ' badge-ok' if r.status == 'nouvelle' }}">{{ r.status }}</span></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <label for="kind">Nature des périodes ajoutées</label>
+    <select id="kind" name="kind">{% for key, label in kinds.items() %}<option value="{{ key }}"{% if key == "vacances" %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    <button type="submit">Ajouter les périodes cochées</button>
+  </form>
+  {% endif %}
+</article>
+{% endblock %}

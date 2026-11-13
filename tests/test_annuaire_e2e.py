@@ -10,6 +10,8 @@ import pytest
 
 pytest.importorskip("playwright.sync_api")
 
+from playwright.sync_api import expect  # noqa: E402
+
 from app.extensions import db  # noqa: E402
 from app.models import Activity, BankAccount, Person  # noqa: E402
 
@@ -58,12 +60,13 @@ def test_a_household_from_start_to_iban(session):
     page.click("text=+ Nouvelle personne à charge")
     page.fill("#first_name", "Léon")
     page.fill("#birth_date", "2016-06-07")
-    page.click("main form[method=post] button[type=submit]")
-    page.wait_for_url("**/annuaire/foyers/*")
+    # Déjà sur une page de foyer : wait_for_url rendrait la main avant le rechargement. On attend la navigation.
+    with page.expect_navigation(url="**/annuaire/foyers/*"):
+        page.click("main form[method=post] button[type=submit]")
     page.fill("#telephones input[name=number]", "06 12 34 56 78")
     page.fill("#telephones input[name=label]", "portable mère")
-    page.click("#telephones button[type=submit]")
-    page.wait_for_url("**/annuaire/foyers/*")
+    with page.expect_navigation(url="**/annuaire/foyers/*"):
+        page.click("#telephones button[type=submit]")
     content = page.content()
     assert "06 12 34 56 78" in content and "Léon Lefèvre" in content and "Responsable 1" in content
 
@@ -99,7 +102,8 @@ def test_a_household_from_start_to_iban(session):
 
     page.goto(f"/annuaire/personnes/{person_id}")
     page.click("text=+ Ajouter une adhésion")
-    assert not page.is_visible("#withdrawn_on")  # date d'abandon masquée tant que l'adhésion est active
+    page.wait_for_url("**/adhesions/nouvelle")
+    expect(page.locator("#withdrawn_on")).to_be_hidden()  # masquée tant que l'adhésion est active (attend le script)
     page.select_option("#status", "withdrawn")
     assert page.is_visible("#withdrawn_on")
     page.select_option("#status", "active")
@@ -127,7 +131,6 @@ def test_directory_pages_have_no_violation(session, scheme):
         "/annuaire",
         "/annuaire/foyers",
         "/annuaire/saisons",
-        "/annuaire/rattachement",
         "/annuaire/personnes/nouvelle",
         "/annuaire/foyers/nouveau",
         "/annuaire/saisons/nouvelle",

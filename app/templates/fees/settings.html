@@ -33,10 +33,10 @@
   </section>
   <section class="card">
     <h2>Tranches de quotient familial</h2>
-    <p class="muted small">De la plus basse à la plus haute. Un quotient égal au plafond passe dans la tranche suivante. La dernière tranche n'a pas de plafond.</p>
+    <p class="muted small">De la plus basse à la plus haute. Un quotient égal au plafond passe dans la tranche suivante. La dernière tranche n'a pas de plafond. Pour retirer une tranche, videz ses deux cases.</p>
     <div class="overflow-auto"><table>
       <thead><tr><th>Tranche</th><th>Plafond (exclu)</th></tr></thead>
-      <tbody>
+      <tbody data-rows>
       {% for k in range(band_rows) %}{% set band = settings.qf_bands[k] if k < settings.qf_bands | length else none %}
       <tr>
         <td><input name="band-{{ k }}-label" maxlength="10" aria-label="Nom de la tranche {{ k + 1 }}" value="{{ band.label if band else '' }}"></td>
@@ -45,6 +45,13 @@
       {% endfor %}
       </tbody>
     </table></div>
+    <template data-row-template>
+      <tr>
+        <td><input name="band-__n__-label" maxlength="10" aria-label="Nom de la tranche __label__"></td>
+        <td><input name="band-__n__-max" inputmode="numeric" aria-label="Plafond de la tranche __label__"></td>
+      </tr>
+    </template>
+    <button type="button" class="secondary small" data-add-row hidden>+ Ajouter une tranche</button>
     <label for="default_band">Tranche d'un foyer qui ne donne pas son quotient</label>
     <select id="default_band" name="default_band">
       <option value="">Aucune (tranche inconnue)</option>

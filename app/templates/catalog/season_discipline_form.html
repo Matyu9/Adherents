@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}{{ discipline.name }} en {{ season.label }}{% endblock %}
+{% block content %}
+<article class="narrow wide-form">
+  <h1>{{ discipline.name }} en {{ season.label }}</h1>
+  <p class="muted">Réglages de cette saison seulement. Vides : ceux de la discipline.</p>
+  {% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+  {% set f = request.form if request.method == "POST" else none %}
+  <form method="post" novalidate>
+    {{ csrf() }}
+    <label class="form-check"><input type="checkbox" name="offered" value="1"{% if (f and f.get('offered')) or (not f and discipline.offered_in(season)) %} checked{% endif %}> Proposée cette saison (cours et inscriptions)</label>
+    <div class="grid">
+      <div><label for="name">Nom cette saison</label><input id="name" name="name" maxlength="80" placeholder="{{ discipline.name }}" value="{{ f.get('name', '') if f else (settings.name or '' if settings else '') }}"></div>
+      <div><label for="type_id">Type cette saison</label>
+        <select id="type_id" name="type_id"><option value="">{{ "— " ~ (discipline.type.name if discipline.type else "aucun") }}</option>{% for t in types %}<option value="{{ t.id }}"{% if (f and f.get('type_id') == t.id | string) or (not f and settings and settings.type_id == t.id) %} selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>
+    </div>
+    <label for="description">Description pour les familles</label>
+    <textarea id="description" name="description" rows="4" maxlength="3000" placeholder="Âge conseillé, prérequis, durée…">{{ f.get('description', '') if f else (settings.description or '' if settings else '') }}</textarea>
+    <div class="grid">
+      <div><label for="capacity">Places</label><input id="capacity" name="capacity" inputmode="numeric" value="{{ f.get('capacity', '') if f else (settings.capacity or '' if settings else '') }}"></div>
+      <div><label for="min_age">Âge minimum</label><input id="min_age" name="min_age" inputmode="numeric" value="{{ f.get('min_age', '') if f else (settings.min_age or '' if settings else '') }}"></div>
+      <div><label for="max_age">Âge maximum</label><input id="max_age" name="max_age" inputmode="numeric" value="{{ f.get('max_age', '') if f else (settings.max_age or '' if settings else '') }}"></div>
+    </div>
+    <small class="muted">Places et âges servent quand les familles choisissent une discipline plutôt qu'un horaire.</small>
+    <button type="submit">Enregistrer</button>
+  </form>
+  <p class="small"><a href="{{ url_for('catalog.season_disciplines', saison=season.id) }}">Annuler</a></p>
+</article>
+{% endblock %}

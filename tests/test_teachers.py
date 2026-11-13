@@ -138,3 +138,100 @@ def test_children_are_never_offered_as_teachers(client, admin, family):
     assert "mineur" in response.get_data(as_text=True)
     client.post(f"/professeurs/nouveau?personne={family['zoe'].id}", data={"status": "CDI"})
     assert db.session.get(Person, family["zoe"].id).teacher is None
+
+
+def _png():
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (600, 300), "red").save(buffer, "PNG")
+    buffer.seek(0)
+    return buffer
+
+
+def test_profile_photo_and_bio(app, client, admin, tmp_path):
+    app.config["UPLOAD_DIR"] = str(tmp_path)
+    paul = person("Paul", "Prof", teacher=Teacher(status="CDI"))
+    db.session.commit()
+    response = client.post(
+        f"/professeurs/{paul.id}/presentation",
+        data={"bio": "Flûtiste depuis 20 ans.", "photo": (_png(), "moi.png")},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 302
+    teacher = db.session.get(Teacher, paul.id)
+    assert teacher.bio == "Flûtiste depuis 20 ans." and teacher.photo.startswith("profs/")
+    from PIL import Image
+
+    image = Image.open(tmp_path / teacher.photo)
+    assert image.size == (400, 400) and image.format == "JPEG"
+    name = teacher.photo.split("/")[-1]
+    assert client.get(f"/professeurs/photo/{name}").status_code == 200
+    assert client.get("/professeurs/photo/../secret.jpg").status_code == 404
+    page = client.get(f"/professeurs/{paul.id}").get_data(as_text=True)
+    assert "Flûtiste depuis 20 ans." in page and name in page
+    old = tmp_path / teacher.photo
+    client.post(f"/professeurs/{paul.id}/presentation", data={"bio": "", "remove_photo": "1"})
+    assert db.session.get(Teacher, paul.id).photo is None and not old.exists()
+    response = client.post(
+        f"/professeurs/{paul.id}/presentation",
+        data={"photo": (__import__("io").BytesIO(b"pas une image"), "x.png")},
+        content_type="multipart/form-data",
+    )
+    assert "pas une image valide" in response.get_data(as_text=True)
+
+
+def test_availability(client, admin):
+    paul = person("Paul", "Prof", teacher=Teacher())
+    db.session.commit()
+    client.post(
+        f"/professeurs/{paul.id}/disponibilites",
+        data={
+            "a-0-day": "2",
+            "a-0-from": "14:00",
+            "a-0-to": "19:00",
+            "a-1-day": "0",
+            "a-1-from": "17:00",
+            "a-1-to": "20:00",
+        },
+    )
+    assert db.session.get(Teacher, paul.id).availability == [
+        {"day": 0, "from": "17:00", "to": "20:00"},
+        {"day": 2, "from": "14:00", "to": "19:00"},
+    ]
+    assert "Mercredi 14:00-19:00" in client.get(f"/professeurs/{paul.id}").get_data(as_text=True)
+    page = client.post(
+        f"/professeurs/{paul.id}/disponibilites", data={"a-0-day": "1", "a-0-from": "18:00", "a-0-to": "17:00"}
+    ).get_data(as_text=True)
+    assert "doit suivre" in page and len(db.session.get(Teacher, paul.id).availability) == 2
+
+
+def test_diplomas_are_part_of_the_contract(client, admin):
+    paul = person("Paul", "Prof", teacher=Teacher())
+    db.session.commit()
+    client.post(f"/professeurs/{paul.id}/modifier", data={"diplomas": "DE de flûte"})
+    assert db.session.get(Teacher, paul.id).diplomas == "DE de flûte"
+
+
+def test_courses_are_edited_from_the_teacher_page(client, admin):
+    from app.models import Course, Discipline
+
+    s = season("2026-2027", current=True)
+    paul = person("Paul", "Prof", teacher=Teacher())
+    flute = Discipline(name="Flûte")
+    db.session.add(flute)
+    db.session.flush()
+    course = Course(season=s, discipline=flute, teacher=paul.teacher)
+    db.session.add(course)
+    db.session.commit()
+    page = client.get(f"/professeurs/{paul.id}").get_data(as_text=True)
+    assert f"/catalogue/cours/{course.id}/modifier?retour=prof" in page and "Nouveau cours avec Paul" in page
+    form = client.get(f"/catalogue/cours/nouveau?saison={s.id}&prof={paul.id}&retour=prof").get_data(as_text=True)
+    assert f'<option selected value="{paul.id}"' in form or f'value="{paul.id}" selected' in form
+    response = client.post(
+        f"/catalogue/cours/nouveau?saison={s.id}&prof={paul.id}&retour=prof",
+        data={"discipline_id": flute.id, "teacher_id": paul.id},
+    )
+    assert response.status_code == 302 and response.location.endswith(f"/professeurs/{paul.id}#enseignement")

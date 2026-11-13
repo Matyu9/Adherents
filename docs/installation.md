@@ -59,6 +59,20 @@ Si le proxy est sur une autre machine, mettez dans `BIND_ADDR` l'adresse privée
 
 Vérifiez ensuite l'installation dans **Paramètres → État de l'installation**, ou sur `/sante` : base, migrations, dossier de données, planificateur et emails.
 
+## Agendas des salles (Google Workspace)
+
+Facultatif, pour une association qui gère ses salles dans Google Workspace. L'appli lit leur occupation et y réserve les séances (voir [cours.md](cours.md#agendas-des-salles-google-workspace)).
+
+1. **Projet Google Cloud** : créez un projet, activez l'**API Google Calendar** et l'**Admin SDK API**.
+2. **Compte de service** : créez-en un, sans rôle sur le projet, puis une **clé JSON**. Posez-la sur le serveur, lisible par l'appli seule, et indiquez son chemin dans `GOOGLE_SERVICE_ACCOUNT_FILE`. Ne la mettez ni dans le dépôt ni dans la base, et sauvegardez-la à part, comme `SECRET_KEY`.
+3. **Rôle d'administration limité** : dans la console d'administration de Workspace, créez un rôle personnalisé qui ne donne que la **lecture des ressources d'agenda** (bâtiments et salles), et attribuez-le au compte de service. **Pas de délégation sur tout le domaine** : une fuite de la clé ne donne alors accès qu'aux salles.
+4. **Partage des agendas** : partagez l'agenda de chaque salle avec l'adresse du compte de service, avec le droit **« Apporter des modifications aux événements »**. L'écran **Salles de l'organisation** liste les salles dont l'agenda n'est pas encore partagé.
+5. Dans l'appli : **Catalogue → Disciplines, niveaux et lieux → Salles de l'organisation**, appliquez l'aperçu, puis **Envoyer les séances à venir**.
+
+Le service scheduler (`flask run-tasks`) envoie ensuite les changements au fil de l'eau.
+
+**À vérifier sur votre organisation** au premier essai : le nom exact du droit dans le rôle personnalisé, et si le partage de l'agenda est nécessaire pour lire l'occupation d'une salle. Faites ce premier essai sur une salle de test.
+
 ## Sauvegarde et restauration
 
 Il faut sauvegarder tout le dossier `data/`. Pour une copie cohérente de la base pendant que l'appli tourne :

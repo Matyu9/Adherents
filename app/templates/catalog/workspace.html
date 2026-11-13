@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Salles de l'organisation{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('catalog.references') }}#salles">← Disciplines, niveaux et lieux</a></p>
+<div class="page-head">
+  <div>
+    <h1>Salles de l'organisation</h1>
+    <p class="muted">Les salles de l'agenda de l'organisation (Google Workspace), comparées à celles du catalogue. Rien n'est écrit sans votre accord.{% if pending %} {{ pending }} envoi(s) vers les agendas en attente.{% endif %}</p>
+  </div>
+  <form method="post" action="{{ url_for('catalog.workspace_push') }}" data-confirm="Envoyer toutes les séances à venir aux agendas des salles reliées ?">
+    {{ csrf() }}<button type="submit" class="secondary">Envoyer les séances à venir</button>
+  </form>
+</div>
+{% if error %}
+<p class="flash flash-error">Impossible de lire les salles : {{ error }}. Vérifiez la clé du compte de service et son rôle d'administration (lecture des ressources d'agenda).</p>
+{% else %}
+{% if plan.unshared %}
+<section class="flash flash-warning">
+  <p><strong>Agenda non partagé avec le compte de service</strong> : l'appli ne peut ni lire leur occupation ni y réserver les séances. Partagez l'agenda de chacune avec le droit « Apporter des modifications aux événements ».</p>
+  <ul>{% for r in plan.unshared %}<li>{{ r.label }} <small class="muted">{{ r.calendar_id }}</small></li>{% endfor %}</ul>
+</section>
+{% endif %}
+<form method="post">
+  {{ csrf() }}
+  <section class="card settings-block">
+    <h2>Nouvelles salles ({{ plan.new | length }})</h2>
+    {% for resource, building in plan.new %}
+    <label class="form-check"><input type="checkbox" name="create" value="{{ resource.resourceEmail }}" checked> <strong>{{ resource.resourceName }}</strong>{% if building %} · {{ building }}{% endif %}{% if resource.capacity %} · {{ resource.capacity }} places{% endif %}</label>
+    {% else %}<p class="muted">Aucune.</p>{% endfor %}
+  </section>
+  {% if plan.linkable %}
+  <section class="card settings-block">
+    <h2>Salles du catalogue à relier ({{ plan.linkable | length }})</h2>
+    <p class="small muted">Même nom : la salle du catalogue est reliée à l'agenda, au lieu d'en créer une seconde.</p>
+    {% for room, resource in plan.linkable %}
+    <label class="form-check"><input type="checkbox" name="link-{{ room.id }}" value="{{ resource.resourceEmail }}" checked> {{ room.label }} → {{ resource.resourceName }}</label>
+    {% endfor %}
+  </section>
+  {% endif %}
+  {% if plan.unlinked %}
+  <section class="card settings-block">
+    <h2>Salles du catalogue sans agenda ({{ plan.unlinked | length }})</h2>
+    <p class="small muted">Une salle municipale peut rester hors de l'organisation. Sinon, choisissez son agenda.</p>
+    {% for room in plan.unlinked %}
+    <label>{{ room.label }}
+      <select name="link-{{ room.id }}" aria-label="Agenda de {{ room.label }}">
+        <option value="">— hors de l'organisation</option>
+        {% for email, resource in all_rooms.items() %}<option value="{{ email }}">{{ resource.resourceName }}</option>{% endfor %}
+      </select></label>
+    {% endfor %}
+  </section>
+  {% endif %}
+  {% if plan.renamed %}
+  <section class="card settings-block">
+    <h2>Renommées dans l'organisation ({{ plan.renamed | length }})</h2>
+    {% for room, resource in plan.renamed %}
+    <label class="form-check"><input type="checkbox" name="rename" value="{{ room.id }}" checked> {{ room.name }} → <strong>{{ resource.resourceName }}</strong></label>
+    {% endfor %}
+  </section>
+  {% endif %}
+  {% if plan.gone %}
+  <section class="card settings-block">
+    <h2>Disparues de l'organisation ({{ plan.gone | length }})</h2>
+    <p class="small muted">Rien n'est supprimé : archivée, une salle n'est plus proposée, les saisons passées la gardent.</p>
+    {% for room in plan.gone %}
+    <label class="form-check"><input type="checkbox" name="archive" value="{{ room.id }}"> Archiver {{ room.label }}</label>
+    {% endfor %}
+  </section>
+  {% endif %}
+  <button type="submit">Appliquer</button>
+</form>
+{% endif %}
+{% endblock %}

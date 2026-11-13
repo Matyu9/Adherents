@@ -8,7 +8,7 @@ Pour le fonctionnement interne, voir [annuaire.md](annuaire.md), [catalogue.md](
 
 - [Pour les familles](#pour-les-familles)
   - [Se connecter](#se-connecter)
-  - [Mon espace](#mon-espace)
+  - [Accueil et Ma famille](#accueil-et-ma-famille)
   - [Inscrire ou réinscrire ses enfants](#inscrire-ou-réinscrire-ses-enfants)
   - [Nouvelle famille : s'inscrire sans compte](#nouvelle-famille--sinscrire-sans-compte)
 - [Pour les professeurs](#pour-les-professeurs)
@@ -16,6 +16,8 @@ Pour le fonctionnement interne, voir [annuaire.md](annuaire.md), [catalogue.md](
   - [Les saisons](#les-saisons)
   - [L'annuaire](#lannuaire)
   - [Le catalogue](#le-catalogue)
+  - [Les élèves d'un cours](#les-élèves-dun-cours)
+  - [Calendrier et séances](#calendrier-et-séances)
   - [Préparer une nouvelle saison](#préparer-une-nouvelle-saison)
   - [Les campagnes d'inscription](#les-campagnes-dinscription)
   - [Relire et valider les dossiers](#relire-et-valider-les-dossiers)
@@ -42,18 +44,24 @@ Le compte est créé par le secrétariat, depuis votre fiche d'adhérent. Vous r
 - **Mot de passe oublié ?** Le lien sous le formulaire de connexion envoie un email de réinitialisation.
 - Le même compte ouvre les autres applis de l'association, comme l'Inventaire.
 
-Si, une fois connecté, **Mon espace** n'apparaît pas dans le menu, votre compte n'est pas encore relié à votre fiche : contactez le secrétariat.
+Si, une fois connecté, **Ma famille** n'apparaît pas dans le menu, votre compte n'est pas encore relié à votre fiche : contactez le secrétariat.
 
-### Mon espace
+### Accueil et Ma famille
 
-**Menu → Mon espace.** On y trouve ce que l'association sait de votre foyer :
+**Menu → Accueil** montre ce qui compte maintenant : les séances des 7 prochains jours (les vôtres et celles de vos enfants), les inscriptions ouvertes et les dernières notifications non lues. Un administrateur y voit aussi le nombre de personnes connectées.
+
+**Prévenir d'une absence** (depuis Ma famille ou l'Accueil) : les séances des quatre semaines à venir, avec **Sera absent(e)** pour chacune. Le professeur est prévenu, et l'absence est notée « excusée » à l'appel. On peut la retirer tant que la séance n'a pas eu lieu.
+
+**Menu → Ma famille.** On y trouve ce que l'association sait de votre foyer. Si l'association l'autorise, **Modifier nos coordonnées** met à jour l'adresse, les téléphones ou les emails (les vôtres et ceux de vos enfants), sauf pendant un dossier d'inscription en cours. Le secrétariat en est prévenu. Vous y trouvez :
 
 - l'**adresse** et les **téléphones** du foyer ;
 - le **prélèvement** : vos coordonnées bancaires, masquées (seuls les quatre derniers chiffres de l'IBAN), et si un mandat est signé ;
-- chaque **membre du foyer**, avec ses adhésions saison par saison et ses **cours** (jour, horaire, salle, professeur) ;
+- chaque **membre du foyer**, avec ses adhésions saison par saison et ses **cours** (jour, horaire ou heure de passage, salle, professeur), les cours où il est en **liste d'attente**, et ses **présences** si l'association les montre ;
 - le **matériel prêté** à chacun, s'il est suivi dans l'Inventaire ;
 - vos **dossiers d'inscription** et leur statut ;
 - les **engagements** donnés (droit à l'image, règlement intérieur…), datés.
+
+**Les cours dans votre agenda** : **Ajouter les cours à mon agenda** crée une adresse à coller dans Google Agenda, Apple ou Outlook. Les déplacements et annulations y apparaissent, avec quelques heures de décalage : un changement de dernière minute vous est aussi envoyé par message.
 
 **Plusieurs foyers ?** Un parent présent dans deux familles (famille recomposée) voit les deux.
 
@@ -63,7 +71,7 @@ Si, une fois connecté, **Mon espace** n'apparaît pas dans le menu, votre compt
 
 ### Inscrire ou réinscrire ses enfants
 
-Pendant une campagne d'inscription, le tableau de bord l'annonce, et une relance arrive chaque semaine tant que le dossier n'est pas envoyé.
+Pendant une campagne d'inscription, l'Accueil l'annonce, et une relance arrive chaque semaine tant que le dossier n'est pas envoyé.
 
 1. **Menu → Inscriptions**, puis **Commencer le dossier** (ou **Continuer**).
 2. Le dossier est **pré-rempli** avec ce que l'association sait de votre foyer. Les cours de l'an dernier sont déjà proposés pour la nouvelle saison : même discipline, même niveau. Vérifiez chaque partie.
@@ -74,7 +82,8 @@ Pendant une campagne d'inscription, le tableau de bord l'annonce, et une relance
 
 - cochez ou décochez **Inscrire cet élève cette saison** (un enfant qui ne revient pas reste dans la liste, décoché) ;
 - vérifiez son identité, sa catégorie et sa classe ;
-- choisissez ses **cours**. Un cours **complet** est grisé : indiquez votre souhait dans la case **Souhaits, contraintes d'horaire**, le secrétariat vous recontactera ;
+- choisissez ses **cours** : ils sont présentés en cartes, par discipline, avec le jour, l'horaire, le professeur et les places qui restent. Un cours **complet** est grisé : cochez la liste d'attente, ou indiquez votre souhait dans la case **Souhaits, contraintes d'horaire** ;
+- si l'association fait choisir **une discipline** plutôt qu'un horaire, cochez la ou les disciplines (avec leur description et les âges conseillés) et indiquez vos **disponibilités** : le secrétariat vous proposera un cours ;
 - répondez aux consentements demandés pour lui (droit à l'image…).
 
 Pour ajouter un enfant, ou vous inscrire vous-même, utilisez **+ Ajouter un élève** sous la liste.
@@ -89,7 +98,7 @@ Pour ajouter un enfant, ou vous inscrire vous-même, utilisez **+ Ajouter un él
 
 - Le secrétariat relit le dossier. Vous êtes prévenu(e) par une notification, et par email si l'envoi d'emails est configuré.
 - S'il manque quelque chose, le dossier revient **à corriger**, avec un message : corrigez, puis renvoyez-le.
-- Une fois **validé**, l'inscription est enregistrée et apparaît dans Mon espace.
+- Une fois **validé**, l'inscription est enregistrée et apparaît dans Ma famille.
 
 Un dossier envoyé ne se modifie plus, sauf s'il vous est renvoyé. Après la clôture de la campagne, il ne se modifie plus du tout : contactez le secrétariat.
 
@@ -103,7 +112,7 @@ Si la campagne accueille les nouvelles familles, le secrétariat diffuse l'adres
 
 Le lien sert autant de fois que nécessaire pendant 30 jours. Si vous en redemandez un, c'est le nouveau qui compte : l'ancien ne sert plus. Pas d'email après quelques minutes ? Regardez dans les courriers indésirables, puis recommencez.
 
-Une fois le dossier validé, le secrétariat peut vous créer un compte pour accéder à Mon espace.
+Une fois le dossier validé, le secrétariat peut vous créer un compte pour accéder à Ma famille.
 
 ---
 
@@ -113,7 +122,23 @@ Une fois le dossier validé, le secrétariat peut vous créer un compte pour acc
 
 Pour la saison en cours, ou une autre choisie en haut à droite, la page liste **vos cours** et, pour chacun, **les élèves inscrits**, leur âge et leurs **responsables** (nom, téléphone, email), pour les joindre.
 
-Vous ne voyez que vos élèves, et rien d'autre de l'annuaire. Un professeur qui est aussi parent retrouve son foyer dans **Mon espace**.
+Le nom d'un élève ouvre **sa fiche** : ses cours de la saison (y compris ceux d'autres professeurs), ses responsables et ses présences à vos cours. **+ Ajouter à ce cours** l'inscrit à un autre de vos cours qui a encore de la place (orchestre, atelier…) ; le secrétariat est prévenu.
+
+Vous ne voyez que vos élèves, et rien d'autre de l'annuaire. Un professeur qui est aussi parent retrouve son foyer dans **Ma famille** ; un professeur qui n'est que professeur n'a ni **Ma famille** ni **Inscriptions** dans son menu.
+
+**Menu → Mon planning** : vos séances en semaine ou en mois, comme un agenda.
+
+**Menu → Mes séances** : vos séances d'aujourd'hui, des huit semaines à venir et de la semaine passée, y compris celles où vous remplacez un collègue.
+
+- **Modifier la séance** : choisissez la date et l'horaire, puis **Voir les salles libres à ce créneau**, et la salle. Ce qui gêne (salle prise, élève qui a un autre cours…) est signalé.
+- **Annuler** : indiquez le motif, il est transmis aux familles.
+- **Toutes les séances → + Ajouter une séance** : un rattrapage.
+
+Le changement s'applique tout de suite : les familles reçoivent un message, et le secrétariat est prévenu. Une séance déjà commencée ne se modifie plus, et l'association peut fixer un délai avant la séance.
+
+**Faire l'appel** : depuis **Mes séances**, le jour de la séance. Chaque élève a une ligne avec quatre gros boutons : **Présent** (d'office), **Absent**, **Excusé** et **Retard** (qui compte comme une présence). Une absence prévenue par la famille arrive déjà sur « Excusé », avec sa date. **Tous présents** remet tout le monde présent, sauf les absences prévenues ; le compteur en haut se met à jour. Puis **Enregistrer l'appel**. Vous pouvez le corriger pendant 7 jours ; ensuite, adressez-vous au secrétariat. N'écrivez jamais de motif : il n'y a pas de case pour cela, exprès. Le nom d'un élève ouvre sa fiche.
+
+**Mon agenda** : une adresse à ajouter à votre agenda (Google Agenda : *Autres agendas → + → À partir de l'URL*), avec vos séances à jour. Elle n'est affichée qu'une fois : gardez-la pour vous.
 
 ---
 
@@ -123,7 +148,7 @@ Le rôle **Gestionnaire** gère l'annuaire, le catalogue et les inscriptions. Il
 
 ### Les saisons
 
-**Annuaire → Saisons.** Une saison (« 2027-2028 ») a une date de début et de fin.
+**Administration → Saisons.** Une saison (« 2027-2028 ») a une date de début et de fin. Cochez **En préparation** pour la cacher aux professeurs et aux familles le temps de la préparer : seuls ceux qui ont accès au catalogue ou à l'annuaire la voient.
 
 - **La saison en cours se choisit à la main** (**Mettre en cours**), elle ne dépend pas de la date : la réinscription à la saison suivante s'ouvre pendant que l'actuelle tourne encore.
 - Une saison qui a des adhésions, des cours ou des campagnes ne se supprime pas.
@@ -132,7 +157,7 @@ Le rôle **Gestionnaire** gère l'annuaire, le catalogue et les inscriptions. Il
 
 **Annuaire → Personnes** et **Foyers.** Une personne a **une seule fiche**, quels que soient ses rôles (élève, responsable, professeur). Le **foyer** est le payeur : adresse, IBAN et cotisations s'y rattachent.
 
-- **Rechercher** : nom, prénom ou email, sans se soucier des accents. Les filtres montrent les élèves de la saison, les anciens adhérents ou les fiches archivées.
+- **Rechercher** : nom, prénom ou email, sans se soucier des accents. Par défaut, la liste montre les personnes de la saison choisie : les élèves, même partis en cours d'année, et les membres de leurs foyers. Les filtres montrent aussi les seuls élèves, toutes les fiches, les anciens adhérents ou les fiches archivées. Une recherche qui trouve des fiches hors saison propose de les voir. La saison choisie reste la même d'une page à l'autre (catalogue, tarifs, calendrier).
 - **Un foyer** a un responsable 1, éventuellement un responsable 2, et des personnes à charge. Un adulte seul est le responsable 1 de son propre foyer.
 - **Doublons** : **Fusionner un doublon**, depuis l'une des deux fiches. L'écran montre les différences et demande quoi garder ; foyers, téléphones, adhésions, cours et consentements s'additionnent.
 - **Archiver** plutôt que supprimer : une fiche archivée sort des listes, son historique reste.
@@ -142,7 +167,7 @@ La fiche d'une personne montre aussi l'historique de ce qui l'a concernée (jour
 
 ### Le catalogue
 
-**Menu → Catalogue.** Il a trois onglets.
+**Menu → Catalogue.** Il a quatre onglets.
 
 **Disciplines, niveaux et lieux.** Ces listes valent pour toutes les saisons : types de discipline, disciplines, niveaux (dans l'ordre, cycle 1 avant cycle 2), sites et leurs salles.
 
@@ -157,7 +182,8 @@ La fiche d'une personne montre aussi l'historique de ce qui l'a concernée (jour
 - une **discipline**, un **niveau** (facultatif) et un **groupe** pour distinguer deux cours semblables (« groupe A », « ados ») ;
 - un **professeur**, ou « À trouver » ;
 - un **jour** et un **horaire**, une **salle** ;
-- un **effectif maximum**, laissé vide pour un cours individuel ;
+- un **effectif maximum**, ou rien pour ne pas limiter ;
+- la case **Cours individuel**, quand chaque élève passe à son heure dans le créneau du professeur ;
 - la case **Complet**, pour ne plus le proposer aux familles.
 
 **+ Nouveau cours** en crée un ; **Dupliquer** part d'un cours existant pour en créer un autre groupe. La colonne **Effectif** montre les inscrits sur le maximum : un cours plein est marqué **complet**.
@@ -168,9 +194,55 @@ La fiche d'une personne montre aussi l'historique de ce qui l'a concernée (jour
 
 **Professeurs.** Les disciplines enseignées par chaque professeur, saison par saison. Confier un cours à un professeur ajoute sa discipline d'office ; à l'inverse, on ne peut pas lui retirer une discipline dont il a encore un cours.
 
+**Disciplines de la saison.** Pour chaque saison, le nom et le type d'une discipline, si elle est proposée, sa description pour les familles, ses places et les âges admis. Renommer une discipline pour une saison ne change pas son nom dans les saisons passées. La copie d'une saison recopie ces réglages.
+
+### Les élèves d'un cours
+
+**Catalogue → cliquez sur un cours.** La page montre ses élèves, leurs responsables et leur date d'arrivée, l'effectif face au maximum, et en bas les élèves partis en cours d'année.
+
+- **Télécharger la liste** donne un fichier à ouvrir dans un tableur.
+- **Écrire aux familles** ouvre votre messagerie avec les adresses des responsables en copie cachée.
+
+En cours d'année, le secrétariat peut :
+
+- **+ Inscrire un élève** : choisissez-le parmi les adhérents de la saison, et la date de son premier cours. On peut aussi partir de sa fiche : **Annuaire → la personne → Adhésions → + Inscrire à un cours**.
+- **Changer de cours** : l'élève quitte son groupe et rejoint l'autre à la date indiquée. Les deux cours gardent la trace du passage.
+- **Abandon** : l'élève quitte ce cours seulement ; il reste adhérent et garde ses autres cours. S'il quitte l'association, passez plutôt son adhésion en « Abandon » sur sa fiche.
+
+Un cours complet accepte quand même l'élève, avec un avertissement.
+
+**Liste d'attente.** Quand un cours est complet, la famille peut demander la liste d'attente dans son dossier, et le secrétariat peut y ajouter un élève depuis la page du cours. L'ordre se change avec ↑ et ↓. Quand une place se libère, vous recevez une notification : rien n'est fait d'office, c'est vous qui inscrivez la personne (**Inscrire**, avec la date de son premier cours) ou qui la retirez.
+
+**Cours individuel.** Sur la page du cours, chaque ligne a une heure de passage et une durée. Les élèves se rangent dans l'ordre de la journée et les plages libres s'affichent en haut. Un passage qui déborde du créneau, qui chevauche celui d'un autre élève ou un autre cours du même élève est signalé en rouge. Le professeur voit ces heures dans **Mes élèves**, la famille dans **Ma famille**.
+
+**La cotisation n'est jamais recalculée toute seule.** Si celle du foyer était déjà calculée, elle est marquée **à revoir** dans **Tarifs → Cotisations**, avec la liste des changements. Recalculez-la, ou indiquez qu'il n'y a rien à changer.
+
+### Calendrier et séances
+
+**Menu → Calendrier.**
+
+1. **Dates des cours** : reprise et fin, si elles diffèrent de celles de la saison.
+2. **Périodes sans cours** : jours fériés, vacances, fermetures. Rien n'est ajouté d'office.
+   - **Ajouter les jours fériés de la saison** les calcule (Pâques, Ascension et Pentecôte compris) ; un clic de plus n'ajoute pas de doublon.
+   - **Importer un fichier** : un `.ics` (le calendrier scolaire officiel de votre zone, un export de Google Agenda ou d'Outlook) ou un `.csv` (`nom ; premier jour ; dernier jour`). Un aperçu dit ce qui est nouveau, déjà là ou hors saison ; seules les lignes cochées sont ajoutées.
+   - **Maintenir les cours** : la période reste affichée dans les calendriers, mais ne retire plus de séance (un jour férié où l'école reste ouverte, par exemple).
+   - Les périodes apparaissent dans tous les calendriers (planning, Mon planning, séances d'un cours), hachurées avec leur nom. Si un professeur place une séance pendant une période sans cours, le secrétariat est prévenu.
+3. **Générer les séances** : l'aperçu dit combien seront créées. Relancez-la après avoir changé un horaire ou ajouté une période : les séances passées et celles modifiées à la main ne bougent pas.
+4. **Délai** (facultatif) : en deçà de ce nombre d'heures avant une séance, le professeur ne la modifie plus lui-même.
+
+**Séances d'un cours** (page du cours → **Séances**) : en haut, le nombre d'élèves, de séances passées et à venir, et le taux de présence. L'onglet **Liste** montre les séances à venir, puis les passées (repliées) ; l'onglet **Calendrier** les montre mois par mois. Le menu **⋯** de chaque séance sert à la modifier, l'annuler, nommer un **remplaçant** ou **revenir en arrière** sur un changement fait par un professeur. Les familles sont prévenues à chaque fois.
+
+**Salles de l'organisation** (si l'association relie son Google Workspace) : **Catalogue → Disciplines, niveaux et lieux → Salles de l'organisation** reprend les salles de l'organisation, avec un aperçu avant d'écrire. Les séances sont ensuite réservées dans l'agenda de chaque salle, et une réunion déjà posée sur une salle apparaît quand on déplace une séance.
+
+**Présences** : le nombre d'appels faits s'affiche dans les séances d'un cours ; le secrétariat corrige un appel à tout moment. **Menu → Absences** liste les élèves qui atteignent le seuil fixé dans le calendrier (aucun tant qu'il n'est pas fixé). Le calendrier règle aussi si les familles voient les présences de leurs enfants (oui par défaut).
+
+**Menu → Salles** : les salles de chaque site, avec leurs places, leur agenda relié, les séances et heures occupées de la semaine et les cours réguliers de la saison. Le nom d'une salle ouvre son planning.
+
+**Menu → Planning** : l'emploi du temps de l'association, en **Semaine** (grille horaire), **Mois** ou **Semaine type**, pour tout ou pour une salle, un professeur ou un site. Les flèches changent de semaine ou de mois, **Aujourd'hui** y revient. Les séances passées sont grisées, les annulées barrées. La couleur d'un cours se choisit dans sa fiche ; sinon, elle dépend de la discipline.
+
 ### Préparer une nouvelle saison
 
-1. **Annuaire → Saisons → + Nouvelle saison** (sans la mettre en cours).
+1. **Administration → Saisons → + Nouvelle saison** (sans la mettre en cours).
 2. **Catalogue → Copier une saison** : choisissez la saison d'origine et la nouvelle. L'aperçu montre ce qui sera repris, laissé de côté ou à compléter, **sans rien écrire**.
    - un cours d'une discipline archivée n'est pas recopié ;
    - un niveau ou une salle archivés sont laissés vides ;
@@ -187,6 +259,7 @@ La fiche d'une personne montre aussi l'historique de ce qui l'a concernée (jour
 - **Saison** et **titre**, vu par les familles (« Réinscriptions 2027-2028 ») ;
 - **ouverture** et **clôture**, à la minute près : les familles ne peuvent modifier ou envoyer leur dossier qu'entre les deux ;
 - **Accueillir aussi les nouvelles familles** : ouvre un formulaire public. Son adresse s'affiche sur la page de la campagne, à diffuser ;
+- **Les familles choisissent** : un cours précis (jour et horaire), ou une discipline. Dans ce second cas, la famille donne ses disponibilités ; après la validation du dossier, l'élève apparaît dans **Catalogue → À placer**, où le secrétariat l'inscrit dans un cours de la discipline ;
 - **Message aux familles** : affiché en tête de chaque dossier (pièces à prévoir, dates…).
 
 Puis, sur la page de la campagne, **+ Ajouter un consentement** pour chaque engagement à demander :
@@ -248,9 +321,9 @@ L'administrateur a tous les droits. Les sections ci-dessous concernent ce qui lu
 
 ### Comptes des familles
 
-- **Créer un compte** : depuis la fiche d'un adulte qui a une adresse email, **Créer son compte et l'inviter**. La personne reçoit l'invitation par email. Pour un élève de 16 ou 17 ans, confirmez qu'un responsable légal a donné son accord.
-- **Relier les comptes existants** : **Annuaire → Rattachement** propose, pour chaque compte sans fiche, les fiches qui lui ressemblent (même email, même nom). Vérifiez avant de valider : l'email seul ne suffit pas, une adresse est souvent partagée dans une famille.
-- Tant qu'un compte n'est pas relié à la fiche d'un responsable, la famille ne voit ni **Mon espace** ni son dossier d'inscription.
+- **Peut se connecter** : sur la fiche d'un adulte qui a une adresse email, cochez la case. Le compte est créé et la personne reçoit l'invitation par email. Décocher la case coupe l'accès sans supprimer le compte ; la recocher le rétablit. Avant 16 ans, la case est grisée et la raison s'affiche ; pour un élève de 16 ou 17 ans, cochez d'abord l'accord du responsable légal.
+- **Relier un compte existant** : la fiche propose les comptes sans fiche qui lui ressemblent (même email, même nom), avec **C'est son compte** ; **Rattacher un autre compte existant** cherche par email. Dans l'autre sens, la page d'un compte sans fiche propose les fiches qui lui ressemblent, et **Comptes → Sans fiche dans l'annuaire** les liste tous. Vérifiez avant de valider : l'email seul ne suffit pas, une adresse est souvent partagée dans une famille.
+- Tant qu'un compte n'est pas relié à la fiche d'un responsable, la famille ne voit ni **Ma famille** ni son dossier d'inscription.
 
 ### Professeurs et contrats
 
@@ -259,7 +332,10 @@ L'administrateur a tous les droits. Les sections ci-dessous concernent ce qui lu
 - **+ Nouveau professeur** crée la fiche et le contrat. Un parent ou un élève adulte qui enseigne garde sa fiche : cherchez-le dans « Il est déjà dans l'annuaire ? ».
 - Le **contrat** (statut, arrivée, départ, email professionnel) n'est visible que d'ici.
 - **Un départ s'indique par sa date** : la fiche et l'historique restent. Le professeur n'est plus proposé pour les saisons suivantes, et la copie de saison laisse ses cours « à trouver ».
-- La fiche d'un professeur montre ses disciplines et ses cours de la saison en cours.
+- Le contrat a aussi ses **diplômes** et des notes internes.
+- **Présentation et photo** : montrées aux familles de ses élèves, dans Ma famille. La photo est recadrée au carré et perd ses métadonnées.
+- **Disponibilités** : les créneaux où il peut donner cours, pour préparer la saison.
+- **Enseignement** : ses disciplines et ses cours de la saison choisie, avec **Modifier** sur chaque cours et **+ Nouveau cours avec…**, qui reviennent sur sa fiche.
 
 ### Coordonnées bancaires
 
@@ -267,7 +343,7 @@ Voir et modifier les IBAN demande le droit « Voir et modifier les coordonnées 
 
 ### Relier l'Inventaire à l'espace adhérent
 
-Pour que les familles voient le matériel prêté dans **Mon espace**, à faire une fois :
+Pour que les familles voient le matériel prêté dans **Ma famille**, à faire une fois :
 
 1. **Ici, Applications → Inventaire → Modifier** : cochez « Peut récupérer la liste des comptes… ». L'Inventaire peut alors lire la liste des personnes de l'annuaire (nom, année de naissance, sans email ni adresse).
 2. **Dans l'Inventaire, Personnes → Rattacher à l'annuaire → Récupérer les personnes depuis Adhérents.** Chaque fiche de l'Inventaire (élève, musicien) est reliée à sa personne d'Adhérents. Seule une fiche déjà reliée au même compte de connexion est cochée d'office ; **un même nom ne suffit pas** : vérifiez (année de naissance, pupitre, classe) avant de cocher.
@@ -278,7 +354,7 @@ Refaites l'étape 2 quand de nouveaux élèves arrivent : les fiches déjà reli
 
 ### Conservation des données
 
-**Annuaire → Conservation** (droit « Fixer la durée de conservation et anonymiser »).
+**Paramètres → Données personnelles** (droit « Fixer la durée de conservation et anonymiser »).
 
 1. **Fixez la durée**, en saisons. Tant qu'elle n'est pas choisie, rien n'est proposé : c'est une décision de l'association, à inscrire au registre des traitements.
 2. L'écran liste alors les **personnes à anonymiser** : sans adhésion depuis ce nombre de saisons, sans compte, sans profil de professeur, et dont aucun membre du foyer n'a d'adhésion récente.
@@ -306,16 +382,23 @@ Le même écran supprime les **anciens dossiers d'inscription** des campagnes tr
 | Pendant la campagne | Secrétariat | Relire, renvoyer ou valider ; reporter dans le logiciel de gestion |
 | Toutes les semaines | (automatique) | Relances des dossiers non envoyés |
 | Rentrée | Secrétariat | Mettre la nouvelle saison en cours ; fermer les cours complets ; trouver les professeurs « à trouver » |
+| Toute l'année | Secrétariat | Arrivées, changements de cours et abandons ; revoir les cotisations marquées « à revoir » |
 | Une fois par an | Administrateur | Anonymiser les anciens adhérents, supprimer les anciens dossiers |
 
 ## Qui peut faire quoi
 
 | Action | Famille | Professeur | Gestionnaire | Administrateur |
 |---|:-:|:-:|:-:|:-:|
-| Mon espace, son dossier d'inscription | ✓ | ✓ (s'il est parent) | ✓ (s'il est parent) | ✓ (s'il est parent) |
+| Ma famille, son dossier d'inscription | ✓ | ✓ (s'il est parent) | ✓ (s'il est parent) | ✓ (s'il est parent) |
 | Mes élèves | | ✓ | | |
 | Annuaire : consulter, modifier, fusionner | | | ✓ | ✓ |
 | Catalogue : consulter, modifier, copier une saison | | | ✓ | ✓ |
+| Élèves d'un cours : inscrire, changer de cours, noter un abandon | | | ✓ | ✓ |
+| Modifier, annuler, ajouter une séance | | ✓ (ses cours) | ✓ | ✓ |
+| Calendrier, génération des séances, remplaçants, retour en arrière | | | ✓ | ✓ |
+| Agenda à s'abonner | ✓ | ✓ | ✓ | ✓ |
+| Faire l'appel | | ✓ (7 jours) | ✓ | ✓ |
+| Voir les présences de ses enfants | ✓ (si l'association le permet) | | | |
 | Campagnes : créer, relire, valider, fichier de report | | | ✓ | ✓ |
 | Fichier de report avec les IBAN, coordonnées bancaires | | | | ✓ |
 | Professeurs et contrats | | | | ✓ |
@@ -336,6 +419,6 @@ Ce tableau décrit les rôles de base. Les droits de chaque rôle se cochent dan
 
 **Le dossier d'une nouvelle famille concerne une famille déjà connue.** Validez-le, puis fusionnez les fiches et les foyers en double depuis l'annuaire : adhésions, cours, consentements et dossiers suivent.
 
-**Mon espace dit « Matériel prêté : indisponible ».** L'Inventaire ne répond pas, ou le jeton n'est plus valable. Le reste de la page marche ; voir [Relier l'Inventaire](#relier-linventaire-à-lespace-adhérent).
+**Ma famille dit « Matériel prêté : indisponible ».** L'Inventaire ne répond pas, ou le jeton n'est plus valable. Le reste de la page marche ; voir [Relier l'Inventaire](#relier-linventaire-à-lespace-adhérent).
 
 **Un matériel prêté n'apparaît pas.** La fiche de l'élève dans l'Inventaire n'est pas encore reliée à l'annuaire (**Personnes → Rattacher à l'annuaire**, dans l'Inventaire), ou le prêt n'est pas une garde validée ou en cours.

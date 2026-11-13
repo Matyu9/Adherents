@@ -377,7 +377,7 @@ def test_preparation(school):
     enroll(m["alice"], school["choeur"])
     enroll(m["basile"], school["piano45"])
     prepared = fees.prepare(school["home"], school["season"])
-    assert prepared.order.picks == (
+    assert tuple(pick[:2] for pick in prepared.order.picks) == (
         (school["alice"].id, school["f30"].id),
         (school["alice"].id, school["chorale"].id),
         (school["basile"].id, school["f45"].id),
@@ -402,7 +402,7 @@ def test_eleve_qui_abandonne_ou_non_inscrit(school):
     enroll(m["alice"], school["flute30"])
     m["alice"].enrollments[0].status = Enrollment.WITHDRAWN
     prepared = fees.prepare(school["home"], school["season"])
-    assert prepared.order.picks == ()
+    assert tuple(pick[:2] for pick in prepared.order.picks) == ()
     assert school["basile"].id not in {st.id for st in prepared.order.students}
 
 

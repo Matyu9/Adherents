@@ -14,6 +14,7 @@
   <title>{% block title %}Espace adhérents{% endblock %} · {{ asso_name }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/pico.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% block styles %}{% endblock %}
   {#- Le thème sombre tient dans un seul fichier : chargé selon l'appareil, toujours, ou jamais selon le choix de chacun. -#}
   {% if theme != "light" %}<link rel="stylesheet" href="{{ url_for('static', filename='css/dark.css') }}"{% if theme != "dark" %} media="(prefers-color-scheme: dark)"{% endif %}>{% endif %}
   <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}" defer></script>
@@ -32,44 +33,43 @@
     </a>
     <nav>
       <p class="nav-title">Au quotidien</p>
-      {{ navlink("dashboard.index", "Tableau de bord", "home") }}
+      {{ navlink("dashboard.index", "Accueil", "home") }}
       {{ navlink("notifications.index", "Notifications", "bell", ["notifications"]) }}
-      {% if current_user.person %}{{ navlink("member.index", "Mon espace", "home") }}{% endif %}
-      {{ navlink("enrollment.index", "Inscriptions", "clipboard") }}
-      {% if current_user.person and current_user.person.teacher %}{{ navlink("enrollment.my_students", "Mes élèves", "music") }}{% endif %}
-      {% if can(current_user, "directory.view") or can(current_user, "teacher.manage") or can(current_user, "directory.anonymize") %}
+      {% set family = is_family(current_user) %}
+      {% if current_user.person %}{% if family %}{{ navlink("member.index", "Ma famille", "users") }}{% endif %}{{ navlink("lessons.my_planning", "Mon planning", "calendar") }}{% endif %}
+      {% if family or not (current_user.person and current_user.person.teacher) %}{{ navlink("enrollment.index", "Inscriptions", "clipboard") }}{% endif %}
+      {% if current_user.person and current_user.person.teacher %}{{ navlink("enrollment.my_students", "Mes élèves", "music") }}{{ navlink("lessons.mine", "Mes séances", "calendar") }}{% endif %}
+      {% if can(current_user, "directory.view") or can(current_user, "teacher.manage") %}
       <p class="nav-title">Annuaire</p>
       {% if can(current_user, "directory.view") %}
       {{ navlink("directory.index", "Personnes", "users") }}
       {{ navlink("directory.households", "Foyers", "home") }}
       {% endif %}
       {% if can(current_user, "teacher.manage") %}{{ navlink("teachers.index", "Professeurs", "music", ["teachers"]) }}{% endif %}
-      {% if can(current_user, "directory.edit") %}{{ navlink("directory.seasons", "Saisons", "calendar") }}{% endif %}
-      {% if can(current_user, "directory.edit") and can(current_user, "account.manage") %}{{ navlink("directory.link_accounts", "Rattachement", "user-check") }}{% endif %}
-      {% if can(current_user, "directory.anonymize") %}{{ navlink("retention.index", "Conservation", "clock", ["retention"]) }}{% endif %}
       {% endif %}
-      {% if can(current_user, "catalog.view") or can(current_user, "registration.view") or can(current_user, "fee.view") %}
+      {% if can(current_user, "catalog.view") or can(current_user, "registration.view") or can(current_user, "fee.view") or can(current_user, "lesson.manage") %}
       <p class="nav-title">Enseignement</p>
       {% endif %}
       {% if can(current_user, "catalog.view") %}
       {{ navlink("catalog.index", "Catalogue", "layers", ["catalog"]) }}
+      {{ navlink("lessons.planning", "Planning", "calendar") }}
+      {{ navlink("lessons.rooms", "Salles", "home") }}
       {% endif %}
+      {% if can(current_user, "lesson.manage") %}{{ navlink("lessons.calendar", "Calendrier", "clock") }}{{ navlink("lessons.absences", "Absences", "user-check") }}{% endif %}
       {% if can(current_user, "registration.view") %}{{ navlink("campaigns.index", "Campagnes", "calendar", ["campaigns"]) }}{% endif %}
       {% if can(current_user, "fee.view") %}{{ navlink("fees.index", "Tarifs", "tag", ["fees"]) }}{% endif %}
-      {% if current_user.is_admin or can(current_user, "account.manage") or can(current_user, "group.manage") or can(current_user, "client.manage") or can(current_user, "settings.manage") or can(current_user, "activity.view") %}
+      {% if current_user.is_admin or can(current_user, "directory.edit") or can(current_user, "account.manage") or can(current_user, "group.manage") or can(current_user, "client.manage") or can(current_user, "settings.manage") or can(current_user, "directory.anonymize") or can(current_user, "activity.view") %}
       <p class="nav-title">Administration</p>
+      {% if can(current_user, "directory.edit") %}{{ navlink("directory.seasons", "Saisons", "calendar") }}{% endif %}
       {% if can(current_user, "account.manage") %}{{ navlink("accounts.index", "Comptes", "users", ["accounts"]) }}{% endif %}
       {% if can(current_user, "group.manage") %}{{ navlink("groups.index", "Groupes", "layers", ["groups"]) }}{% endif %}
       {% if can(current_user, "client.manage") %}{{ navlink("applications.index", "Applications", "package", ["applications"]) }}{% endif %}
       {% if current_user.is_admin %}{{ navlink("roles.index", "Rôles", "key", ["roles"]) }}{% endif %}
-      {% if can(current_user, "settings.manage") %}{{ navlink("settings.index", "Paramètres", "settings", ["settings", "health"]) }}{% endif %}
+      {% if can(current_user, "settings.manage") %}{{ navlink("settings.index", "Paramètres", "settings", ["settings", "health", "retention"]) }}
+      {% elif can(current_user, "directory.anonymize") %}{{ navlink("retention.index", "Paramètres", "settings", ["retention"]) }}{% endif %}
       {% if can(current_user, "activity.view") %}{{ navlink("journal.index", "Journal", "clock", ["journal"]) }}{% endif %}
       {% endif %}
     </nav>
-    <div class="sidebar-user">
-      {{ avatar(current_user) }}
-      <a href="{{ url_for('account.index') }}" class="who"><strong>{{ current_user.full_name }}</strong><small>{{ current_user.role_label }}</small></a>
-    </div>
   </aside>
   <div class="scrim" data-close-nav hidden></div>
 
@@ -84,6 +84,14 @@
         <ul dir="rtl">
           <li><small>{{ current_user.full_name }} · {{ current_user.role_label }}</small></li>
           <li><a href="{{ url_for('account.index') }}">Mon compte</a></li>
+          {% if has_staff_rights(current_user) %}
+          <li>
+            <form method="post" action="{{ url_for('account.member_view') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="link-button">{{ "Quitter la vue adhérent" if current_user.member_view else "Passer en vue adhérent" }}</button>
+            </form>
+          </li>
+          {% endif %}
           {% if can(current_user, "settings.manage") %}<li><a href="{{ url_for('settings.index') }}">Paramètres</a></li>{% endif %}
           <li>
             <form method="post" action="{{ url_for('auth.logout') }}">
@@ -96,6 +104,15 @@
     </header>
 
     <main class="content">
+      {% if current_user.member_view %}
+      <div class="member-view-banner" role="status">
+        <span>{{ icon("user-check", 18) }} <strong>Vue adhérent</strong> : vous voyez l'appli comme un adhérent, avec ses seuls droits.</span>
+        <form method="post" action="{{ url_for('account.member_view') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="secondary small">Revenir à mes droits</button>
+        </form>
+      </div>
+      {% endif %}
       {#- Messages collés sous la barre du haut : visibles même quand la page s'ouvre sur une ancre (#banque…). -#}
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}

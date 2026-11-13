@@ -1,19 +1,46 @@
 """Catalogue : disciplines, niveaux, sites et salles communs à toutes les saisons, puis les cours de chaque saison et
 les disciplines de chaque professeur. Voir docs/catalogue.md."""
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+import csv
+import io
+from datetime import date
+
+from flask import Blueprint, Response, abort, flash, redirect, render_template, request, url_for
+from flask_login import current_user
 from flask_wtf import FlaskForm
-from wtforms import BooleanField, IntegerField, SelectField, SelectMultipleField, StringField, TextAreaField, TimeField
+from wtforms import (
+    BooleanField,
+    DateField,
+    IntegerField,
+    SelectField,
+    SelectMultipleField,
+    StringField,
+    TextAreaField,
+    TimeField,
+)
 from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError
 from wtforms.widgets import CheckboxInput, ListWidget
 
 from ..extensions import db, fold
 from ..filters import date_fr
-from ..models import Course, Discipline, DisciplineType, Level, Room, Season, Site, Teacher
-from ..permissions import require
-from ..services import catalog, directory, registration
+from ..models import (
+    Course,
+    Discipline,
+    DisciplineType,
+    Enrollment,
+    Level,
+    Membership,
+    Room,
+    Season,
+    Site,
+    Teacher,
+    WaitlistEntry,
+)
+from ..permissions import can, require
+from ..services import catalog, courses, directory, registration
 from ..services.activity import diff, log
 from ..services.catalog import CatalogError
+from ..services.courses import CourseError
 from .directory import _blank, _strip
 
 bp = Blueprint("catalog", __name__, url_prefix="/catalogue")
@@ -29,6 +56,8 @@ COURSE_FIELDS = (
     "ends_at",
     "room_id",
     "capacity",
+    "individual",
+    "color",
     "marked_full",
     "notes",
 )
@@ -50,11 +79,7 @@ def _optional_int(value):
 
 
 def _selected_season():
-    """Saison demandée (?saison=), sinon la saison en cours, sinon la plus récente."""
-    seasons = directory.seasons()
-    wanted = request.args.get("saison", type=int)
-    season = next((s for s in seasons if s.id == wanted), None) if wanted else None
-    return season or directory.current_season() or (seasons[0] if seasons else None), seasons
+    return directory.selected_season()
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +106,13 @@ class CourseForm(FlaskForm):
     capacity = IntegerField(
         "Effectif maximum",
         validators=[Optional(), NumberRange(min=1, max=500, message="Entre 1 et 500.")],
-        description="Vide : pas de limite, par exemple pour un cours individuel.",
+        description="Vide : pas de limite.",
+    )
+    individual = BooleanField("Cours individuel : chaque élève a son heure de passage dans le créneau")
+    color = SelectField(
+        "Couleur dans les plannings",
+        choices=[("", "Automatique, d'après la discipline"), *Course.COLORS.items()],
+        default="",
     )
     marked_full = BooleanField("Complet : ne plus proposer ce cours aux inscriptions")
     notes = TextAreaField("Notes", validators=[Optional(), Length(max=5000)])
@@ -89,10 +120,17 @@ class CourseForm(FlaskForm):
     def __init__(self, *args, season, course=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._season = season
+        if self.color.data is None:  # cours sans couleur : WTForms garde None, qui n'est pas un choix
+            self.color.data = ""
         keep_discipline = course.discipline if course else None
         self.discipline_id.choices = [("", "—")] + [
-            (str(d.id), d.name + (" (archivée)" if d.archived else ""))
-            for d in _with(catalog.disciplines(), keep_discipline)
+            (
+                str(d.id),
+                d.name_for(season)
+                + (" (archivée)" if d.archived else "")
+                + ("" if d.offered_in(season) else " (pas proposée cette saison)"),
+            )
+            for d in _with([d for d in catalog.disciplines() if d.offered_in(season)], keep_discipline)
         ]
         self.level_id.choices = [("", "—")] + [
             (str(lv.id), lv.name + (" (archivé)" if lv.archived else ""))
@@ -137,6 +175,8 @@ class CourseForm(FlaskForm):
             "ends_at": self.ends_at.data,
             "room_id": self.room_id.data,
             "capacity": self.capacity.data,
+            "individual": self.individual.data,
+            "color": self.color.data or None,
             "marked_full": self.marked_full.data,
             "notes": _blank(self.notes.data),
         }
@@ -202,15 +242,35 @@ class SiteForm(FlaskForm):
 class RoomForm(FlaskForm):
     site_id = Choice("Site", coerce=_optional_int, validators=[DataRequired("Choisissez le site.")])
     name = StringField("Nom", validators=[DataRequired(), Length(max=80)], filters=[_strip])
+    capacity = IntegerField("Places", validators=[Optional(), NumberRange(min=1, max=5000, message="Entre 1 et 5000.")])
+    calendar_id = StringField(
+        "Agenda de la salle",
+        validators=[Optional(), Length(max=255)],
+        filters=[_strip],
+        description="Adresse de la ressource dans l'agenda de l'organisation (…@resource.calendar.google.com).",
+    )
 
     def __init__(self, *args, room=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self._room = room
         self.site_id.choices = [("", "—")] + [
             (str(s.id), s.name) for s in _with(catalog.sites(), room.site if room else None)
         ]
 
+    def validate_calendar_id(self, field):
+        if not field.data:
+            return
+        other = db.session.scalar(db.select(Room).filter_by(calendar_id=field.data))
+        if other is not None and other is not self._room:
+            raise ValidationError(f"Cet agenda est déjà celui de {other.label}.")
+
     def values(self):
-        return {"site_id": self.site_id.data, "name": self.name.data}
+        return {
+            "site_id": self.site_id.data,
+            "name": self.name.data,
+            "capacity": self.capacity.data,
+            "calendar_id": _blank(self.calendar_id.data),
+        }
 
 
 # Chaque liste de référence : modèle, formulaire, libellés, et champ qui doit être unique (avec sa portée).
@@ -232,7 +292,13 @@ REFERENCES = {
     },
     "niveaux": {"model": Level, "form": LevelForm, "one": "niveau", "title": "Niveaux", "fields": ("name", "position")},
     "sites": {"model": Site, "form": SiteForm, "one": "site", "title": "Sites", "fields": ("name", "address")},
-    "salles": {"model": Room, "form": RoomForm, "one": "salle", "title": "Salles", "fields": ("site_id", "name")},
+    "salles": {
+        "model": Room,
+        "form": RoomForm,
+        "one": "salle",
+        "title": "Salles",
+        "fields": ("site_id", "name", "capacity", "calendar_id"),
+    },
 }
 
 
@@ -303,6 +369,11 @@ def _save_course(course, form, season):
     others = db.session.scalars(catalog.course_query(season, weekday=course.weekday)).all()
     for other, reason in catalog.conflicts(course, others):
         flash(f"Chevauchement ({reason}) avec {catalog.describe(other)}.", "warning")
+    if course.room and course.room.capacity and course.capacity and course.capacity > course.room.capacity:
+        flash(
+            f"L'effectif maximum ({course.capacity}) dépasse les places de {course.room.label} ({course.room.capacity}).",
+            "warning",
+        )
     return changes
 
 
@@ -318,6 +389,8 @@ def create_course():
     if copy and copy.season_id == season.id:  # « dupliquer » : un autre groupe du même cours
         form = CourseForm(season=season, obj=copy, formdata=None)
         form.marked_full.data = False
+    elif request.method == "GET" and (prof := request.args.get("prof", type=int)):  # depuis la page du professeur
+        form.teacher_id.data = prof
     if form.validate_on_submit():
         course = Course(season=season, discipline_id=form.discipline_id.data)
         db.session.add(course)
@@ -325,8 +398,15 @@ def create_course():
         log("course.create", f"Cours ajouté : {catalog.describe(course)}")
         db.session.commit()
         flash("Cours ajouté.", "success")
-        return redirect(url_for(".index", saison=season.id))
+        return _back_to_teacher(course.teacher_id) or redirect(url_for(".index", saison=season.id))
     return render_template("catalog/course_form.html", form=form, season=season, course=None)
+
+
+def _back_to_teacher(person_id):
+    """?retour=prof : on vient de la page du professeur, on y revient."""
+    if request.args.get("retour") == "prof" and person_id:
+        return redirect(url_for("teachers.detail", person_id=person_id) + "#enseignement")
+    return None
 
 
 def _course(course_id):
@@ -342,9 +422,11 @@ def edit_course(course_id):
     if form.validate_on_submit():
         if changes := _save_course(course, form, season):
             log("course.update", f"Cours modifié : {catalog.describe(course)}", changes=changes)
+            if "capacity" in changes or "marked_full" in changes:
+                courses.announce_free_place(course)
         db.session.commit()
         flash("Cours enregistré.", "success")
-        return redirect(url_for(".index", saison=season.id))
+        return _back_to_teacher(course.teacher_id) or redirect(url_for(".index", saison=season.id))
     return render_template("catalog/course_form.html", form=form, season=season, course=course)
 
 
@@ -360,11 +442,364 @@ def delete_course(course_id):
             "error",
         )
         return redirect(url_for(".index", saison=season_id))
+    if course.waitlist:
+        flash("Ce cours a une liste d'attente : il ne peut pas être supprimé.", "error")
+        return redirect(url_for(".index", saison=season_id))
     log("course.delete", f"Cours supprimé : {catalog.describe(course)}")
     db.session.delete(course)
     db.session.commit()
     flash("Cours supprimé.", "success")
     return redirect(url_for(".index", saison=season_id))
+
+
+# ---------------------------------------------------------------------------
+# Élèves d'un cours : inscrire, transférer, noter un abandon (voir docs/cours.md)
+# ---------------------------------------------------------------------------
+
+
+class _DatedForm(FlaskForm):
+    on = DateField("À partir du", validators=[DataRequired("Indiquez la date.")], default=date.today)
+
+
+class EnrollStudentForm(_DatedForm):
+    membership_id = Choice("Élève", coerce=_optional_int, validators=[DataRequired("Choisissez l'élève.")])
+
+
+class EnrollCourseForm(_DatedForm):
+    course_id = Choice("Cours", coerce=_optional_int, validators=[DataRequired("Choisissez le cours.")])
+
+
+class WithdrawForm(_DatedForm):
+    on = DateField("Date de l'abandon", validators=[DataRequired("Indiquez la date.")], default=date.today)
+
+
+def _course_choices(form, course_list, counts):
+    form.course_id.choices = [("", "—")] + [
+        (str(c.id), catalog.describe(c) + (" — complet" if c.is_full(counts.get(c.id, 0)) else "")) for c in course_list
+    ]
+
+
+def _back_to(enrollment_or_course, person=None):
+    """Retour à la fiche de l'élève (?retour=fiche) ou, par défaut, à la page du cours."""
+    if request.values.get("retour") == "fiche" and person is not None:
+        return redirect(url_for("directory.person", person_id=person.id) + "#adhesions")
+    course = enrollment_or_course if isinstance(enrollment_or_course, Course) else enrollment_or_course.course
+    return redirect(url_for(".course", course_id=course.id))
+
+
+def _flash_all(messages, category="warning"):
+    for message in messages:
+        flash(message, category)
+
+
+@bp.route("/cours/<int:course_id>")
+@require("catalog.view")
+def course(course_id):
+    if not can(current_user, "directory.view"):  # la liste des élèves vient de l'annuaire
+        abort(403)
+    record = _course(course_id)
+    active, gone = courses.roster(record)
+    count = len(active)
+    slots, free = courses.planning(record) if record.individual else ([], [])
+    if record.individual:
+        active = [e for e, _ in slots]
+    return render_template(
+        "catalog/course.html",
+        course=record,
+        season=record.season,
+        active=active,
+        gone=gone,
+        count=count,
+        full=record.is_full(count),
+        guardians={e.id: courses.guardians_of(e.membership.person) for e in active},
+        waiting_guardians={w.id: courses.guardians_of(w.membership.person) for w in courses.waitlist(record)},
+        recipients=courses.recipients(record),
+        withdraw_form=WithdrawForm(),
+        slot_warnings={e.id: w for e, w in slots},
+        waiting=courses.waitlist(record),
+        waitlist_candidates=[
+            m for m in courses.candidates(record) if not any(w.course_id == record.id and w.waiting for w in m.waitlist)
+        ],
+        free=free,
+    )
+
+
+@bp.route("/cours/<int:course_id>/eleves.csv")
+@require("catalog.view")
+def course_csv(course_id):
+    if not can(current_user, "directory.view"):
+        abort(403)
+    record = _course(course_id)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, delimiter=";")
+    writer.writerow(courses.ROSTER_COLUMNS)
+    writer.writerows(courses.roster_rows(record))
+    response = Response("\ufeff" + buffer.getvalue(), mimetype="text/csv")  # BOM : Excel lit les accents
+    response.headers["Content-Disposition"] = f'attachment; filename="eleves-cours-{record.id}.csv"'
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@bp.route("/cours/<int:course_id>/inscrire", methods=["GET", "POST"])
+@require("enrollment.edit")
+def enroll_student(course_id):
+    """Depuis la page du cours : choisir l'élève parmi les adhérents de la saison."""
+    record = _course(course_id)
+    form = EnrollStudentForm()
+    form.membership_id.choices = [("", "—")] + [
+        (
+            str(m.id),
+            m.person.sort_name + (f" ({m.person.age(record.season.starts_on)} ans)" if m.person.birth_date else ""),
+        )
+        for m in courses.candidates(record)
+    ]
+    if form.validate_on_submit():
+        membership = db.session.get(Membership, form.membership_id.data) or abort(404)
+        try:
+            _, warnings = courses.enroll(membership, record, form.on.data)
+        except CourseError as exc:
+            form.on.errors.append(str(exc))
+        else:
+            db.session.commit()
+            flash(f"{membership.person.full_name} est inscrit(e) au cours.", "success")
+            _flash_all(warnings)
+            return redirect(url_for(".course", course_id=record.id))
+    return render_template("catalog/enroll_form.html", form=form, course=record, membership=None, enrollment=None)
+
+
+@bp.route("/adhesions/<int:membership_id>/inscrire", methods=["GET", "POST"])
+@require("enrollment.edit")
+def enroll_in_course(membership_id):
+    """Depuis la fiche de l'élève : choisir le cours de la saison."""
+    membership = db.session.get(Membership, membership_id) or abort(404)
+    form = EnrollCourseForm()
+    _course_choices(form, *courses.open_courses(membership))
+    if form.validate_on_submit():
+        record = db.session.get(Course, form.course_id.data) or abort(404)
+        try:
+            _, warnings = courses.enroll(membership, record, form.on.data)
+        except CourseError as exc:
+            form.on.errors.append(str(exc))
+        else:
+            db.session.commit()
+            flash(f"{membership.person.full_name} est inscrit(e) à {record.title}.", "success")
+            _flash_all(warnings)
+            return redirect(url_for("directory.person", person_id=membership.person_id) + "#adhesions")
+    return render_template("catalog/enroll_form.html", form=form, course=None, membership=membership, enrollment=None)
+
+
+def _enrollment(enrollment_id):
+    return db.session.get(Enrollment, enrollment_id) or abort(404)
+
+
+@bp.route("/inscriptions/<int:enrollment_id>/transferer", methods=["GET", "POST"])
+@require("enrollment.edit")
+def transfer(enrollment_id):
+    enrollment = _enrollment(enrollment_id)
+    membership = enrollment.membership
+    if not enrollment.active:
+        flash("Cette inscription est déjà terminée.", "error")
+        return _back_to(enrollment, membership.person)
+    form = EnrollCourseForm()
+    _course_choices(form, *courses.open_courses(membership, exclude=enrollment.course))
+    if form.validate_on_submit():
+        record = db.session.get(Course, form.course_id.data) or abort(404)
+        try:
+            new, warnings = courses.transfer(enrollment, record, form.on.data)
+        except CourseError as exc:
+            form.on.errors.append(str(exc))
+        else:
+            db.session.commit()
+            flash(f"{membership.person.full_name} passe à {record.title}.", "success")
+            _flash_all(warnings)
+            return _back_to(new, membership.person)
+    return render_template(
+        "catalog/enroll_form.html", form=form, course=enrollment.course, membership=membership, enrollment=enrollment
+    )
+
+
+class SlotForm(FlaskForm):
+    starts_at = TimeField("Heure de passage", validators=[Optional()])
+    minutes = IntegerField("Durée (min)", validators=[Optional()])
+
+
+@bp.route("/inscriptions/<int:enrollment_id>/passage", methods=["POST"])
+@require("enrollment.edit")
+def set_slot(enrollment_id):
+    enrollment = _enrollment(enrollment_id)
+    form = SlotForm()
+    if not form.validate_on_submit():
+        flash("Heure ou durée illisible.", "error")
+        return redirect(url_for(".course", course_id=enrollment.course_id))
+    try:
+        warnings = courses.set_slot(enrollment, form.starts_at.data, form.minutes.data)
+    except CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+        flash(f"Passage de {enrollment.membership.person.full_name} enregistré.", "success")
+        _flash_all(warnings)
+    return redirect(url_for(".course", course_id=enrollment.course_id) + f"#e{enrollment.id}")
+
+
+@bp.route("/inscriptions/<int:enrollment_id>/abandon", methods=["POST"])
+@require("enrollment.edit")
+def withdraw(enrollment_id):
+    enrollment = _enrollment(enrollment_id)
+    person = enrollment.membership.person
+    form = WithdrawForm()
+    if not form.validate_on_submit():
+        flash("Indiquez une date valide.", "error")
+        return _back_to(enrollment, person)
+    try:
+        courses.withdraw(enrollment, form.on.data)
+    except CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+        flash(f"Abandon de {person.full_name} noté. Son adhésion reste active.", "success")
+    return _back_to(enrollment, person)
+
+
+def _entry(entry_id):
+    return db.session.get(WaitlistEntry, entry_id) or abort(404)
+
+
+def _to_waitlist(course):
+    return redirect(url_for(".course", course_id=course.id) + "#attente")
+
+
+@bp.route("/cours/<int:course_id>/attente", methods=["POST"])
+@require("enrollment.edit")
+def add_to_waitlist(course_id):
+    record = _course(course_id)
+    membership = db.session.get(Membership, request.form.get("membership_id", type=int) or 0)
+    if membership is None:
+        flash("Choisissez l'élève.", "error")
+        return _to_waitlist(record)
+    try:
+        courses.add_to_waitlist(membership, record)
+    except CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+        flash(f"{membership.person.full_name} est en liste d'attente.", "success")
+    return _to_waitlist(record)
+
+
+@bp.route("/attente/<int:entry_id>/<any(monter, descendre):direction>", methods=["POST"])
+@require("enrollment.edit")
+def move_waitlist(entry_id, direction):
+    entry = _entry(entry_id)
+    try:
+        courses.move_in_waitlist(entry, -1 if direction == "monter" else 1)
+    except CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+    return _to_waitlist(entry.course)
+
+
+@bp.route("/attente/<int:entry_id>/retirer", methods=["POST"])
+@require("enrollment.edit")
+def remove_from_waitlist(entry_id):
+    entry = _entry(entry_id)
+    try:
+        courses.remove_from_waitlist(entry)
+    except CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+        flash(f"{entry.membership.person.full_name} est retiré(e) de la liste d'attente.", "success")
+    return _to_waitlist(entry.course)
+
+
+@bp.route("/attente/<int:entry_id>/inscrire", methods=["POST"])
+@require("enrollment.edit")
+def enroll_from_waitlist(entry_id):
+    entry = _entry(entry_id)
+    form = _DatedForm()
+    if not form.validate_on_submit():
+        flash("Indiquez une date valide.", "error")
+        return _to_waitlist(entry.course)
+    try:
+        _, warnings = courses.enroll_from_waitlist(entry, form.on.data)
+    except CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        db.session.commit()
+        flash(f"{entry.membership.person.full_name} est inscrit(e) au cours.", "success")
+        _flash_all(warnings)
+    return redirect(url_for(".course", course_id=entry.course_id))
+
+
+# ---------------------------------------------------------------------------
+# Salles de l'organisation (Google Workspace)
+# ---------------------------------------------------------------------------
+
+
+@bp.route("/salles-workspace", methods=["GET", "POST"])
+@require("catalog.edit")
+def workspace_rooms():
+    """GET : aperçu, sans rien écrire. POST : les choix cochés."""
+    from ..services import google_workspace, room_calendars
+
+    if not room_calendars.enabled():
+        abort(404)
+    if request.method == "POST":
+        try:
+            done = room_calendars.apply_sync(
+                create=set(request.form.getlist("create")),
+                rename={int(v) for v in request.form.getlist("rename") if v.isdigit()},
+                link={
+                    int(key.removeprefix("link-")): value
+                    for key, value in request.form.items()
+                    if key.startswith("link-") and key.removeprefix("link-").isdigit() and value
+                },
+                archive={int(v) for v in request.form.getlist("archive") if v.isdigit()},
+            )
+        except google_workspace.GoogleError as exc:
+            db.session.rollback()
+            flash(f"Google ne répond pas comme prévu : {exc}. Rien n'a été changé.", "error")
+            return redirect(url_for(".workspace_rooms"))
+        db.session.commit()
+        flash(", ".join(f"{n} salle(s) {label}" for label, n in done.items() if n) or "Rien à changer.", "success")
+        if done["créées"] or done["reliées"]:
+            flash("Pensez à envoyer les séances à venir aux agendas des salles reliées.", "info")
+        return redirect(url_for(".workspace_rooms"))
+    try:
+        plan = room_calendars.sync_plan()
+    except google_workspace.GoogleError as exc:
+        return render_template(
+            "catalog/workspace.html", plan=None, error=str(exc), pending=room_calendars.pending_count()
+        )
+    return render_template(
+        "catalog/workspace.html",
+        plan=plan,
+        error=None,
+        pending=room_calendars.pending_count(),
+        all_rooms=plan.resources,
+    )
+
+
+@bp.route("/salles-workspace/envoyer", methods=["POST"])
+@require("catalog.edit")
+def workspace_push():
+    from ..services import room_calendars
+
+    if not room_calendars.enabled():
+        abort(404)
+    count = room_calendars.push_upcoming()
+    db.session.commit()
+    sent, failed, dropped = room_calendars.deliver_pending()
+    flash(f"{count} séance(s) à envoyer : {sent} envoi(s) faits, {failed} à réessayer plus tard.", "success")
+    return redirect(url_for(".workspace_rooms"))
 
 
 # ---------------------------------------------------------------------------
@@ -475,7 +910,7 @@ def teacher_disciplines(person_id):
             )
         db.session.commit()
         flash("Disciplines enregistrées.", "success")
-        return redirect(url_for(".teachers", saison=season.id))
+        return _back_to_teacher(person_id) or redirect(url_for(".teachers", saison=season.id))
     courses = catalog.sorted_courses(c for c in teacher.courses if c.season_id == season.id)
     return render_template("catalog/teacher_form.html", form=form, teacher=teacher, season=season, courses=courses)
 
@@ -494,7 +929,11 @@ def references():
         "niveaux": catalog.levels(include_archived=True),
         "sites": catalog.sites(include_archived=True),
     }
-    return render_template("catalog/references.html", lists=lists, usage=catalog.usage)
+    from ..services import room_calendars
+
+    return render_template(
+        "catalog/references.html", lists=lists, usage=catalog.usage, workspace=room_calendars.enabled()
+    )
 
 
 def _reference(kind, item_id):
@@ -590,3 +1029,174 @@ def delete_item(kind, item_id):
         db.session.commit()
         flash("Supprimé.", "success")
     return redirect(url_for(".references") + f"#{kind}")
+
+
+# ---------------------------------------------------------------------------
+# Disciplines de la saison : nom, type, proposée ou non, description, places et âges
+# ---------------------------------------------------------------------------
+
+
+@bp.route("/disciplines")
+@require("catalog.view")
+def season_disciplines():
+    season, seasons = _selected_season()
+    if season is None:
+        return redirect(url_for(".index"))
+    courses = db.session.scalars(db.select(Course).where(Course.season_id == season.id)).all()
+    per_discipline = {}
+    for course in courses:
+        per_discipline[course.discipline_id] = per_discipline.get(course.discipline_id, 0) + 1
+    return render_template(
+        "catalog/season_disciplines.html",
+        season=season,
+        seasons=seasons,
+        disciplines=catalog.disciplines(),
+        courses=per_discipline,
+    )
+
+
+@bp.route("/disciplines/<int:discipline_id>", methods=["GET", "POST"])
+@require("catalog.edit")
+def season_discipline(discipline_id):
+    from ..models import DisciplineSeason, DisciplineType
+
+    discipline = db.session.get(Discipline, discipline_id) or abort(404)
+    season, _ = _selected_season()
+    if season is None:
+        abort(404)
+    settings = discipline.settings_for(season)
+    error = None
+    if request.method == "POST":
+        form = request.form
+
+        def number(name, label):
+            value = (form.get(name) or "").strip()
+            if not value:
+                return None
+            if not value.isdigit() or int(value) <= 0 or int(value) > 999:
+                raise CatalogError(f"{label} : un nombre entier positif.")
+            return int(value)
+
+        try:
+            values = {
+                "name": ((form.get("name") or "").strip()[:80] or None),
+                "type_id": form.get("type_id", type=int) or None,
+                "offered": form.get("offered") == "1",
+                "description": (form.get("description") or "").strip()[:3000] or None,
+                "capacity": number("capacity", "Places"),
+                "min_age": number("min_age", "Âge minimum"),
+                "max_age": number("max_age", "Âge maximum"),
+            }
+            if values["min_age"] and values["max_age"] and values["min_age"] > values["max_age"]:
+                raise CatalogError("L'âge minimum dépasse l'âge maximum.")
+            if values["name"] == discipline.name:
+                values["name"] = None
+            if values["type_id"] and db.session.get(DisciplineType, values["type_id"]) is None:
+                raise CatalogError("Type inconnu.")
+        except CatalogError as exc:
+            error = str(exc)
+        else:
+            if settings is None:
+                settings = DisciplineSeason(discipline=discipline, season=season)
+                db.session.add(settings)
+            changes = diff(settings, tuple(values), values)
+            for key, value in values.items():
+                setattr(settings, key, value)
+            if changes:
+                log(
+                    "discipline.season",
+                    f"Discipline {discipline.name} en {season.label} modifiée",
+                    changes=changes,
+                )
+            db.session.commit()
+            flash("Réglages de la saison enregistrés.", "success")
+            return redirect(url_for(".season_disciplines", saison=season.id))
+    return render_template(
+        "catalog/season_discipline_form.html",
+        discipline=discipline,
+        season=season,
+        settings=settings,
+        types=catalog.discipline_types(),
+        error=error,
+    )
+
+
+# ---------------------------------------------------------------------------
+# À placer : élèves validés « par discipline », à inscrire dans un cours
+# ---------------------------------------------------------------------------
+
+
+def _to_place(season):
+    """[(discipline, [(adhésion, note)], [cours de la discipline])] : les demandes encore sans cours de la discipline."""
+    from ..models import Membership
+
+    rows = db.session.scalars(
+        db.select(Membership).where(
+            Membership.season_id == season.id, Membership.placement.is_not(None), Membership.status == Membership.ACTIVE
+        )
+    ).all()
+    by_discipline = {}
+    for membership in rows:
+        placed = {e.course.discipline_id for e in membership.enrollments if e.active}
+        for discipline_id in (membership.placement or {}).get("disciplines", []):
+            if discipline_id not in placed:
+                by_discipline.setdefault(discipline_id, []).append((membership, membership.placement.get("note")))
+    result = []
+    for discipline in catalog.disciplines(include_archived=True):
+        if discipline.id in by_discipline:
+            own = catalog.sorted_courses(
+                db.session.scalars(
+                    db.select(Course).where(Course.season_id == season.id, Course.discipline_id == discipline.id)
+                )
+            )
+            people = sorted(by_discipline[discipline.id], key=lambda r: (r[0].person.last_name, r[0].person.first_name))
+            result.append((discipline, people, own))
+    return result
+
+
+@bp.route("/a-placer")
+@require("enrollment.edit")
+def to_place():
+    season, seasons = _selected_season()
+    if season is None:
+        return redirect(url_for(".index"))
+    return render_template(
+        "catalog/to_place.html",
+        season=season,
+        seasons=seasons,
+        rows=_to_place(season),
+        counts=registration.enrolled_counts(season),
+    )
+
+
+@bp.route("/a-placer/<int:membership_id>", methods=["POST"])
+@require("enrollment.edit")
+def place(membership_id):
+    from ..models import Membership
+
+    membership = db.session.get(Membership, membership_id) or abort(404)
+    season = membership.season
+    discipline_id = request.form.get("discipline_id", type=int)
+    if request.form.get("action") == "retirer":
+        wanted = [d for d in (membership.placement or {}).get("disciplines", []) if d != discipline_id]
+        membership.placement = {**(membership.placement or {}), "disciplines": wanted} if wanted else None
+        log("enrollment.placement", f"Demande retirée pour {membership.person.full_name}", person=membership.person)
+        db.session.commit()
+        flash("Demande retirée.", "success")
+        return redirect(url_for(".to_place", saison=season.id))
+    course = db.session.get(Course, request.form.get("course_id", type=int) or 0)
+    if course is None or course.season_id != season.id or course.discipline_id != discipline_id:
+        abort(400)
+    try:
+        _enrollment, warnings = courses.enroll(
+            membership, course, max(date.today(), season.starts_on), user=current_user
+        )
+    except courses.CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        for message in warnings:
+            flash(message, "warning")
+        db.session.commit()
+        flash(f"{membership.person.full_name} est inscrit(e) à {course.title}.", "success")
+    return redirect(url_for(".to_place", saison=season.id))

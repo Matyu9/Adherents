@@ -3,7 +3,7 @@
 import hashlib
 import hmac
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from authlib.oauth2.rfc6749 import ClientMixin
 from flask_login import UserMixin
@@ -11,6 +11,9 @@ from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .extensions import db, login_manager
+
+# Clé de session de la vue adhérent (voir Account.member_view).
+MEMBER_VIEW_KEY = "vue_adherent"
 
 
 class TimestampMixin:
@@ -103,6 +106,8 @@ class Account(UserMixin, TimestampMixin, db.Model):
     totp_enabled_at = db.Column(db.DateTime)
     totp_last_counter = db.Column(db.Integer)  # dernier code accepté : un code ne sert qu'une fois
     theme = db.Column(db.String(10))  # "light", "dark" ou None (celui du système)
+    # Empreinte du jeton de l'agenda à s'abonner (.ics) ; le jeton lui-même n'est montré qu'une fois.
+    calendar_token = db.Column(db.String(64), unique=True)
     text_size = db.Column(db.String(10))  # "large", "xlarge" ou None (normale)
 
     groups = db.relationship(
@@ -134,7 +139,14 @@ class Account(UserMixin, TimestampMixin, db.Model):
 
     @property
     def is_admin(self):
-        return self.role == Role.ADMIN
+        return self.role == Role.ADMIN and not self.member_view
+
+    @property
+    def member_view(self):
+        """Vue adhérent activée par ce compte pour sa session : ses droits sont alors ceux d'un adhérent."""
+        from flask import has_request_context, session
+
+        return has_request_context() and session.get(MEMBER_VIEW_KEY) == self.id
 
     @property
     def totp_enabled(self):
@@ -598,9 +610,49 @@ class Season(db.Model):
     label = db.Column(db.String(20), nullable=False, unique=True)
     starts_on = db.Column(db.Date, nullable=False)
     ends_on = db.Column(db.Date, nullable=False)
+    # Reprise et fin des cours ; vides : les dates de la saison. Voir docs/cours.md.
+    lessons_from = db.Column(db.Date)
+    lessons_until = db.Column(db.Date)
+    # En préparation : invisible pour qui n'a pas accès au catalogue (professeurs, familles), le temps de la préparer.
+    hidden = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+
+    breaks = db.relationship(
+        "SeasonBreak", back_populates="season", cascade="all, delete-orphan", order_by="SeasonBreak.starts_on"
+    )
+
+    @property
+    def lessons_window(self):
+        return self.lessons_from or self.starts_on, self.lessons_until or self.ends_on
 
     def __repr__(self):
         return f"<Season {self.label}>"
+
+
+class SeasonBreak(db.Model):
+    """Période sans cours d'une saison : jour férié (calculé sur demande), vacances (saisies ou importées d'un
+    fichier) ou fermeture. Avec « cours maintenus », elle reste affichée dans les calendriers sans retirer de séance."""
+
+    HOLIDAY, VACATION, CLOSURE = "ferie", "vacances", "fermeture"
+    KINDS = {HOLIDAY: "Jour férié", VACATION: "Vacances", CLOSURE: "Fermeture"}
+
+    __table_args__ = (db.CheckConstraint("ends_on >= starts_on", name="ck_season_break_dates"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="CASCADE"), nullable=False, index=True)
+    label = db.Column(db.String(80), nullable=False)
+    starts_on = db.Column(db.Date, nullable=False)
+    ends_on = db.Column(db.Date, nullable=False)
+    kind = db.Column(db.String(12), nullable=False, default=CLOSURE, server_default=CLOSURE)
+    keep_lessons = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+
+    @property
+    def kind_label(self):
+        return self.KINDS.get(self.kind, self.kind)
+
+    season = db.relationship("Season", back_populates="breaks")
+
+    def covers(self, day):
+        return self.starts_on <= day <= self.ends_on
 
 
 class Membership(TimestampMixin, db.Model):
@@ -625,6 +677,9 @@ class Membership(TimestampMixin, db.Model):
     school_class = db.Column(db.String(40))
     # Étiquettes de l'élève pour les tarifs de la saison (« personnel », « boursier »…), voir docs/tarifs.md.
     fee_tags = db.Column(db.JSON, nullable=False, default=list, server_default="[]")
+    # Disciplines demandées dans un dossier « par discipline », à placer dans un cours par le secrétariat :
+    # {"disciplines": [id…], "note": "disponibilités"}. Vide : rien à placer.
+    placement = db.Column(db.JSON)
 
     person = db.relationship("Person", back_populates="memberships")
     season = db.relationship("Season")
@@ -640,7 +695,13 @@ class Teacher(db.Model):
     started_on = db.Column(db.Date)
     left_on = db.Column(db.Date)  # un départ n'efface pas la fiche
     work_email = db.Column(db.String(255))
-    notes = db.Column(db.Text)
+    notes = db.Column(db.Text)  # internes : jamais montrées aux familles
+    # Présentation et photo : visibles des familles de ses élèves.
+    bio = db.Column(db.Text)
+    photo = db.Column(db.String(60))  # chemin relatif dans UPLOAD_DIR (« profs/<uuid>.jpg »)
+    diplomas = db.Column(db.Text)  # DE, CA… internes
+    # Créneaux où il peut donner cours, pour préparer la saison : [{"day": 0-6, "from": "HH:MM", "to": "HH:MM"}].
+    availability = db.Column(db.JSON, nullable=False, default=list, server_default="[]")
 
     person = db.relationship("Person", back_populates="teacher")
 
@@ -687,13 +748,61 @@ class DisciplineType(ArchivableMixin, db.Model):
 
 
 class Discipline(ArchivableMixin, db.Model):
-    """Discipline enseignée (« Flûte traversière », « Formation musicale »…), commune à toutes les saisons."""
+    """Discipline enseignée (« Flûte traversière », « Formation musicale »…), commune à toutes les saisons. Son nom,
+    son type et d'autres réglages peuvent changer d'une saison à l'autre (DisciplineSeason) : l'historique garde le nom
+    de l'époque."""
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False, unique=True)
     # Facultatif. Un type qui a des disciplines ne se supprime pas.
     type_id = db.Column(db.ForeignKey("discipline_type.id", ondelete="RESTRICT"), index=True)
 
+    type = db.relationship("DisciplineType")
+    season_settings = db.relationship(
+        "DisciplineSeason", back_populates="discipline", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+    def settings_for(self, season):
+        """Réglages de cette saison, ou None (ceux par défaut)."""
+        season_id = getattr(season, "id", season)
+        return next((s for s in self.season_settings if s.season_id == season_id), None)
+
+    def name_for(self, season):
+        settings = self.settings_for(season) if season is not None else None
+        return (settings.name if settings and settings.name else None) or self.name
+
+    def type_for(self, season):
+        settings = self.settings_for(season) if season is not None else None
+        return (settings.type if settings and settings.type_id else None) or self.type
+
+    def offered_in(self, season):
+        settings = self.settings_for(season)
+        return settings.offered if settings is not None else not self.archived
+
+
+class DisciplineSeason(db.Model):
+    """Réglages d'une discipline pour une saison : nom et type (vides : ceux de la discipline), proposée ou non,
+    description pour les familles, places et âges admis (utiles quand les familles choisissent une discipline)."""
+
+    __table_args__ = (
+        db.CheckConstraint("capacity IS NULL OR capacity > 0", name="ck_discipline_season_capacity"),
+        db.CheckConstraint(
+            "min_age IS NULL OR max_age IS NULL OR min_age <= max_age", name="ck_discipline_season_ages"
+        ),
+    )
+
+    discipline_id = db.Column(db.ForeignKey("discipline.id", ondelete="CASCADE"), primary_key=True)
+    season_id = db.Column(db.ForeignKey("season.id", ondelete="CASCADE"), primary_key=True)
+    name = db.Column(db.String(80))
+    type_id = db.Column(db.ForeignKey("discipline_type.id", ondelete="SET NULL"))
+    offered = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    description = db.Column(db.Text)
+    capacity = db.Column(db.Integer)
+    min_age = db.Column(db.Integer)
+    max_age = db.Column(db.Integer)
+
+    discipline = db.relationship("Discipline", back_populates="season_settings")
+    season = db.relationship("Season")
     type = db.relationship("DisciplineType")
 
     def __repr__(self):
@@ -717,6 +826,8 @@ class Site(ArchivableMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False, unique=True)
     address = db.Column(db.String(255))
+    # Identifiant du bâtiment dans l'agenda de l'organisation (Google Workspace), s'il vient de là.
+    external_id = db.Column(db.String(255), unique=True)
 
     rooms = db.relationship("Room", back_populates="site", order_by="Room.name")
 
@@ -731,6 +842,9 @@ class Room(ArchivableMixin, db.Model):
     # Un site qui a des salles ne se supprime pas.
     site_id = db.Column(db.ForeignKey("site.id", ondelete="RESTRICT"), nullable=False, index=True)
     name = db.Column(db.String(80), nullable=False)
+    # Adresse de l'agenda de la salle (ressource Google Workspace, « …@resource.calendar.google.com »).
+    calendar_id = db.Column(db.String(255), unique=True)
+    capacity = db.Column(db.Integer)  # places, d'après l'agenda de l'organisation ou saisies
 
     site = db.relationship("Site", back_populates="rooms")
 
@@ -749,6 +863,19 @@ class Course(TimestampMixin, db.Model):
     """
 
     WEEKDAYS = ("Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche")
+    # Couleurs des plannings : des noms, rendus par des classes CSS (thèmes clair et sombre), jamais un style en ligne.
+    COLORS = {
+        "rouge": "Rouge",
+        "orange": "Orange",
+        "jaune": "Jaune",
+        "vert": "Vert",
+        "sarcelle": "Sarcelle",
+        "bleu": "Bleu",
+        "indigo": "Indigo",
+        "violet": "Violet",
+        "rose": "Rose",
+        "brun": "Brun",
+    }
     __table_args__ = (
         db.CheckConstraint("weekday BETWEEN 0 AND 6", name="ck_course_weekday"),
         db.CheckConstraint("(starts_at IS NULL) = (ends_at IS NULL)", name="ck_course_times_together"),
@@ -768,7 +895,10 @@ class Course(TimestampMixin, db.Model):
     weekday = db.Column(db.SmallInteger)  # 0 = lundi
     starts_at = db.Column(db.Time)
     ends_at = db.Column(db.Time)
-    capacity = db.Column(db.Integer)  # effectif maximum ; vide : pas de limite (cours individuel)
+    capacity = db.Column(db.Integer)  # effectif maximum ; vide : pas de limite
+    color = db.Column(db.String(12))  # une clé de COLORS ; vide : choisie d'après la discipline
+    # Cours individuel : chaque élève a son heure de passage et sa durée dans le créneau. Voir docs/cours.md.
+    individual = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     # Fermé aux inscriptions à la main. Les inscriptions (phase 6) le rendront complet aussi une fois l'effectif atteint.
     marked_full = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     notes = db.Column(db.Text)
@@ -787,8 +917,17 @@ class Course(TimestampMixin, db.Model):
         return self.WEEKDAYS[self.weekday] if self.weekday is not None else None
 
     @property
+    def color_key(self):
+        """La couleur choisie, sinon une couleur stable tirée de la discipline (ses cours se ressemblent)."""
+        if self.color in self.COLORS:
+            return self.color
+        keys = list(self.COLORS)
+        discipline_id = self.discipline_id or (self.discipline.id if self.discipline is not None else 0)
+        return keys[(discipline_id or 0) % len(keys)]
+
+    @property
     def title(self):
-        parts = [self.discipline.name]
+        parts = [self.discipline.name_for(self.season)]
         if self.level is not None:
             parts.append(self.level.name)
         if self.group_label:
@@ -812,6 +951,135 @@ class Course(TimestampMixin, db.Model):
 
     def __repr__(self):
         return f"<Course {self.id}>"
+
+
+class Lesson(db.Model):
+    """Séance d'un cours, à une date. Générée depuis le créneau du cours, ou ajoutée (rattrapage).
+
+    Une séance modifiée à la main (`edited`) n'est plus touchée par une nouvelle génération. `previous` garde l'état
+    d'avant la dernière modification, pour que le secrétariat puisse revenir en arrière. `revision` augmente à chaque
+    changement : c'est le SEQUENCE des agendas. Voir docs/cours.md.
+    """
+
+    PLANNED = "planned"
+    CANCELLED = "cancelled"
+    STATUSES = {PLANNED: "Prévue", CANCELLED: "Annulée"}
+    __table_args__ = (
+        db.UniqueConstraint("course_id", "scheduled_on"),
+        db.CheckConstraint("ends_at > starts_at", name="ck_lesson_times"),
+        db.CheckConstraint("status IN ('planned', 'cancelled')", name="ck_lesson_status"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    course_id = db.Column(db.ForeignKey("course.id", ondelete="CASCADE"), nullable=False, index=True)
+    # Date du créneau régulier dont la séance vient ; vide pour une séance ajoutée.
+    scheduled_on = db.Column(db.Date)
+    day = db.Column(db.Date, nullable=False, index=True)
+    starts_at = db.Column(db.Time, nullable=False)
+    ends_at = db.Column(db.Time, nullable=False)
+    room_id = db.Column(db.ForeignKey("room.id", ondelete="SET NULL"), index=True)
+    substitute_id = db.Column(db.ForeignKey("teacher.person_id", ondelete="SET NULL"), index=True)
+    status = db.Column(db.String(10), nullable=False, default=PLANNED)
+    reason = db.Column(db.String(200))  # motif d'annulation ou de déplacement, montré aux familles
+    edited = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    previous = db.Column(db.JSON)
+    changed_by_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"))
+    changed_at = db.Column(db.DateTime)
+    revision = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    course = db.relationship("Course", backref=db.backref("lessons", passive_deletes=True, order_by="Lesson.day"))
+    room = db.relationship("Room")
+    substitute = db.relationship("Teacher")
+    changed_by = db.relationship("Account")
+
+    @property
+    def extra(self):
+        return self.scheduled_on is None
+
+    @property
+    def cancelled(self):
+        return self.status == self.CANCELLED
+
+    @property
+    def teacher(self):
+        """Qui fait la séance : le remplaçant s'il y en a un, sinon le professeur du cours."""
+        return self.substitute or self.course.teacher
+
+    def starts(self):
+        return datetime.combine(self.day, self.starts_at)
+
+    def ends(self):
+        return datetime.combine(self.day, self.ends_at)
+
+    def __repr__(self):
+        return f"<Lesson {self.course_id} {self.day}>"
+
+
+class Attendance(db.Model):
+    """Présence d'un élève à une séance. Pas de motif en texte libre : il révélerait vite des données de santé.
+    Voir docs/cours.md."""
+
+    PRESENT = "present"
+    ABSENT = "absent"
+    EXCUSED = "excused"
+    LATE = "late"  # venu, mais en retard : compte comme une présence
+    STATUSES = {PRESENT: "Présent", ABSENT: "Absent", EXCUSED: "Excusé", LATE: "Retard"}
+    ATTENDED = (PRESENT, LATE)
+    __table_args__ = (
+        db.UniqueConstraint("lesson_id", "enrollment_id"),
+        db.CheckConstraint("status IN ('present', 'absent', 'excused', 'late')", name="ck_attendance_status"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    lesson_id = db.Column(db.ForeignKey("lesson.id", ondelete="CASCADE"), nullable=False, index=True)
+    enrollment_id = db.Column(db.ForeignKey("enrollment.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = db.Column(db.String(10), nullable=False)
+    recorded_by_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"))
+    recorded_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    lesson = db.relationship("Lesson", backref=db.backref("attendance", passive_deletes=True))
+    enrollment = db.relationship("Enrollment", backref=db.backref("attendance", passive_deletes=True))
+    recorded_by = db.relationship("Account")
+
+    @property
+    def label(self):
+        return self.STATUSES[self.status]
+
+
+class AbsenceNotice(db.Model):
+    """Absence prévenue à l'avance par la famille pour une séance. À l'appel, l'élève est proposé « excusé »."""
+
+    __table_args__ = (db.UniqueConstraint("lesson_id", "enrollment_id"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    lesson_id = db.Column(db.ForeignKey("lesson.id", ondelete="CASCADE"), nullable=False, index=True)
+    enrollment_id = db.Column(db.ForeignKey("enrollment.id", ondelete="CASCADE"), nullable=False, index=True)
+    account_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    lesson = db.relationship("Lesson", backref=db.backref("absence_notices", passive_deletes=True))
+    enrollment = db.relationship("Enrollment", backref=db.backref("absence_notices", passive_deletes=True))
+    account = db.relationship("Account")
+
+
+class RoomCalendarJob(db.Model):
+    """Envoi en attente vers l'agenda d'une salle : créer ou mettre à jour l'événement d'une séance (`put`), ou le
+    retirer (`delete`). Réessayé par `flask run-tasks` jusqu'à réussite. Voir docs/cours.md."""
+
+    PUT = "put"
+    DELETE = "delete"
+    __table_args__ = (db.CheckConstraint("action IN ('put', 'delete')", name="ck_room_calendar_job_action"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    calendar_id = db.Column(db.String(255), nullable=False)
+    event_id = db.Column(db.String(64), nullable=False)
+    action = db.Column(db.String(10), nullable=False)
+    payload = db.Column(db.JSON)
+    attempts = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    next_try_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    last_error = db.Column(db.String(300))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
 
 class TeacherDiscipline(db.Model):
@@ -845,6 +1113,10 @@ class Campaign(TimestampMixin, db.Model):
     opens_at = db.Column(db.DateTime, nullable=False)
     closes_at = db.Column(db.DateTime, nullable=False)
     allow_new = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())  # formulaire public
+    # Ce que les familles choisissent : un cours précis (horaire) ou une discipline, que le secrétariat place ensuite.
+    COURSE, DISCIPLINE = "cours", "discipline"
+    CHOICES = {COURSE: "Un cours précis (jour et horaire)", DISCIPLINE: "Une discipline : le secrétariat place l'élève"}
+    choice = db.Column(db.String(12), nullable=False, default=COURSE, server_default=COURSE)
     instructions = db.Column(db.Text)  # affichées en tête du dossier
 
     season = db.relationship("Season")
@@ -960,6 +1232,10 @@ class Enrollment(TimestampMixin, db.Model):
     __table_args__ = (
         db.UniqueConstraint("membership_id", "course_id"),
         db.CheckConstraint("status IN ('active', 'withdrawn')", name="ck_enrollment_status"),
+        db.CheckConstraint("withdrawn_on >= enrolled_on", name="ck_enrollment_dates"),
+        db.CheckConstraint("replaces_id <> id", name="ck_enrollment_replaces"),
+        db.CheckConstraint("slot_minutes > 0", name="ck_enrollment_slot_minutes"),
+        db.CheckConstraint("slot_starts_at IS NULL OR slot_minutes IS NOT NULL", name="ck_enrollment_slot"),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -967,14 +1243,75 @@ class Enrollment(TimestampMixin, db.Model):
     # Un cours qui a des élèves ne se supprime pas.
     course_id = db.Column(db.ForeignKey("course.id", ondelete="RESTRICT"), nullable=False, index=True)
     status = db.Column(db.String(10), nullable=False, default=ACTIVE)
+    # Date d'entrée dans le cours : la validation du dossier, ou l'arrivée en cours de saison.
+    enrolled_on = db.Column(db.Date, nullable=False, default=date.today, server_default=db.text("CURRENT_DATE"))
     withdrawn_on = db.Column(db.Date)
     dossier_id = db.Column(db.ForeignKey("dossier.id", ondelete="SET NULL"), index=True)
+    # Transfert : l'inscription quittée pour celle-ci (même saison). Voir docs/cours.md.
+    replaces_id = db.Column(db.ForeignKey("enrollment.id", ondelete="SET NULL"), index=True)
+    # Cours individuel : heure de passage et durée (minutes). La durée peut être connue avant l'heure.
+    slot_starts_at = db.Column(db.Time)
+    slot_minutes = db.Column(db.SmallInteger)
 
     membership = db.relationship(
         "Membership", backref=db.backref("enrollments", cascade="all, delete-orphan", passive_deletes=True)
     )
     course = db.relationship("Course", backref=db.backref("enrollments", passive_deletes=True))
     dossier = db.relationship("Dossier")
+    replaces = db.relationship("Enrollment", remote_side=[id])
+
+    @property
+    def active(self):
+        return self.status == self.ACTIVE
+
+    @property
+    def slot_ends_at(self):
+        if self.slot_starts_at is None or not self.slot_minutes:
+            return None
+        start = datetime.combine(date.min, self.slot_starts_at)
+        return (start + timedelta(minutes=self.slot_minutes)).time()
+
+    def attends_on(self, day):
+        """Suit le cours ce jour-là : entré au plus tard ce jour, pas encore parti."""
+        return self.enrolled_on <= day and (self.withdrawn_on is None or day < self.withdrawn_on)
+
+    @property
+    def status_label(self):
+        return self.STATUSES[self.status]
+
+
+class WaitlistEntry(db.Model):
+    """Place sur la liste d'attente d'un cours. L'ordre est une position explicite, que le secrétariat change.
+    Une entrée n'est jamais supprimée par l'appli : elle passe à « inscrit » ou « retiré ». Voir docs/cours.md."""
+
+    WAITING = "waiting"
+    ENROLLED = "enrolled"
+    REMOVED = "removed"
+    STATUSES = {WAITING: "En attente", ENROLLED: "Inscrit", REMOVED: "Retiré"}
+    __table_args__ = (
+        db.UniqueConstraint("course_id", "membership_id"),
+        db.CheckConstraint("status IN ('waiting', 'enrolled', 'removed')", name="ck_waitlist_status"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    # Un cours qui a une liste d'attente ne se supprime pas.
+    course_id = db.Column(db.ForeignKey("course.id", ondelete="RESTRICT"), nullable=False, index=True)
+    membership_id = db.Column(db.ForeignKey("membership.id", ondelete="CASCADE"), nullable=False, index=True)
+    position = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(10), nullable=False, default=WAITING)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    closed_at = db.Column(db.DateTime)
+    dossier_id = db.Column(db.ForeignKey("dossier.id", ondelete="SET NULL"), index=True)
+
+    course = db.relationship("Course", backref=db.backref("waitlist", passive_deletes=True))
+    membership = db.relationship(
+        "Membership", backref=db.backref("waitlist", cascade="all, delete-orphan", passive_deletes=True)
+    )
+    dossier = db.relationship("Dossier")
+
+    @property
+    def waiting(self):
+        return self.status == self.WAITING
 
 
 class Consent(db.Model):
@@ -1201,6 +1538,9 @@ class Assessment(TimestampMixin, db.Model):
     validated_at = db.Column(db.DateTime)
     validated_by_id = db.Column(db.ForeignKey("account.id", ondelete="SET NULL"))
     warnings = db.Column(db.JSON, nullable=False, default=list)
+    # Changements d'inscription survenus depuis le calcul (« à revoir »). Vidé par un nouveau calcul, ou quand un
+    # gestionnaire constate qu'il n'y a rien à changer. Voir docs/cours.md.
+    review_reasons = db.Column(db.JSON, nullable=False, default=list, server_default="[]")
 
     household = db.relationship("Household")
     season = db.relationship("Season")
@@ -1293,6 +1633,8 @@ class Notification(db.Model):
     dedup_key = db.Column(db.String(120), unique=True)
     emailed = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.now, server_default=func.now())
+    # Supprimée par son destinataire : cachée, mais gardée pour que sa clé de déduplication empêche de la recréer.
+    dismissed_at = db.Column(db.DateTime)
 
     account = db.relationship("Account")
 

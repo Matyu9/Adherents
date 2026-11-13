@@ -1,0 +1,9 @@
+{#- Onglets des Paramètres : chacun n'apparaît qu'avec son droit. -#}
+{% macro tabs(active) -%}
+<nav class="tabs" aria-label="Paramètres">
+  {% if can(current_user, "settings.manage") %}<a href="{{ url_for('settings.index') }}"{% if active == "general" %} aria-current="page"{% endif %}>Général</a>{% endif %}
+  {% if can(current_user, "settings.manage") %}<a href="{{ url_for('settings.members') }}"{% if active == "adherents" %} aria-current="page"{% endif %}>Adhérents</a>{% endif %}
+  {% if can(current_user, "directory.anonymize") %}<a href="{{ url_for('retention.index') }}"{% if active == "donnees" %} aria-current="page"{% endif %}>Données personnelles</a>{% endif %}
+  {% if can(current_user, "settings.manage") %}<a href="{{ url_for('health.page') }}"{% if active == "etat" %} aria-current="page"{% endif %}>État de l'installation</a>{% endif %}
+</nav>
+{%- endmacro %}

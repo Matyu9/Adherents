@@ -84,6 +84,7 @@ def create_app(config_class=Config):
     from .blueprints.groups import bp as groups_bp
     from .blueprints.health import bp as health_bp
     from .blueprints.journal import bp as journal_bp
+    from .blueprints.lessons import bp as lessons_bp
     from .blueprints.member import bp as member_bp
     from .blueprints.notifications import bp as notifications_bp
     from .blueprints.oidc import bp as oidc_bp
@@ -93,15 +94,17 @@ def create_app(config_class=Config):
     from .blueprints.teachers import bp as teachers_bp
     from .cli import register_cli
     from .filters import register_filters
-    from .permissions import can
+    from .permissions import can, has_staff_rights
     from .services import logout, oidc_server
     from .services.notify import unread_count
+    from .services.registration import is_family
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(directory_bp)
     app.register_blueprint(teachers_bp)
     app.register_blueprint(catalog_bp)
+    app.register_blueprint(lessons_bp)
     app.register_blueprint(fees_bp)
     app.register_blueprint(campaigns_bp)
     app.register_blueprint(enrollment_bp)
@@ -131,10 +134,24 @@ def create_app(config_class=Config):
             with contextlib.suppress(OSError):
                 values["v"] = int((Path(app.static_folder) / values["filename"]).stat().st_mtime)
 
+    # Aussi pour les macros importées sans contexte (onglets, sélecteurs de saison).
+    from flask_login import current_user as _current_user
+
+    app.jinja_env.globals.update(
+        can=can, has_staff_rights=has_staff_rights, is_family=is_family, current_user=_current_user
+    )
+
     @app.context_processor
     def inject_globals():
         brand = branding.current()
-        return {"can": can, "branding": brand, "asso_name": brand.name, "unread_notifications": unread_count}
+        return {
+            "can": can,
+            "has_staff_rights": has_staff_rights,
+            "is_family": is_family,
+            "branding": brand,
+            "asso_name": brand.name,
+            "unread_notifications": unread_count,
+        }
 
     @app.after_request
     def security_headers(response):

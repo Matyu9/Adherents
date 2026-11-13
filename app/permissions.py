@@ -40,6 +40,8 @@ PERMISSION_GROUPS = [
         [
             ("registration.view", "Consulter les campagnes et les dossiers d'inscription"),
             ("registration.manage", "Ouvrir les campagnes, valider ou renvoyer les dossiers, préparer le report"),
+            ("enrollment.edit", "Inscrire, transférer ou désinscrire un élève d'un cours en cours de saison"),
+            ("lesson.manage", "Calendrier de la saison, séances de tous les cours, remplaçants ; avis des changements"),
         ],
     ),
     (
@@ -81,6 +83,8 @@ DEFAULT_PERMISSIONS = {
         "catalog.edit",
         "registration.view",
         "registration.manage",
+        "enrollment.edit",
+        "lesson.manage",
         "fee.view",
         "fee.edit",
         "fee.assess",
@@ -104,7 +108,13 @@ def can(user, action):
         raise KeyError(f"Permission inconnue : {action}")
     if user is None or not getattr(user, "is_authenticated", False):
         return False
-    return action in permissions_of(user.role)
+    role = H if getattr(user, "member_view", False) else user.role
+    return action in permissions_of(role)
+
+
+def has_staff_rights(user):
+    """Le rôle réel du compte donne au moins un droit : la vue adhérent a un sens pour lui."""
+    return bool(user is not None and getattr(user, "is_authenticated", False) and permissions_of(user.role))
 
 
 def require(action):

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Mes coordonnées{% endblock %}
+{% macro phones(owner, prefix) %}
+{% for k in range(max_phones) %}{% set p = owner.phones[k] if k < owner.phones | length else none %}
+<div class="grid phone-row">
+  <input name="{{ prefix }}-label-{{ k }}" maxlength="40" placeholder="Libellé (portable, travail…)" aria-label="Libellé du téléphone {{ k + 1 }}" value="{{ form.get(prefix ~ '-label-' ~ k, '') if form else (p.label or '' if p else '') }}">
+  <input name="{{ prefix }}-phone-{{ k }}" inputmode="tel" placeholder="Numéro" aria-label="Numéro {{ k + 1 }}" value="{{ form.get(prefix ~ '-phone-' ~ k, '') if form else (p.number | phone if p else '') }}">
+</div>
+{% endfor %}
+{% endmacro %}
+{% block content %}
+<p><a href="{{ url_for('member.index') }}">← Ma famille</a></p>
+<article class="wide-form">
+  <h1>Coordonnées : {{ household.name }}</h1>
+  <p class="muted">Vos changements s'appliquent tout de suite, et le secrétariat en est prévenu. Pour retirer un numéro, videz-le.</p>
+  {% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+  {% if dossier %}
+  <p class="flash flash-info">Un dossier d'inscription est en cours : modifiez vos coordonnées <a href="{{ url_for('enrollment.dossier', uuid=dossier.uuid) }}">dans le dossier</a>, il les reprendra à sa validation.</p>
+  {% else %}
+  <form method="post" novalidate>
+    {{ csrf() }}
+    {% if "adresse" in allowed %}
+    <fieldset>
+      <legend>Adresse du foyer</legend>
+      <label for="address_street">Rue</label>
+      <textarea id="address_street" name="address_street" rows="2">{{ form.get('address_street', '') if form else (household.address_street or '') }}</textarea>
+      <div class="grid">
+        <div><label for="postal_code">Code postal</label><input id="postal_code" name="postal_code" maxlength="10" value="{{ form.get('postal_code', '') if form else (household.postal_code or '') }}"></div>
+        <div><label for="city">Ville</label><input id="city" name="city" maxlength="80" value="{{ form.get('city', '') if form else (household.city or '') }}"></div>
+      </div>
+    </fieldset>
+    {% endif %}
+    {% if "telephones" in allowed %}
+    <fieldset>
+      <legend>Téléphones du foyer</legend>
+      {{ phones(household, "foyer") }}
+    </fieldset>
+    {% endif %}
+    {% for p in people %}
+    {% if "telephones" in allowed or "email" in allowed %}
+    <fieldset>
+      <legend>{{ p.full_name }}</legend>
+      {% if "email" in allowed %}
+      <label for="p{{ p.id }}-email">Email</label>
+      <input id="p{{ p.id }}-email" name="p{{ p.id }}-email" type="email" maxlength="255" value="{{ form.get('p' ~ p.id ~ '-email', '') if form else (p.email or '') }}">
+      {% if p.account %}<small class="muted">C'est l'adresse de la fiche. Celle qui sert à se connecter se change dans Mon compte.</small>{% endif %}
+      {% endif %}
+      {% if "telephones" in allowed %}{{ phones(p, "p" ~ p.id) }}{% endif %}
+    </fieldset>
+    {% endif %}
+    {% endfor %}
+    <button type="submit">Enregistrer</button>
+  </form>
+  {% endif %}
+</article>
+{% endblock %}

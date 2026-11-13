@@ -8,7 +8,7 @@
 {{ tabs("regles", season) }}
 <p class="muted">Les règles s'appliquent <strong>de haut en bas</strong>, chacune sur le résultat des précédentes. Une règle en brouillon ne compte pas : voyez son effet avant de l'activer. Dans un groupe exclusif, seule la première règle qui s'applique à un élément compte.</p>
 {% set edit = can(current_user, "fee.edit") %}
-{% if edit %}<div class="actions"><a href="{{ url_for('fees.create_rule', saison=season.id) }}" role="button">+ Nouvelle règle</a></div>{% endif %}
+{% if edit %}<div class="actions"><a href="{{ url_for('fees.rule_templates', saison=season.id) }}" role="button">+ Nouvelle règle</a> <a href="{{ url_for('fees.create_rule', saison=season.id) }}" role="button" class="secondary outline">Formulaire avancé</a></div>{% endif %}
 <ol class="rule-list">
 {% for rule, conditions, target, effect in described %}
   <li id="regle-{{ rule.id }}" class="card{{ ' draft' if not rule.active }}">

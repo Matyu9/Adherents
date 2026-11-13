@@ -1,14 +1,21 @@
 {% extends "base.html" %}
-{% block title %}Mon espace{% endblock %}
+{% block title %}Ma famille{% endblock %}
 {% macro courses_of(person, seasons) %}
 {% for membership, courses in seasons %}
 <p class="small"><strong>{{ membership.season.label }}</strong>{% if current and membership.season_id == current.id %} <span class="badge badge-ok">saison en cours</span>{% endif %}
   {% if membership.status != active %}<span class="badge">abandon</span>{% endif %}{% if membership.category %} · {{ membership.category }}{% endif %}{% if membership.school_class %} · {{ membership.school_class }}{% endif %}</p>
 {% if courses %}
 <ul class="plain-list">
-  {% for c in courses %}<li>{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}{% if c.room %} · {{ c.room.label }}{% endif %}</small>{% endif %}{% if c.teacher %} <small class="muted">avec {{ c.teacher.person.full_name }}</small>{% endif %}</li>{% endfor %}
+  {% for e in courses %}{% set c = e.course %}<li>{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if e.slot_starts_at %} {{ e.slot_starts_at.strftime("%H:%M") }}-{{ e.slot_ends_at.strftime("%H:%M") }}{% elif c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}{% if c.room %} · {{ c.room.label }}{% endif %}</small>{% endif %}{% if c.teacher %} <small class="muted">avec {{ c.teacher.person.full_name }}</small>{% if c.teacher.bio or c.teacher.photo %}
+    <details class="teacher-intro"><summary class="small">Présentation</summary>
+      {% if c.teacher.photo %}<img src="{{ url_for('teachers.photo', name=c.teacher.photo.split('/')[-1]) }}" alt="{{ c.teacher.person.full_name }}" class="portrait small">{% endif %}
+      {% if c.teacher.bio %}<p class="notes small">{{ c.teacher.bio }}</p>{% endif %}
+    </details>{% endif %}{% endif %}
+    {%- if attendance_visible and e.attendance %}{% set missed = e.attendance | selectattr("status", "in", ["absent", "excused"]) | sort(attribute="lesson.day") | list %}
+    <br><small>{{ e.attendance | length - missed | length }} présence{{ "s" if e.attendance | length - missed | length > 1 }}{% if missed %}, {{ missed | length }} absence{{ "s" if missed | length > 1 }} : {% for a in missed %}{{ a.lesson.day | date_fr }} ({{ a.label | lower }}){{ ", " if not loop.last }}{% endfor %}{% endif %}</small>{% endif %}</li>{% endfor %}
 </ul>
 {% endif %}
+{% for w in membership.waitlist if w.status == "waiting" %}<p class="small">{{ w.course.title }} <span class="badge">liste d'attente</span></p>{% endfor %}
 {% else %}<p class="small muted">Pas d'adhésion enregistrée.</p>{% endfor %}
 {% endmacro %}
 {% macro loaned(person) %}
@@ -24,8 +31,10 @@
 {% endmacro %}
 {% block content %}
 <div class="page-head">
-  <div><h1>Mon espace</h1><p class="muted">Ce que l'association sait de votre foyer. Pour corriger une information, passez par votre dossier d'inscription ou par le secrétariat.</p></div>
+  <div><h1>Ma famille</h1><p class="muted">Ce que l'association sait de votre foyer. {% if editable %}Vous pouvez mettre à jour certaines coordonnées ; pour le reste, passez par votre dossier d'inscription ou par le secrétariat.{% else %}Pour corriger une information, passez par votre dossier d'inscription ou par le secrétariat.{% endif %}</p></div>
   <a href="{{ url_for('enrollment.index') }}" role="button" class="secondary">Inscriptions</a>
+  <a href="{{ url_for('member.absences') }}" role="button" class="secondary">Prévenir d'une absence</a>
+  <a href="{{ url_for('lessons.agenda_page') }}" role="button" class="secondary">Ajouter les cours à mon agenda</a>
 </div>
 {% if not person %}
 <p class="empty">Votre compte n'est pas encore relié à votre fiche d'adhérent : contactez le secrétariat.</p>
@@ -35,6 +44,7 @@
 {% set h = block.household %}
 <section class="card settings-block">
   <h2>{{ h.name }}</h2>
+  {% if editable %}<p class="small"><a href="{{ url_for('member.contacts_form', household_id=h.id) }}" role="button" class="secondary small">Modifier nos coordonnées</a></p>{% endif %}
   <div class="detail-grid">
     <div>
       <h3>Adresse</h3>

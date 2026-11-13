@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf, post_button %}
+{% block title %}{{ course.title }}{% endblock %}
+{% block content %}
+{% set edit = can(current_user, "enrollment.edit") %}
+<p><a href="{{ url_for('catalog.index', saison=season.id) }}">← Catalogue {{ season.label }}</a></p>
+<div class="page-head">
+  <div>
+    <h1>{{ course.title }}</h1>
+    <p class="muted">
+      {% if course.weekday is not none %}{{ course.weekday_name }}{% if course.starts_at %} {{ course.starts_at.strftime("%H:%M") }}-{{ course.ends_at.strftime("%H:%M") }}{% endif %}{% else %}Horaire à fixer{% endif %}
+      · {{ course.room.label if course.room else "salle à fixer" }}
+      · {% if course.teacher %}{{ course.teacher.person.full_name }}{% else %}professeur à trouver{% endif %}
+    </p>
+    <p><strong>{{ count }}</strong> élève{{ "s" if count > 1 }}{% if course.capacity %} sur {{ course.capacity }}{% endif %}
+      {% if full %} <span class="badge health-warn">complet</span>{% endif %}
+      {% if course.marked_full %} <small class="muted">(fermé aux inscriptions à la main)</small>{% endif %}
+      {% if course.individual %} <span class="badge">cours individuel</span>{% endif %}</p>
+    {% if course.individual and free %}<p class="small muted">Plages libres : {% for a, b in free %}{{ a }}-{{ b }}{{ ", " if not loop.last }}{% endfor %}</p>{% endif %}
+  </div>
+  <div class="actions">
+    {% if edit %}<a href="{{ url_for('catalog.enroll_student', course_id=course.id) }}" role="button">+ Inscrire un élève</a>{% endif %}
+    <a href="{{ url_for('lessons.course', course_id=course.id) }}" role="button" class="secondary">Séances ({{ course.lessons | length }})</a>
+    {% if can(current_user, "catalog.edit") %}<a href="{{ url_for('catalog.edit_course', course_id=course.id) }}" role="button" class="secondary">Modifier le cours</a>{% endif %}
+  </div>
+</div>
+
+{% if active %}
+<p class="small">
+  <a href="{{ url_for('catalog.course_csv', course_id=course.id) }}">Télécharger la liste (CSV)</a>
+  {% if recipients %} · <a href="mailto:?bcc={{ recipients | join(',') | urlencode }}">Écrire aux familles</a> <small class="muted">({{ recipients | length }} adresse{{ "s" if recipients | length > 1 }}, en copie cachée)</small>{% endif %}
+</p>
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr>{% if course.individual %}<th>Passage</th>{% endif %}<th>Élève</th><th>Âge</th><th>Responsables</th><th>Depuis le</th>{% if edit %}<th></th>{% endif %}</tr></thead>
+  <tbody>
+  {% for e in active %}{% set student = e.membership.person %}
+  <tr id="e{{ e.id }}">
+    {% if course.individual %}
+    <td data-label="Passage">
+      {% if e.slot_starts_at %}<strong>{{ e.slot_starts_at.strftime("%H:%M") }}-{{ e.slot_ends_at.strftime("%H:%M") }}</strong>{% elif e.slot_minutes %}{{ e.slot_minutes }} min, heure à fixer{% else %}<span class="muted">à fixer</span>{% endif %}
+      {% for w in slot_warnings.get(e.id, []) %}<br><small class="error">{{ w }}</small>{% endfor %}
+      {% if edit %}
+      <form method="post" action="{{ url_for('catalog.set_slot', enrollment_id=e.id) }}" class="inline-form">
+        {{ csrf() }}
+        <input type="time" name="starts_at" value="{{ e.slot_starts_at.strftime('%H:%M') if e.slot_starts_at }}" aria-label="Heure de passage">
+        <input type="number" name="minutes" min="1" max="240" step="5" value="{{ e.slot_minutes or '' }}" aria-label="Durée en minutes" placeholder="min" class="narrow-number">
+        <button type="submit" class="secondary small">OK</button>
+      </form>
+      {% endif %}
+    </td>
+    {% endif %}
+    <td data-label="Élève"><a href="{{ url_for('directory.person', person_id=student.id) }}">{{ student.sort_name }}</a>{% if e.replaces %}<br><small class="muted">venu(e) de {{ e.replaces.course.title }}</small>{% endif %}</td>
+    <td data-label="Âge"><small>{{ student.age() ~ " ans" if student.birth_date else "—" }}</small></td>
+    <td data-label="Responsables"><small>{% for g in guardians[e.id] %}{{ g.full_name }}{% for p in g.phones[:1] %} · <a href="tel:{{ p.number }}">{{ p.number | phone }}</a>{% endfor %}{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}</small></td>
+    <td data-label="Depuis le"><small>{{ e.enrolled_on | date_fr }}</small></td>
+    {% if edit %}
+    <td data-label="" class="actions">
+      <a href="{{ url_for('catalog.transfer', enrollment_id=e.id) }}">Changer de cours</a>
+      <details>
+        <summary>Abandon</summary>
+        <form method="post" action="{{ url_for('catalog.withdraw', enrollment_id=e.id) }}" class="inline-form" data-confirm="Noter l'abandon de {{ student.full_name }} ? Son adhésion reste active.">
+          {{ csrf() }}
+          <input type="date" name="on" value="{{ withdraw_form.on._value() }}" aria-label="Date de l'abandon" required>
+          <button type="submit" class="secondary small">Noter l'abandon</button>
+        </form>
+      </details>
+    </td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}
+<p class="empty">Aucun élève inscrit.</p>
+{% endif %}
+
+<h2 id="attente">Liste d'attente{% if waiting %} <small class="muted">({{ waiting | length }})</small>{% endif %}</h2>
+{% if waiting %}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Rang</th><th>Élève</th><th>Depuis le</th><th>Responsables</th>{% if edit %}<th></th>{% endif %}</tr></thead>
+  <tbody>
+  {% for w in waiting %}{% set student = w.membership.person %}
+  <tr>
+    <td data-label="Rang">{{ loop.index }}</td>
+    <td data-label="Élève"><a href="{{ url_for('directory.person', person_id=student.id) }}">{{ student.sort_name }}</a>{% if w.dossier %} <small class="muted">par son dossier</small>{% endif %}</td>
+    <td data-label="Depuis le"><small>{{ w.created_at | date_fr }}</small></td>
+    <td data-label="Responsables"><small>{% for g in waiting_guardians[w.id] %}{{ g.full_name }}{% for p in g.phones[:1] %} · <a href="tel:{{ p.number }}">{{ p.number | phone }}</a>{% endfor %}{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}</small></td>
+    {% if edit %}
+    <td data-label="" class="actions">
+      {% if not loop.first %}{{ post_button(url_for('catalog.move_waitlist', entry_id=w.id, direction='monter'), "↑", "link-button") }}{% endif %}
+      {% if not loop.last %}{{ post_button(url_for('catalog.move_waitlist', entry_id=w.id, direction='descendre'), "↓", "link-button") }}{% endif %}
+      <details>
+        <summary>Inscrire</summary>
+        <form method="post" action="{{ url_for('catalog.enroll_from_waitlist', entry_id=w.id) }}" class="inline-form">
+          {{ csrf() }}
+          <input type="date" name="on" value="{{ withdraw_form.on._value() }}" aria-label="Premier cours le" required>
+          <button type="submit" class="small">Inscrire</button>
+        </form>
+      </details>
+      {{ post_button(url_for('catalog.remove_from_waitlist', entry_id=w.id), "Retirer", "link-button", "Retirer " ~ student.full_name ~ " de la liste d'attente ?") }}
+    </td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}<p class="muted">Personne en attente.</p>{% endif %}
+{% if edit and waitlist_candidates %}
+<form method="post" action="{{ url_for('catalog.add_to_waitlist', course_id=course.id) }}" class="inline-form">
+  {{ csrf() }}
+  <select name="membership_id" aria-label="Élève à mettre en attente" required>
+    <option value="">Mettre un élève en attente…</option>
+    {% for m in waitlist_candidates %}<option value="{{ m.id }}">{{ m.person.sort_name }}</option>{% endfor %}
+  </select>
+  <button type="submit" class="secondary small">Ajouter</button>
+</form>
+{% endif %}
+
+{% if gone %}
+<details>
+  <summary>Partis en cours de saison ({{ gone | length }})</summary>
+  <ul class="plain-list">
+    {% for e in gone %}{% set student = e.membership.person %}
+    <li><a href="{{ url_for('directory.person', person_id=student.id) }}">{{ student.sort_name }}</a>
+      <small class="muted">du {{ e.enrolled_on | date_fr }}{% if e.withdrawn_on %} au {{ e.withdrawn_on | date_fr }}{% endif %}
+      {%- set next = e.membership.enrollments | selectattr("replaces_id", "equalto", e.id) | first %}{% if next %}, passé(e) à {{ next.course.title }}{% endif %}</small></li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
+{% endblock %}

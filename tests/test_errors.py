@@ -10,7 +10,7 @@ def test_404_page_is_in_french(client):
 
 def test_403_page_when_logged_in(client, member):
     html = client.get("/parametres").get_data(as_text=True)
-    assert "Accès refusé" in html and "Tableau de bord" in html
+    assert "Accès refusé" in html and "Accueil" in html
 
 
 def test_405_page(client):

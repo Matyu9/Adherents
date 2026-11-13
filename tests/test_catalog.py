@@ -701,3 +701,73 @@ def test_read_only_catalogue(client, school):
 def test_members_do_not_see_the_catalogue(client, member, school):
     assert client.get("/catalogue").status_code == 403
     assert "/catalogue" not in client.get("/").get_data(as_text=True)
+
+
+# ---------------------------------------------------------------------------
+# Réglages d'une discipline propres à une saison
+# ---------------------------------------------------------------------------
+
+
+def test_discipline_renamed_for_one_season_only(client, manager, school):
+    from app.models import DisciplineSeason
+
+    old, new, fm = school["old"], school["new"], school["fm"]
+    c_old, c_new = course(old, fm), course(new, fm)
+    db.session.commit()
+    page = client.get(f"/catalogue/disciplines?saison={new.id}").get_data(as_text=True)
+    assert "Formation musicale" in page and f"/catalogue/disciplines/{fm.id}?saison={new.id}" in page
+    client.post(
+        f"/catalogue/disciplines/{fm.id}?saison={new.id}",
+        data={
+            "offered": "1",
+            "name": "Culture musicale",
+            "type_id": school["instrument"].id,
+            "description": "Dès 7 ans.",
+            "capacity": "12",
+            "min_age": "7",
+            "max_age": "11",
+        },
+    )
+    settings = db.session.get(DisciplineSeason, (fm.id, new.id))
+    assert settings.name == "Culture musicale" and settings.capacity == 12 and settings.min_age == 7
+    assert c_new.title == "Culture musicale" and c_old.title == "Formation musicale"  # l'historique garde son nom
+    assert fm.type_for(new) == school["instrument"] and fm.type_for(old) == school["theory"]
+    page = client.get(f"/catalogue/disciplines?saison={new.id}").get_data(as_text=True)
+    assert "Culture musicale" in page and "(Formation musicale)" in page and "dès 7 ans, jusqu'à 11 ans" in page
+
+
+def test_discipline_not_offered_leaves_the_course_form(client, manager, school):
+    new, piano = school["new"], school["piano"]
+    client.post(f"/catalogue/disciplines/{piano.id}?saison={new.id}", data={})  # case décochée
+    assert not piano.offered_in(new) and piano.offered_in(school["old"])
+    form = client.get(f"/catalogue/cours/nouveau?saison={new.id}").get_data(as_text=True)
+    assert f'<option value="{piano.id}">Piano</option>' not in form
+    form = client.get(f"/catalogue/cours/nouveau?saison={school['old'].id}").get_data(as_text=True)
+    assert f'<option value="{piano.id}">Piano</option>' in form
+
+
+def test_bad_season_settings_are_refused(client, manager, school):
+    from app.models import DisciplineSeason
+
+    new, fm = school["new"], school["fm"]
+    page = client.post(
+        f"/catalogue/disciplines/{fm.id}?saison={new.id}", data={"offered": "1", "min_age": "12", "max_age": "8"}
+    ).get_data(as_text=True)
+    assert "dépasse" in page and db.session.get(DisciplineSeason, (fm.id, new.id)) is None
+    page = client.post(
+        f"/catalogue/disciplines/{fm.id}?saison={new.id}", data={"offered": "1", "capacity": "-3"}
+    ).get_data(as_text=True)
+    assert "entier positif" in page
+
+
+def test_copying_a_season_copies_discipline_settings(school):
+    from app.models import DisciplineSeason
+
+    old, new, fm = school["old"], school["new"], school["fm"]
+    course(old, fm)
+    db.session.add(DisciplineSeason(discipline=fm, season=old, name="Culture musicale", capacity=10))
+    db.session.commit()
+    catalog.copy_season(old, new)
+    db.session.commit()
+    copied = db.session.get(DisciplineSeason, (fm.id, new.id))
+    assert copied.name == "Culture musicale" and copied.capacity == 10

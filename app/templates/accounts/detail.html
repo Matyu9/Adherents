@@ -1,5 +1,28 @@
 {% extends "base.html" %}
-{% block title %}{{ account.full_name }}{% endblock %}
+{% block title %}{{ account.full_name }}{% if person_suggestions is not none %}
+<section class="card settings-block" id="fiche">
+  <h2>Fiche de l'annuaire</h2>
+  <p class="muted small">Ce compte n'a pas de fiche. Une adresse identique ne suffit pas (adresse partagée, parents séparés) : vérifiez avant de rattacher.</p>
+  {% if person_suggestions %}
+  <ul class="plain-list">
+    {% for person, reasons in person_suggestions %}
+    <li><a href="{{ url_for('directory.person', person_id=person.id) }}">{{ person.full_name }}</a>
+      <small class="muted">{{ person.email or "sans email" }}{% if person.birth_date %} · {{ person.birth_date | date_fr }}{% endif %}{% for link in person.household_links %} · {{ link.household.name }}{% endfor %}</small>
+      {% for r in reasons %}<span class="badge">{{ r }}</span> {% endfor %}
+      <form method="post" action="{{ url_for('directory.link_account', account_id=account.id) }}" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="person_id" value="{{ person.id }}">
+        <button type="submit" class="secondary small">C'est sa fiche</button>
+      </form></li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">Aucune fiche ne lui ressemble. On peut aussi rattacher le compte depuis la fiche de la personne.</p>{% endif %}
+  <form method="post" action="{{ url_for('directory.person_from_account', account_id=account.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="link-button small">Créer sa fiche à partir du compte</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}
 {% block content %}
 <p><a href="{{ url_for('accounts.index') }}">← Comptes</a></p>
 <div class="page-head">
@@ -21,7 +44,7 @@
       <dt>Dernière connexion</dt><dd>{{ account.last_login_at | datetime_fr if account.last_login_at else "jamais" }}</dd>
       <dt>Créé le</dt><dd>{{ account.created_at | date_fr }}</dd>
       {% if can(current_user, "directory.view") %}
-      <dt>Fiche de l'annuaire</dt><dd>{% if account.person %}<a href="{{ url_for('directory.person', person_id=account.person.id) }}">{{ account.person.full_name }}</a>{% else %}Aucune{% if can(current_user, "directory.edit") %} · <a href="{{ url_for('directory.link_accounts') }}">rattacher</a>{% endif %}{% endif %}</dd>
+      <dt>Fiche de l'annuaire</dt><dd>{% if account.person %}<a href="{{ url_for('directory.person', person_id=account.person.id) }}">{{ account.person.full_name }}</a>{% else %}Aucune{% if person_suggestions is not none %} · <a href="#fiche">rattacher</a>{% endif %}{% endif %}</dd>
       {% endif %}
     </dl>
   </section>

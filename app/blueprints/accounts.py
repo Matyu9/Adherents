@@ -10,7 +10,7 @@ from wtforms.validators import DataRequired, Length, Regexp, ValidationError
 from ..extensions import db, fold_contains
 from ..models import AccessGroup, Account, AccountToken, Activity, Role
 from ..permissions import can, require
-from ..services import accounts, groups, logout, mailer, oidc, roles, sessions, totp
+from ..services import accounts, directory, groups, logout, mailer, oidc, roles, sessions, totp
 from ..services.activity import diff, log
 
 bp = Blueprint("accounts", __name__, url_prefix="/comptes")
@@ -88,6 +88,9 @@ def index():
     status = request.args.get("statut")
     if status in accounts.STATUSES:
         query = query.where(accounts.status_condition(status))
+    without_person = request.args.get("fiche") == "sans"
+    if without_person:
+        query = query.where(~Account.person.has())
     group = db.session.get(AccessGroup, request.args.get("groupe", type=int) or 0)
     if group:
         query = query.where(groups.is_member(group))  # cochés sur le compte ou donnés par le rôle
@@ -104,6 +107,7 @@ def index():
             ("role", role if role in labels else None),
             ("statut", status if status in accounts.STATUSES else None),
             ("groupe", group.id if group else None),
+            ("fiche", "sans" if without_person else None),
             ("q", q),
         )
         if v
@@ -122,6 +126,7 @@ def index():
         status_of=accounts.status_of,
         q=q,
         group=group,
+        without_person=without_person,
         all_groups=groups.all_groups(),
     )
 
@@ -166,6 +171,13 @@ def detail(account_id):
         activities=activities,
         all_groups=groups.all_groups() if can(current_user, "group.manage") else [],
         recovery_left=totp.remaining_recovery_codes(account),
+        person_suggestions=(
+            directory.suggestions(account)
+            if account.person is None
+            and can(current_user, "directory.edit")
+            and accounts.can_manage(current_user, account)
+            else None
+        ),
     )
 
 
@@ -217,33 +229,41 @@ def invite(account_id):
     return _grant_access(account)
 
 
+def cut_account(account):
+    """Effet immédiat : plus de connexion, plus de session ouverte, plus aucun lien valable. Renvoie False (avec un
+    message) pour son propre compte."""
+    if account.id == current_user.id:
+        flash("Vous ne pouvez pas couper votre propre compte.", "error")
+        return False
+    account.active = False
+    sessions.revoke(account)
+    accounts.revoke(account)
+    oidc.revoke_tokens(account=account)
+    log("account.cut", f"Compte coupé : {account.full_name}", target=account)
+    db.session.commit()
+    flash(f"Le compte de {account.full_name} est coupé.", "success")
+    return True
+
+
+def restore_account(account):
+    account.active = True
+    log("account.restore", f"Compte rétabli : {account.full_name}", target=account)
+    db.session.commit()
+    flash(f"Le compte de {account.full_name} est rétabli.", "success")
+
+
 @bp.route("/<int:account_id>/couper", methods=["POST"])
 @require("account.manage")
 def cut(account_id):
-    """Effet immédiat : plus de connexion, plus de session ouverte, plus aucun lien valable."""
-    account = _managed(account_id)
-    if account.id == current_user.id:
-        flash("Vous ne pouvez pas couper votre propre compte.", "error")
-    else:
-        account.active = False
-        sessions.revoke(account)
-        accounts.revoke(account)
-        oidc.revoke_tokens(account=account)
-        log("account.cut", f"Compte coupé : {account.full_name}", target=account)
-        db.session.commit()
-        flash(f"Le compte de {account.full_name} est coupé.", "success")
-    return redirect(url_for(".detail", account_id=account.id))
+    cut_account(_managed(account_id))
+    return redirect(url_for(".detail", account_id=account_id))
 
 
 @bp.route("/<int:account_id>/retablir", methods=["POST"])
 @require("account.manage")
 def restore(account_id):
-    account = _managed(account_id)
-    account.active = True
-    log("account.restore", f"Compte rétabli : {account.full_name}", target=account)
-    db.session.commit()
-    flash(f"Le compte de {account.full_name} est rétabli.", "success")
-    return redirect(url_for(".detail", account_id=account.id))
+    restore_account(_managed(account_id))
+    return redirect(url_for(".detail", account_id=account_id))
 
 
 @bp.route("/<int:account_id>/groupes", methods=["POST"])

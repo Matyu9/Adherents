@@ -5,6 +5,7 @@ JavaScript, les boutons « Ajouter une condition » renvoyant simplement le form
 """
 
 import re
+from datetime import date
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -35,11 +36,7 @@ BAND_ROWS = 6
 
 
 def _selected_season():
-    """Saison demandée (?saison=), sinon la saison en cours, sinon la plus récente."""
-    seasons = directory.seasons()
-    wanted = request.values.get("saison", type=int)
-    season = next((s for s in seasons if s.id == wanted), None) if wanted else None
-    return season or directory.current_season() or (seasons[0] if seasons else None), seasons
+    return directory.selected_season()
 
 
 def _season_or_redirect():
@@ -233,7 +230,9 @@ def settings():
     if request.method == "POST":
         form = request.form
         bands = []
-        for k in range(BAND_ROWS + len(current.qf_bands)):
+        # Autant de lignes que le formulaire en envoie : le bouton « + Ajouter une tranche » en ajoute sans limite.
+        rows = sorted({int(key.split("-")[1]) for key in form if re.fullmatch(r"band-\d{1,4}-(label|max)", key)})
+        for k in rows:
             label = (form.get(f"band-{k}-label") or "").strip()
             ceiling = (form.get(f"band-{k}-max") or "").strip()
             if not label and not ceiling:
@@ -328,6 +327,38 @@ def rules():
     )
 
 
+@bp.route("/regles/modeles", methods=["GET", "POST"])
+@require("fee.edit")
+def rule_templates():
+    """Modèles de règles : les cas courants en quelques champs. La règle créée arrive en brouillon."""
+    from ..services import rule_templates as templates
+
+    season, seasons = _season_or_redirect()
+    if season is None:
+        return redirect(url_for(".index"))
+    error, chosen = None, request.form.get("modele")
+    if request.method == "POST":
+        try:
+            saved = fees.save_rule(season, templates.build(chosen, request.form, season))
+            db.session.commit()
+            flash(f"Règle « {saved.name} » créée en brouillon : vérifiez-la, puis activez-la.", "success")
+            return redirect(url_for(".edit_rule", rule_id=saved.id))
+        except (FeeError, PricingError) as exc:
+            db.session.rollback()
+            error = str(exc)
+    return render_template(
+        "fees/rule_templates.html",
+        season=season,
+        seasons=seasons,
+        templates=templates.TEMPLATES,
+        items=fees.items(season),
+        categories=fees.categories(season),
+        bands=[b["label"] for b in fees.season_settings(season).qf_bands],
+        error=error,
+        chosen=chosen,
+    )
+
+
 @bp.route("/regles/nouvelle", methods=["GET", "POST"])
 @require("fee.edit")
 def create_rule():
@@ -411,6 +442,20 @@ def _parse_condition(row, items_by_label):
         if len(numbers) != expected:
             raise FeeError(f"« {label} » : indiquez {'deux nombres (« 10 et 14 »)' if expected == 2 else 'un nombre'}.")
         value = numbers if op == "between" else numbers[0]
+    elif kind == pricing.DATE:
+        found = re.findall(r"(\d{1,2})/(\d{1,2})/(\d{4})|(\d{4})-(\d{2})-(\d{2})", text)
+        expected = 2 if op == "between" else 1
+        if len(found) != expected:
+            raise FeeError(
+                f"« {label} » : indiquez {'deux dates (« 01/09/2026 et 31/12/2026 »)' if expected == 2 else 'une date (JJ/MM/AAAA)'}."
+            )
+        days = []
+        for d, m, y, y2, m2, d2 in found:
+            try:
+                days.append(date(int(y or y2), int(m or m2), int(d or d2)).isoformat())
+            except ValueError:
+                raise FeeError(f"« {label} » : date impossible.") from None
+        value = days if expected == 2 else days[0]
     elif kind == pricing.BOOL:
         answer = fold(text)
         if answer not in ("oui", "non", "o", "n"):
@@ -755,7 +800,9 @@ def assessments():
         for household in sorted(households, key=lambda h: fold(h.name)):
             assessment = existing.get(household.id)
             state = assessment.status if assessment else "none"
-            if status and status != state:
+            if status == "review" and not (assessment and assessment.review_reasons):
+                continue
+            if status and status != "review" and status != state:
                 continue
             rows.append((household, assessment))
     totals = {
@@ -942,6 +989,20 @@ def reopen_assessment(assessment_id):
         fees.reopen(assessment, request.form.get("reason"), current_user)
         db.session.commit()
         flash("Cotisation rouverte.", "success")
+    except FeeError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    return _back(assessment.household_id, assessment.season_id)
+
+
+@bp.route("/cotisations/<int:assessment_id>/revue", methods=["POST"])
+@require("fee.assess")
+def acknowledge_review(assessment_id):
+    assessment = _assessment(assessment_id)
+    try:
+        fees.acknowledge_review(assessment, current_user)
+        db.session.commit()
+        flash("Cotisation revue : rien à changer.", "success")
     except FeeError as exc:
         db.session.rollback()
         flash(str(exc), "error")

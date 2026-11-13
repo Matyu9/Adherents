@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from ..extensions import db
-from . import accounts, activity, bank, logout, mailer, oidc, registration, sessions, throttle
+from . import accounts, activity, bank, logout, mailer, oidc, registration, room_calendars, sessions, throttle
 
 
 def run(now=None):
@@ -19,11 +19,13 @@ def run(now=None):
     db.session.commit()
     sent, failed, dropped = logout.deliver_pending(now)
     emails = mailer.deliver_pending()
+    rooms_sent, rooms_failed, rooms_dropped = room_calendars.deliver_pending(now)
     return (
         f"{logins} connexion(s), {attempts} tentative(s) et {links} lien(s) expiré(s) effacé(s), "
         f"{old_sessions} session(s) trop ancienne(s) fermée(s), {expired} élément(s) OIDC expiré(s) effacé(s), "
         f"{orphans} session(s) d'appli rattrapée(s), avis de déconnexion : {sent} reçu(s), {failed} à réessayer, "
         f"{dropped} abandonné(s), {emails} email(s) envoyé(s), {mandates} mandat(s) SEPA et "
         f"{bank_accounts} compte(s) bancaire(s) arrivés au bout de leur conservation supprimés, "
-        f"{reminded} foyer(s) relancé(s) pour leur inscription."
+        f"{reminded} foyer(s) relancé(s) pour leur inscription, agendas des salles : {rooms_sent} envoi(s), "
+        f"{rooms_failed} à réessayer, {rooms_dropped} abandonné(s)."
     )

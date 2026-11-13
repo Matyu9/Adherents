@@ -464,8 +464,16 @@ def prepare(household, season):
                 age=age,
                 adult=age >= 18 if age is not None else member.role == HouseholdMember.GUARDIAN,
                 tags=frozenset(membership.fee_tags or ()),
-                disciplines=frozenset(e.course.discipline.name for e in enrollments),
+                disciplines=frozenset(
+                    name
+                    for e in enrollments
+                    for name in (e.course.discipline.name, e.course.discipline.name_for(e.course.season))
+                ),
                 seniority=seniority,
+                category=membership.category,
+                school_level=membership.school_level,
+                courses=len(enrollments),
+                enrolled_on=min((e.enrolled_on for e in enrollments if e.enrolled_on), default=None),
             )
         )
         for enrollment in enrollments:
@@ -477,7 +485,7 @@ def prepare(household, season):
                     f"{person.full_name} : le cours « {course.title} » facture un élément d'une autre saison."
                 )
             else:
-                picks.append((person.id, course.fee_item_id))
+                picks.append((person.id, course.fee_item_id, _course_facts(enrollment)))
     picked = db.session.scalars(
         db.select(FeePick)
         .join(FeeItem)
@@ -503,6 +511,20 @@ def prepare(household, season):
         picks=tuple(picks),
     )
     return Prepared(order, engine_items, persons, warnings)
+
+
+def _course_facts(enrollment):
+    """Ce que les règles peuvent consulter d'un cours facturé : individuel, durée (minutes), date d'inscription."""
+    course = enrollment.course
+    minutes = None
+    if course.individual and enrollment.slot_starts_at and enrollment.slot_ends_at:
+        start, end = enrollment.slot_starts_at, enrollment.slot_ends_at
+        minutes = (end.hour * 60 + end.minute) - (start.hour * 60 + start.minute)
+    elif course.starts_at and course.ends_at:
+        minutes = (course.ends_at.hour * 60 + course.ends_at.minute) - (
+            course.starts_at.hour * 60 + course.starts_at.minute
+        )
+    return {"individual": bool(course.individual), "minutes": minutes, "enrolled_on": enrollment.enrolled_on}
 
 
 def _engine_item(item):
@@ -575,6 +597,7 @@ def assess(household, season, discard_corrections=False):
     assessment.computed_total = result.total
     assessment.computed_at = datetime.now()
     assessment.warnings = prepared.warnings
+    assessment.review_reasons = []
     db.session.flush()
     return assessment
 
@@ -711,6 +734,21 @@ def reopen(assessment, reason, user=None):
         user=user,
         household=assessment.household,
     )
+    db.session.flush()
+
+
+def acknowledge_review(assessment, user=None):
+    """Le gestionnaire a vu les changements d'inscription et il n'y a rien à changer : le signal « à revoir » tombe."""
+    if not assessment.review_reasons:
+        raise FeeError("Cette cotisation n'est pas à revoir.")
+    log(
+        "fee.review",
+        f"Cotisation {assessment.season.label} du foyer {assessment.household.name} revue sans changement "
+        f"({len(assessment.review_reasons)} changement(s) d'inscription)",
+        user=user,
+        household=assessment.household,
+    )
+    assessment.review_reasons = []
     db.session.flush()
 
 
@@ -944,6 +982,9 @@ def describe_condition(condition, labels):
         value = ", ".join(labels.get(v, "?") for v in value)
     elif isinstance(value, bool):
         value = "oui" if value else "non"
+    elif kind == pricing.DATE:
+        shown = [f"{v[8:10]}/{v[5:7]}/{v[:4]}" for v in (value if isinstance(value, list) else [value])]
+        value = " et le ".join(shown)
     elif condition["op"] == "between":
         value = f"{value[0]} et {value[1]}"
     elif isinstance(value, list):

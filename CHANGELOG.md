@@ -4,6 +4,74 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ## Non publié
 
+### Changé : retours du tour complet, tarifs
+
+- **Modèles de règles** : six cas courants en deux ou trois champs (frères et sœurs, quotient familial, n-ième cours, ajout d'un élément, prix fixe pour une étiquette, supplément hors commune). La règle arrive en brouillon dans le formulaire complet.
+- **Éléments visés** au choix en étiquettes avec recherche ou en glisser-déposer, choix retenu dans le navigateur.
+- **Nouveaux critères** : catégorie et niveau scolaire de l'élève, nombre de cours suivis sur la saison, date de première inscription ; pour un cours facturé, cours individuel, durée et date d'inscription. Nouveau type « date » (avant le, à partir du, entre).
+
+### Changé : retours du tour complet, réinscriptions
+
+- **Cours proposés en cartes**, regroupés par discipline (description de la saison, jour et horaire, professeur, salle, places qui restent, complet et liste d'attente). Corrige l'affichage serré des cours dans le dossier.
+- **Campagne « par discipline »** (réglage de chaque campagne) : la famille choisit une ou plusieurs disciplines et donne ses disponibilités ; les âges conseillés et les places de la saison s'affichent. À la validation, l'élève devient adhérent sans cours, et apparaît dans **Catalogue → À placer**, où le secrétariat l'inscrit. Migration `a0000020choix`.
+
+### Changé : retours du tour complet, disciplines par saison
+
+- **Catalogue → Disciplines de la saison** : chaque discipline garde une seule fiche, avec des réglages propres à chaque saison (nom, type, proposée ou non, description pour les familles, places, âges admis). L'historique garde le nom de l'époque, « Copier une saison » recopie ces réglages, et une discipline qui n'est pas proposée sort du choix des cours de la saison. Migration `a0000019disciplines`.
+
+### Changé : retours du tour complet, jours fériés et salles
+
+- **Jours fériés calculés** pour la saison, d'un bouton, chacun modifiable ou supprimable.
+- **Import de vacances et fermetures** depuis un fichier `.ics` (calendrier scolaire officiel, export d'agenda) ou CSV, avec un aperçu (nouvelle, déjà là, hors saison) avant tout ajout.
+- **Nature d'une période** (jour férié, vacances, fermeture) et **cours maintenus** : la période reste affichée sans retirer de séance. Migration `a0000018feries`.
+- **Calendriers** : jours fériés et vacances visibles dans le planning (semaine et mois) et le calendrier d'un cours, séances annulées barrées.
+- **Séance d'un professeur pendant une période sans cours** : le secrétariat est prévenu, avec le nom de la période.
+- **Menu → Salles** : salles par site, places, agenda relié, occupation de la semaine, cours réguliers.
+
+### Changé : retours du tour complet, professeurs et séances
+
+- **Menu d'un professeur** : sans famille ni adhésion, plus de « Ma famille » ni d'« Inscriptions ».
+- **Fiche élève pour le professeur** (depuis Mes élèves ou l'appel) : cours de la saison, responsables, présences à ses cours ; **+ Ajouter à ce cours** l'inscrit à un autre de ses cours qui a de la place, le secrétariat est prévenu.
+- **Fiche d'un professeur** : présentation et photo (montrées aux familles de ses élèves), diplômes, disponibilités, et ses cours de la saison choisie modifiables depuis sa page. Migration `a0000016profs`.
+- **Fiche d'appel refaite** : gros boutons Présent / Absent / Excusé / **Retard**, « Tous présents », compteur, noms cliquables, pensée pour le téléphone.
+- **Absence prévenue à l'avance** par la famille (Ma famille → Prévenir d'une absence) : le professeur est notifié, l'élève est proposé « excusé » à l'appel. Migration `a0000017retards`.
+- **Séances d'un cours** : résumé (élèves, séances, taux de présence), onglets Liste (à venir, passées repliées) et Calendrier, actions dans un menu « ⋯ ».
+
+### Changé : retours du tour complet, menu, comptes et accueil
+
+- **Menu** : Saisons passe dans Administration. Conservation devient l'onglet **Données personnelles** des Paramètres, qui ont maintenant des onglets (Général, Adhérents, Données personnelles, État de l'installation).
+- **Connexion depuis la fiche** : une case **Peut se connecter** crée et invite le compte, le coupe ou le rétablit. La page Rattachement disparaît : la fiche propose les comptes qui lui ressemblent, la page d'un compte sans fiche propose les fiches, et Comptes a un filtre « Sans fiche dans l'annuaire ».
+- **Vue adhérent** : depuis le menu du compte, un administrateur ou un gestionnaire voit l'appli avec les seuls droits d'un adhérent (les pages d'administration sont refusées), avec un bandeau pour revenir.
+- **Accueil** (ex-Tableau de bord) : séances des 7 prochains jours, inscriptions, notifications non lues. **Ma famille** remplace Mon espace (l'ancienne adresse redirige).
+- **Coordonnées modifiables par les familles** en cours d'année, au choix dans Paramètres → Adhérents (adresse, téléphones, emails) : appliquées tout de suite, notées au journal, secrétariat prévenu ; pendant un dossier en cours, tout passe par le dossier.
+- **Saison en préparation** : cachée aux professeurs et aux familles (Mes séances, Mes élèves, plannings, agendas) tant qu'elle n'est pas prête. Migration `a0000015preparation`.
+
+### Changé : retours du tour complet, corrections rapides
+
+- **Saison retenue** : la saison choisie dans le catalogue, les tarifs, le calendrier, l'annuaire ou Mes élèves reste la même en passant d'une page à l'autre, jusqu'à la déconnexion.
+- **Annuaire** : par défaut, seules les personnes de la saison choisie s'affichent (son adhésion, même abandonnée, ou celle de quelqu'un de son foyer). Filtre « Toutes les fiches » pour le reste ; une recherche qui trouve des fiches hors saison le signale.
+- **Envoi d'un dossier** : le bouton « Envoyer le dossier » reste grisé tant que l'exactitude n'est pas certifiée.
+- **Séances** : « Déplacer » devient « Modifier la séance ».
+- **Tranches de quotient familial** : bouton « + Ajouter une tranche », sans limite de nombre.
+- **Notifications** : supprimer une notification, ou toutes celles déjà lues. Une relance supprimée n'est pas renvoyée. Migration `a0000014notifications`.
+- **Barre latérale** : le nom en bas à gauche disparaît, il faisait doublon avec le menu du compte en haut à droite.
+
+### Ajouté : gestion des cours, effectifs et inscriptions en cours de saison
+
+- **Page d'un cours** (Catalogue → un cours) : élèves inscrits avec leurs responsables et leur date d'arrivée, effectif face à la capacité, élèves partis en cours de saison, liste en CSV, lien pour écrire aux familles en copie cachée.
+- **Inscrire, changer de cours, noter l'abandon d'un cours**, depuis la page du cours ou la fiche de l'élève. Nouveau droit `enrollment.edit`, donné au gestionnaire.
+- **Cotisation « à revoir »** : un changement d'inscription marque la cotisation déjà calculée de chaque foyer de l'élève, avec un motif, sans la recalculer. Filtre « À revoir » dans Tarifs → Cotisations, et bouton « rien à changer ».
+- **Migration `a0000007effectifs`** : date d'entrée de chaque inscription (reprise de sa date d'enregistrement), lien de transfert, motifs « à revoir ». Voir [docs/cours.md](docs/cours.md).
+- **Cours individuels** : case « Cours individuel » sur un cours ; heure de passage et durée de chaque élève, plages libres du créneau, passages qui débordent ou se chevauchent signalés. Visibles dans Mes élèves et Mon espace. Migration `a0000008individuel`.
+- **Liste d'attente** d'un cours complet : demandée par la famille dans son dossier ou ajoutée par le secrétariat, ordre réglable, inscription en un clic ; notification au secrétariat quand une place se libère, sans inscription automatique. Migration `a0000009attente`.
+- **Fusion de deux fiches** : les inscriptions passent sur la fiche gardée avec leurs dates (elles étaient recréées sans).
+- **Calendrier et séances** : reprise et fin des cours, périodes sans cours saisies par l'association, génération des séances (relançable, sans toucher aux séances passées ni modifiées à la main). Le **professeur déplace, annule ou ajoute ses séances** depuis **Mes séances**, avec les salles libres et les gênes signalées ; les familles et le secrétariat sont prévenus, le secrétariat peut revenir en arrière et nommer un remplaçant. Délai réglable, sans valeur par défaut. Nouveau droit `lesson.manage`. Migration `a0000010seances`.
+- **Plannings** : une vraie semaine en grille horaire et un mois en calendrier, pour toute l'association, une salle, un professeur ou un site, plus la semaine type. Séances passées grisées, annulées barrées, jour et heure courants marqués. **Couleur de chaque cours**, choisie ou tirée de la discipline (migration `a0000013couleurs`). **Mon planning** pour chaque professeur et chaque famille, avec le prénom de l'enfant et son heure de passage.
+- **Agenda à s'abonner** (.ics) pour chaque compte : séances du professeur, ou des enfants, sans nom d'élève, à adresse secrète régénérable. Nouveau réglage `TIMEZONE`.
+- **Agendas des salles (Google Workspace, facultatif)** : lecture de l'occupation des salles avant de déplacer une séance, réservation de chaque séance dans l'agenda de sa salle (file d'envoi réessayée, sans doublon, sans nom d'élève), écran **Salles de l'organisation** qui reprend bâtiments et salles avec un aperçu. Compte de service avec un rôle d'administration limité, sans délégation sur tout le domaine. Places d'une salle, et effectif d'un cours qui les dépasse signalé. Nouveaux réglages `GOOGLE_SERVICE_ACCOUNT_FILE` et `GOOGLE_WORKSPACE_CUSTOMER`. Migration `a0000011salles`.
+- **Présences** : l'appel fait par le professeur ou le remplaçant depuis Mes séances (présent, absent, excusé, sans motif écrit), corrigeable 7 jours puis par le secrétariat ; feuille limitée aux élèves inscrits ce jour-là ; absences répétées à partir d'un seuil sans valeur par défaut ; présences visibles des familles dans Mon espace (réglage actif par défaut) ; effacées à l'anonymisation. Migration `a0000012presences`.
+- **Feuille de route** : la gestion des cours, en six étapes (effectifs, cours individuels, liste d'attente, séances et agendas, agendas des salles Google Workspace, présences).
+
 ### Changé : les types de discipline se composent
 
 - **Types de discipline** : la liste fixe (instrument, formation musicale, pratique collective, éveil, autre) laisse place à une liste que chaque association compose, dans **Catalogue → Disciplines, niveaux et lieux**. Un type a un nom et un ordre ; un type qui a servi s'archive au lieu de se supprimer. Rien n'est plus propre à la musique.

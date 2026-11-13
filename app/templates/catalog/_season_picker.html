@@ -13,7 +13,9 @@
 {% macro tabs(active, season) -%}
 <nav class="tabs" aria-label="Catalogue">
   <a href="{{ url_for('catalog.index', saison=season.id if season) }}"{% if active == "cours" %} aria-current="page"{% endif %}>Cours</a>
+  <a href="{{ url_for('catalog.season_disciplines', saison=season.id if season) }}"{% if active == "disciplines" %} aria-current="page"{% endif %}>Disciplines de la saison</a>
   <a href="{{ url_for('catalog.teachers', saison=season.id if season) }}"{% if active == "profs" %} aria-current="page"{% endif %}>Professeurs</a>
+  {% if can(current_user, "enrollment.edit") %}<a href="{{ url_for('catalog.to_place', saison=season.id if season) }}"{% if active == "placer" %} aria-current="page"{% endif %}>À placer</a>{% endif %}
   <a href="{{ url_for('catalog.references') }}"{% if active == "refs" %} aria-current="page"{% endif %}>Disciplines, niveaux et lieux</a>
 </nav>
 {%- endmacro %}

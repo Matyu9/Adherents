@@ -24,6 +24,14 @@
   {% endif %}
 </section>
 
+{% if assessment and assessment.review_reasons %}
+<section class="flash flash-warning">
+  <p><strong>À revoir :</strong> les inscriptions ont changé depuis le calcul.</p>
+  <ul>{% for r in assessment.review_reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+  {% if assess %}<p class="small">{% if assessment.status == "validated" %}Rouvrez la cotisation pour la recalculer, ou{% else %}Recalculez-la, ou{% endif %}
+    {{ post_button(url_for('fees.acknowledge_review', assessment_id=assessment.id), "indiquez qu'il n'y a rien à changer", "link-button") }}.</p>{% endif %}
+</section>
+{% endif %}
 {% for w in (assessment.warnings if assessment else prepared.warnings) %}<p class="flash flash-warning">{{ w }}</p>{% endfor %}
 {% if assessment and drift is not none %}
 <p class="flash flash-warning">Un nouveau calcul donnerait {{ drift | euros }} au lieu de {{ assessment.computed_total | euros }} : les inscriptions, la situation ou les règles ont changé depuis.{% if assessment.status == "validated" %} Rouvrez la cotisation pour la recalculer.{% endif %}</p>

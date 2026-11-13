@@ -24,6 +24,7 @@ DIR_VIEW, DIR_EDIT, DIR_MERGE, BANK = "directory.view", "directory.edit", "direc
 LINKING = "account.manage+directory.edit"
 TEACHERS = "teacher.manage"
 CAT_VIEW, CAT_EDIT = "catalog.view", "catalog.edit"
+ROSTER, ENROLL, LESSONS = "catalog.view+directory.view", "enrollment.edit", "lesson.manage"
 REG_VIEW, REG_MANAGE, REG_IBAN = "registration.view", "registration.manage", "registration.manage+bank.view"
 FEE_VIEW, FEE_EDIT, FEE_ASSESS, FEE_SITUATION = "fee.view", "fee.edit", "fee.assess", "fee.situation"
 ACCESS = {
@@ -46,6 +47,10 @@ ACCESS = {
     "oidc.directory": PUBLIC,
     "oidc.persons": PUBLIC,
     "member.index": LOGGED_IN,
+    "member.contacts_form": LOGGED_IN,
+    "member.absences": LOGGED_IN,
+    "member.declare_absence": LOGGED_IN,
+    "member.cancel_absence": LOGGED_IN,
     **{
         f"applications.{name}": CLIENTS
         for name in (
@@ -64,6 +69,7 @@ ACCESS = {
     "auth.logout": LOGGED_IN,
     "auth.password": LOGGED_IN,
     "dashboard.index": LOGGED_IN,
+    "dashboard.old_member_space": LOGGED_IN,
     "account.index": LOGGED_IN,
     "account.display": LOGGED_IN,
     "account.revoke_session": LOGGED_IN,
@@ -75,6 +81,9 @@ ACCESS = {
     "account.totp_disable": LOGGED_IN,
     "notifications.index": LOGGED_IN,
     "notifications.mark_all_read": LOGGED_IN,
+    "notifications.dismiss": LOGGED_IN,
+    "notifications.dismiss_read": LOGGED_IN,
+    "account.member_view": LOGGED_IN,
     "journal.index": JOURNAL,
     **{
         f"accounts.{name}": ACCOUNTS
@@ -104,6 +113,7 @@ ACCESS = {
     "settings.test_email": SETTINGS,
     "settings.run_tasks": SETTINGS,
     "settings.revoke_sessions": SETTINGS,
+    "settings.members": SETTINGS,
     "health.as_json": HIDDEN,
     "health.page": HIDDEN,
     **{f"directory.{name}": DIR_VIEW for name in ("index", "person", "households", "household")},
@@ -134,8 +144,15 @@ ACCESS = {
             "delete_season",
         )
     },
-    **{f"teachers.{name}": TEACHERS for name in ("index", "create", "detail", "edit", "remove")},
-    **{f"catalog.{name}": CAT_VIEW for name in ("index", "teachers", "references")},
+    **{
+        f"teachers.{name}": TEACHERS
+        for name in ("index", "create", "detail", "edit", "remove", "profile", "availability")
+    },
+    "teachers.photo": LOGGED_IN,
+    **{f"catalog.{name}": CAT_VIEW for name in ("index", "teachers", "references", "season_disciplines")},
+    "catalog.season_discipline": CAT_EDIT,
+    "catalog.to_place": ENROLL,
+    "catalog.place": ENROLL,
     **{f"campaigns.{name}": REG_VIEW for name in ("index", "detail", "dossiers", "dossier")},
     **{
         f"campaigns.{name}": REG_MANAGE
@@ -169,6 +186,7 @@ ACCESS = {
             "create_regie",
             "toggle_regie",
             "create_rule",
+            "rule_templates",
             "edit_rule",
             "move_rule",
             "toggle_rule",
@@ -187,6 +205,7 @@ ACCESS = {
             "undo_line",
             "validate_assessment",
             "reopen_assessment",
+            "acknowledge_review",
             "delete_assessment",
         )
     },
@@ -195,6 +214,8 @@ ACCESS = {
     "enrollment.index": LOGGED_IN,
     "enrollment.start": LOGGED_IN,
     "enrollment.my_students": LOGGED_IN,
+    "enrollment.my_student": LOGGED_IN,
+    "enrollment.add_my_student": LOGGED_IN,
     # Un dossier s'ouvre par son compte ou par le lien reçu par email : un identifiant inconnu donne 404.
     **{
         f"enrollment.{name}": PUBLIC
@@ -217,6 +238,8 @@ ACCESS = {
         for name in (
             "create_course",
             "edit_course",
+            "workspace_rooms",
+            "workspace_push",
             "delete_course",
             "copy",
             "teacher_disciplines",
@@ -227,6 +250,46 @@ ACCESS = {
             "delete_item",
         )
     },
+    "catalog.course": ROSTER,
+    "catalog.course_csv": ROSTER,
+    **{
+        f"catalog.{name}": ENROLL
+        for name in (
+            "enroll_student",
+            "enroll_in_course",
+            "transfer",
+            "withdraw",
+            "set_slot",
+            "add_to_waitlist",
+            "move_waitlist",
+            "remove_from_waitlist",
+            "enroll_from_waitlist",
+        )
+    },
+    **{
+        f"lessons.{name}": LESSONS
+        for name in (
+            "calendar",
+            "add_break",
+            "delete_break",
+            "generate",
+            "save_delay",
+            "revert",
+            "substitute",
+            "absences",
+            "save_attendance_settings",
+            "add_holidays",
+            "import_breaks",
+            "keep_break",
+        )
+    },
+    **{
+        f"lessons.{name}": LOGGED_IN
+        for name in ("course", "edit", "add", "cancel", "mine", "agenda_page", "roll", "my_planning")
+    },
+    "lessons.planning": CAT_VIEW,
+    "lessons.rooms": CAT_VIEW,
+    "lessons.feed": PUBLIC,
     "directory.merge_person": DIR_MERGE,
     "directory.merge_household": DIR_MERGE,
     **{
@@ -243,7 +306,14 @@ ACCESS = {
     "directory.leave_secure": LOGGED_IN,
     **{
         f"directory.{name}": LINKING
-        for name in ("create_account", "unlink_account", "link_accounts", "link_account", "person_from_account")
+        for name in (
+            "create_account",
+            "set_login",
+            "attach_account",
+            "unlink_account",
+            "link_account",
+            "person_from_account",
+        )
     },
 }
 HOLDERS = {
@@ -262,6 +332,9 @@ HOLDERS = {
     TEACHERS: {A},
     CAT_VIEW: {A, G},
     CAT_EDIT: {A, G},
+    ROSTER: {A, G},
+    ENROLL: {A, G},
+    LESSONS: {A, G},
     REG_VIEW: {A, G},
     REG_MANAGE: {A, G},
     REG_IBAN: {A},
@@ -299,6 +372,14 @@ ARGUMENTS = {
     "assessment_id": 999,
     "pick_id": 999,
     "regie_id": 999,
+    "enrollment_id": 999,
+    "entry_id": 999,
+    "lesson_id": 999,
+    "break_id": 999,
+    "notification_id": 999,
+    "notice_id": 999,
+    "discipline_id": 999,
+    "direction": "monter",
 }
 # Publiques, mais renvoient légitimement vers la connexion : rien en cours, ou lien inconnu.
 SENDS_TO_LOGIN = {"auth.logout", "auth.two_factor", "auth.token_link", "oidc.end_session", "enrollment.access"}
@@ -333,6 +414,8 @@ def test_every_declared_permission_exists():
         TEACHERS,
         CAT_VIEW,
         CAT_EDIT,
+        ENROLL,
+        LESSONS,
         REG_VIEW,
         REG_MANAGE,
         FEE_VIEW,
@@ -563,7 +646,40 @@ def _fees(season, household):
     fees.add_pick(household, membership.person, location, "<b>violon")
     assessment = fees.assess(household, season)
     fees.correct_line(assessment.lines[0], 30000, "Geste <b>")
+    _transfer(season, membership)
     db.session.flush()
+
+
+def _transfer(season, membership):
+    """Un élève passé d'un cours à l'autre : la cotisation de son foyer est « à revoir »."""
+    from app.models import Course
+    from app.services import courses
+
+    first, second = db.session.scalars(db.select(Course).where(Course.season_id == season.id).order_by(Course.id))
+    enrollment = next(e for e in membership.enrollments if e.course_id == first.id)
+    courses.transfer(enrollment, second, enrollment.enrolled_on)
+    courses.flag_review(membership.person, season, "Motif <script>")
+    courses.add_to_waitlist(membership, first)
+    _lessons(season, first)
+
+
+def _lessons(season, course):
+    """Un calendrier : une période sans cours au nom piégé, les séances générées, une séance déplacée et annulée."""
+    from datetime import date
+
+    from app.services import lessons
+
+    lessons.add_break(season, "Vacances <b>", date(2026, 10, 17), date(2026, 11, 1))
+    lessons.generate(season, today=date(2026, 9, 1), apply=True)
+    first, second = course.lessons[:2]
+    first.reason, first.edited, first.previous = "Motif <script>", True, {"extra": True}
+    second.status, second.reason = "cancelled", "Grève <script>"
+    from app.models import Attendance
+    from app.services import options
+
+    options.put(options.ABSENCE_THRESHOLD, 1)
+    enrollment = next(e for e in course.enrollments)
+    db.session.add(Attendance(lesson=first, enrollment=enrollment, status="absent"))
 
 
 INLINE = re.compile(
@@ -613,6 +729,10 @@ def test_crawl_every_link(app, rich, who):
             problems.append(f"{path} : une donnée n'a pas été échappée")
         for link in LINK.findall(html):
             target = urlsplit(urljoin(path, link.replace("&amp;", "&")))
+            if (
+                "date=" in target.query or "mois=" in target.query
+            ) and "/seances/" in target.path:  # plannings sans fin
+                continue
             if not target.netloc and target.scheme not in ("data", "mailto", "tel"):  # data : QR code intégré
                 queue.append(target.path + (f"?{target.query}" if target.query else ""))
     assert not problems, "\n".join(problems)
@@ -625,18 +745,27 @@ def test_crawl_every_link(app, rich, who):
     assert ("/applications" in seen) == (who == A)
     assert ("/annuaire" in seen) == (who in (A, G)) and ("/annuaire/foyers" in seen) == (who in (A, G))
     assert ("/annuaire/saisons" in seen) == (who in (A, G))
-    assert ("/annuaire/rattachement" in seen) == (who == A)
     assert ("/professeurs" in seen) == (who == A) and any(p.startswith("/professeurs/") for p in seen) == (who == A)
     assert any(p.startswith("/annuaire/personnes/") for p in seen) == (who in (A, G))
     assert any(p.endswith("/afficher") for p in seen) == (who == A)
     assert any(p.endswith("/fusionner") for p in seen) == (who in (A, G))
     assert ("/catalogue" in seen) == (who in (A, G)) and ("/catalogue/referentiels" in seen) == (who in (A, G))
     assert any(p.startswith("/catalogue/cours/") for p in seen) == (who in (A, G))
+    assert any(p.endswith("/eleves.csv") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/catalogue/inscriptions/") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/catalogue/adhesions/") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/seances/calendrier") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/seances/cours/") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/seances/planning") for p in seen) == (who in (A, G))
+    assert any(p.endswith("/modifier") and p.startswith("/seances/") for p in seen) == (who in (A, G))
+    assert "/seances/agenda" in seen
+    assert any(p.endswith("/appel") for p in seen) == (who in (A, G))
+    assert any(p.startswith("/seances/absences") for p in seen) == (who in (A, G))
     assert any(p.startswith("/catalogue/copier") for p in seen) == (who in (A, G))
     assert ("/campagnes" in seen) == (who in (A, G))
     assert any(p.startswith("/campagnes/dossiers/") for p in seen) == (who in (A, G))
     assert any(p.startswith("/inscription/dossier/") for p in seen) == (who == H)  # le compte d'Anne, responsable
-    assert ("/mon-espace" in seen) == (who == H)
+    assert ("/ma-famille" in seen) == (who == H)
     assert ("/tarifs" in seen) == (who in (A, G)) and any(p.startswith("/tarifs/regles/") for p in seen) == (
         who in (A, G)
     )

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Nouvelle règle{% endblock %}
+{% macro category_field(t) %}
+<div><label for="{{ t }}-category">Catégorie visée</label>
+  <select id="{{ t }}-category" name="category"><option value="">Tous les éléments</option>{% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select></div>
+{% endmacro %}
+{% macro item_field(t) %}
+<div><label for="{{ t }}-item">Élément</label>
+  <select id="{{ t }}-item" name="item" required><option value="">—</option>{% for i in items %}<option value="{{ i.id }}">{{ i.label }} ({{ i.price | euros }})</option>{% endfor %}</select></div>
+{% endmacro %}
+{% block content %}
+<p><a href="{{ url_for('fees.rules', saison=season.id) }}">← Règles {{ season.label }}</a></p>
+<div class="page-head">
+  <div>
+    <h1>Nouvelle règle</h1>
+    <p class="muted">Partez d'un modèle : quelques champs suffisent. La règle arrive en brouillon, dans le formulaire complet, pour la vérifier ou l'affiner avant de l'activer.</p>
+  </div>
+  <a href="{{ url_for('fees.create_rule', saison=season.id) }}" role="button" class="secondary outline">Formulaire avancé</a>
+</div>
+{% if error %}<p class="flash flash-error" role="alert">{{ error }}</p>{% endif %}
+<div class="template-grid">
+{% for key, t in templates.items() %}
+<form method="post" class="card template-card{{ ' is-chosen' if chosen == key }}" novalidate>
+  {{ csrf() }}
+  <input type="hidden" name="modele" value="{{ key }}">
+  <h2>{{ t.title }}</h2>
+  <p class="muted small">{{ t.text }}</p>
+  <div class="grid">
+    {% if "rank" in t.fields %}<div><label for="{{ key }}-rank">À partir du</label><input id="{{ key }}-rank" name="rank" inputmode="numeric" value="2" aria-describedby="{{ key }}-rank-help"><small id="{{ key }}-rank-help" class="muted">{{ "ᵉ élève du foyer" if key == "fratrie" else "ᵉ élément chez l'élève" }}</small></div>{% endif %}
+    {% if "band" in t.fields %}<div><label for="{{ key }}-band">Tranche</label>
+      {% if bands %}<select id="{{ key }}-band" name="band">{% for b in bands %}<option value="{{ b }}">{{ b }}</option>{% endfor %}</select>
+      {% else %}<p class="small muted">Définissez d'abord les tranches dans les <a href="{{ url_for('fees.settings', saison=season.id) }}">réglages</a>.</p>{% endif %}</div>{% endif %}
+    {% if "percent" in t.fields %}<div><label for="{{ key }}-percent">Réduction (%)</label><input id="{{ key }}-percent" name="percent" inputmode="decimal" placeholder="10"></div>{% endif %}
+    {% if "category" in t.fields %}{{ category_field(key) }}{% endif %}
+    {% if "tag" in t.fields %}<div><label for="{{ key }}-tag">Étiquette de l'élève</label><input id="{{ key }}-tag" name="tag" placeholder="personnel"></div>{% endif %}
+    {% if "item" in t.fields %}{{ item_field(key) }}{% endif %}
+    {% if "price" in t.fields %}<div><label for="{{ key }}-price">Prix (€)</label><input id="{{ key }}-price" name="price" inputmode="decimal"></div>{% endif %}
+    {% if "per" in t.fields %}<div><label for="{{ key }}-per">Ajouté</label><select id="{{ key }}-per" name="per"><option value="student">Pour chaque élève</option><option value="household">Une fois pour le foyer</option></select></div>{% endif %}
+    {% if "amount" in t.fields %}<div><label for="{{ key }}-amount">Supplément (€)</label><input id="{{ key }}-amount" name="amount" inputmode="decimal"></div>{% endif %}
+  </div>
+  <button type="submit" class="secondary">Créer cette règle</button>
+</form>
+{% endfor %}
+</div>
+{% endblock %}

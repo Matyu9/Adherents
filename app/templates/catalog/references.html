@@ -68,7 +68,7 @@
 </section>
 
 <section id="sites" class="settings-block">
-  <div class="page-head"><h2>Sites et salles</h2>{% if can(current_user, "catalog.edit") %}<a href="{{ url_for('catalog.create_item', kind='sites') }}" role="button" class="secondary small">+ Site</a>{% endif %}</div>
+  <div class="page-head"><h2>Sites et salles</h2>{% if can(current_user, "catalog.edit") %}<div class="actions">{% if workspace %}<a href="{{ url_for('catalog.workspace_rooms') }}" role="button" class="secondary small">Salles de l'organisation</a>{% endif %}<a href="{{ url_for('catalog.create_item', kind='sites') }}" role="button" class="secondary small">+ Site</a></div>{% endif %}</div>
   {% for s in lists.sites %}
   <div class="card settings-block" id="site-{{ s.id }}">
     <div class="page-head">
@@ -77,7 +77,7 @@
     </div>
     <ul class="plain-list">
       {% for r in s.rooms %}
-      <li>{{ r.name }}{% if r.archived %} <span class="badge">archivée</span>{% endif %} <span class="actions">{{ row_actions("salles", r, r.label) }}</span></li>
+      <li>{{ r.name }}{% if r.capacity %} <small class="muted">{{ r.capacity }} places</small>{% endif %}{% if r.calendar_id %} <span class="badge">agenda relié</span>{% endif %}{% if r.archived %} <span class="badge">archivée</span>{% endif %} <span class="actions">{{ row_actions("salles", r, r.label) }}</span></li>
       {% else %}<li class="muted">Aucune salle.</li>{% endfor %}
     </ul>
     {% if can(current_user, "catalog.edit") and not s.archived %}<a href="{{ url_for('catalog.create_item', kind='salles', site=s.id) }}" class="small">+ Salle</a>{% endif %}

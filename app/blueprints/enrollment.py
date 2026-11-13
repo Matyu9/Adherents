@@ -350,11 +350,30 @@ class StudentForm(FlaskForm):
     courses = SelectMultipleField(
         "Cours", coerce=int, widget=ListWidget(prefix_label=False), option_widget=CheckboxInput(), validate_choice=False
     )
+    waitlist = SelectMultipleField(
+        "Liste d'attente",
+        coerce=int,
+        widget=ListWidget(prefix_label=False),
+        option_widget=CheckboxInput(),
+        validate_choice=False,
+    )
+    disciplines = SelectMultipleField(
+        "Disciplines",
+        coerce=int,
+        widget=ListWidget(prefix_label=False),
+        option_widget=CheckboxInput(),
+        validate_choice=False,
+    )
     wishes = TextAreaField("Souhaits, contraintes d'horaire", validators=[Optional(), Length(max=2000)])
 
-    def __init__(self, *args, is_guardian=False, full=(), offered=(), already=(), **kwargs):
+    def __init__(
+        self, *args, is_guardian=False, full=(), offered=(), already=(), by_discipline=False, proposed=(), **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self._is_guardian, self._full, self._offered, self._already = is_guardian, set(full), set(offered), set(already)
+        self._by_discipline, self._proposed = by_discipline, set(proposed)
+        if by_discipline:
+            self.wishes.label.text = "Vos disponibilités (jours, heures), et vos souhaits"
 
     def validate(self, extra_validators=None):
         ok = super().validate(extra_validators)
@@ -365,16 +384,24 @@ class StudentForm(FlaskForm):
                 if not getattr(self, f).data:
                     getattr(self, f).errors.append("Obligatoire pour inscrire l'élève.")
                     ok = False
+        if self._by_discipline:
+            if set(self.disciplines.data or []) - self._proposed:
+                self.disciplines.errors.append("Une discipline choisie n'est pas proposée.")
+                ok = False
+            return ok
         chosen = set(self.courses.data or [])
         if chosen - self._offered:
             self.courses.errors.append("Un cours choisi n'est pas proposé.")
             ok = False
         if full := chosen & self._full - self._already:
             self.courses.errors.append(
-                "Un cours choisi est complet : choisissez-en un autre, ou indiquez votre souhait plus bas."
+                "Un cours choisi est complet : choisissez-en un autre, ou demandez la liste d'attente."
                 if len(full) == 1
                 else "Des cours choisis sont complets."
             )
+            ok = False
+        if set(self.waitlist.data or []) - (self._full & self._offered):
+            self.waitlist.errors.append("La liste d'attente ne concerne que les cours complets.")
             ok = False
         return ok
 
@@ -400,23 +427,37 @@ def student(dossier, student_key):
     courses, counts = registration.offered_courses(dossier.campaign)
     full = [c.id for c in courses if c.is_full(counts.get(c.id, 0))]
     is_guardian = s.get("guardian") is not None
+    by_discipline = dossier.campaign.choice == Campaign.DISCIPLINE
+    proposed = registration.offered_disciplines(dossier.campaign) if by_discipline else []
     form = StudentForm(
-        is_guardian=is_guardian, full=full, offered=[c.id for c in courses], already=s.get("courses", [])
+        is_guardian=is_guardian,
+        full=full,
+        offered=[c.id for c in courses],
+        already=s.get("courses", []),
+        by_discipline=by_discipline,
+        proposed=[d.id for d, _left, _courses in proposed],
     )
     form.courses.choices = [(c.id, c.title) for c in courses]
+    form.disciplines.choices = [(d.id, d.name) for d, _left, _courses in proposed]
     if request.method == "GET":
         form.enrolled.data = bool(s.get("enrolled"))
         for f in ("first_name", "last_name", "sex", "category", "school_level", "school_class", "wishes"):
             getattr(form, f).data = s.get(f) or ""
         form.birth_date.data = datetime.fromisoformat(s["birth_date"]).date() if s.get("birth_date") else None
         form.courses.data = s.get("courses", [])
+        form.waitlist.data = s.get("waitlist", [])
+        form.disciplines.data = s.get("disciplines", [])
     if form.validate_on_submit():
         s["enrolled"] = form.enrolled.data
         if not is_guardian:
             s.update({f: _blank(getattr(form, f).data) for f in ("first_name", "last_name", "sex")})
             s["birth_date"] = form.birth_date.data.isoformat() if form.birth_date.data else None
         s.update({f: _blank(getattr(form, f).data) for f in ("category", "school_level", "school_class", "wishes")})
-        s["courses"] = list(form.courses.data or [])
+        if by_discipline:
+            s["disciplines"] = list(form.disciplines.data or [])
+        else:
+            s["courses"] = list(form.courses.data or [])
+            s["waitlist"] = [c for c in form.waitlist.data or [] if c not in s["courses"]]
         s["consents"] = {str(c.id): request.form.get(f"consent-{c.id}") == "y" for c in _student_consents(dossier)}
         registration.save(dossier, data)
         db.session.commit()
@@ -433,8 +474,33 @@ def student(dossier, student_key):
         courses=courses,
         counts=counts,
         full=set(full),
+        groups=_course_groups(courses, dossier.campaign.season),
+        by_discipline=by_discipline,
+        proposed=proposed,
+        age=_age_on(s, dossier.campaign.season),
+        season=dossier.campaign.season,
         consents=_student_consents(dossier),
     )
+
+
+def _course_groups(courses, season):
+    """Cours regroupés par discipline, dans l'ordre du catalogue : [(discipline, réglages de saison, [cours])]."""
+    groups = []
+    for course in courses:
+        if groups and groups[-1][0] == course.discipline:
+            groups[-1][2].append(course)
+        else:
+            groups.append((course.discipline, course.discipline.settings_for(season), [course]))
+    return groups
+
+
+def _age_on(student, season):
+    """Âge de l'élève au début de la saison, s'il est connu (pour signaler une discipline hors des âges admis)."""
+    if not student.get("birth_date"):
+        return None
+    born = datetime.fromisoformat(student["birth_date"]).date()
+    start = season.starts_on
+    return start.year - born.year - ((start.month, start.day) < (born.month, born.day))
 
 
 @bp.route("/dossier/<uuid>/eleves/nouveau", methods=["POST"])
@@ -628,12 +694,104 @@ def my_students():
         abort(404)
     flask_g.write_lock = True
     guard.count_read()
-    seasons = directory.seasons()
-    wanted = request.args.get("saison", type=int)
-    season = (
-        next((s for s in seasons if s.id == wanted), None)
-        or directory.current_season()
-        or (seasons[0] if seasons else None)
-    )
+    season, seasons = directory.selected_season()
     rows = registration.students_of(teacher, season) if season else []
     return render_template("enrollment/my_students.html", season=season, seasons=seasons, rows=rows)
+
+
+def _my_student(person_id):
+    """(professeur, saison, élève, [ses inscriptions à mes cours]) ; 404 si ce n'est pas un de mes élèves cette saison."""
+    teacher = teacher_of(current_user)
+    if teacher is None:
+        abort(404)
+    season, _ = directory.selected_season()
+    if season is None:
+        abort(404)
+    mine = [
+        e
+        for course, students in registration.students_of(teacher, season)
+        for student, _guardians, e in students
+        if student.id == person_id
+    ]
+    if not mine:
+        abort(404)
+    return teacher, season, mine[0].membership.person, mine
+
+
+@bp.route("/mes-eleves/<int:person_id>")
+@login_required
+def my_student(person_id):
+    """Fiche d'un de mes élèves, en lecture : ses cours de la saison, ses responsables, ses présences à mes cours."""
+    from flask import g as flask_g
+
+    from ..models import Enrollment
+    from ..services import attendance, guard
+
+    teacher, season, student, mine = _my_student(person_id)
+    flask_g.write_lock = True
+    guard.count_read()
+    membership = mine[0].membership
+    all_courses = [e for e in membership.enrollments if e.status == Enrollment.ACTIVE]
+    guardians = list(
+        {
+            link.person.id: link.person
+            for h in student.household_links
+            if h.role == "dependent"
+            for link in h.household.guardians
+        }.values()
+    )
+    enrolled_ids = {e.course_id for e in all_courses}
+    counts = registration.enrolled_counts(season)
+    addable = [
+        c
+        for c in teacher.courses
+        if c.season_id == season.id and c.id not in enrolled_ids and not c.is_full(counts.get(c.id, 0))
+    ]
+    return render_template(
+        "enrollment/my_student.html",
+        student=student,
+        membership=membership,
+        season=season,
+        all_courses=all_courses,
+        mine=mine,
+        guardians=guardians,
+        history={e.id: attendance.history(e) for e in mine},
+        addable=sorted(addable, key=lambda c: c.title),
+        teacher=teacher,
+        can_add=membership.status == membership.ACTIVE,
+    )
+
+
+@bp.route("/mes-eleves/<int:person_id>/cours", methods=["POST"])
+@login_required
+def add_my_student(person_id):
+    """Le professeur inscrit son élève à un autre de ses cours (orchestre, atelier…) ; le secrétariat est prévenu."""
+    from datetime import date
+
+    from ..services import courses, notify
+
+    teacher, season, student, mine = _my_student(person_id)
+    course = next(
+        (c for c in teacher.courses if c.id == request.form.get("course_id", type=int) and c.season_id == season.id),
+        None,
+    )
+    if course is None:
+        abort(404)
+    if course.is_full(registration.enrolled_counts(season).get(course.id, 0)):
+        flash(f"{course.title} est complet : voyez avec le secrétariat.", "error")
+        return redirect(url_for(".my_student", person_id=person_id, saison=season.id))
+    on = max(date.today(), season.starts_on)
+    try:
+        courses.enroll(mine[0].membership, course, on, user=current_user)
+    except courses.CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        notify.notify(
+            notify.holders("enrollment.edit"),
+            f"{current_user.full_name} a inscrit {student.full_name} à {course.title} (à partir du {on:%d/%m/%Y}).",
+            link=url_for("catalog.course", course_id=course.id),
+        )
+        db.session.commit()
+        flash(f"{student.first_name} est inscrit(e) à {course.title}. Le secrétariat est prévenu.", "success")
+    return redirect(url_for(".my_student", person_id=person_id, saison=season.id))

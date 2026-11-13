@@ -342,11 +342,21 @@ def test_status_filters(client, admin, family):
         page = client.get("/annuaire?" + query).get_data(as_text=True)
         return {n for n in ("Zoé", "Anne", "Marc", "Paul", "Parti", "Ancienne") if f" {n}</a>" in page}
 
+    # Par défaut : les personnes de la saison choisie, avec leur foyer (Anne, responsable de Zoé).
     assert names("") == {"Zoé", "Anne", "Marc"}
+    seul = person("Seul", "Ancien")
+    db.session.add(Membership(person=seul, season=old))
+    db.session.commit()
+    assert names("") == {"Zoé", "Anne", "Marc"}  # Seul n'est que de l'ancienne saison
+    assert " Seul</a>" in client.get(f"/annuaire?saison={old.id}").get_data(as_text=True)
+    assert " Seul</a>" in client.get("/annuaire").get_data(as_text=True)  # saison retenue d'une page à l'autre
+    page = client.get(f"/annuaire?saison={current.id}&q=seul").get_data(as_text=True)
+    assert " Seul</a>" not in page and "Voir aussi 1 fiche hors de la saison" in page
+    assert " Seul</a>" in client.get("/annuaire?statut=toutes&q=seul").get_data(as_text=True)
     assert names("statut=eleves") == {"Zoé"}
     assert names(f"statut=eleves&saison={old.id}") == {"Anne"}
     assert names("statut=anciens") == {"Anne", "Marc"}  # Marc a abandonné cette saison
-    assert names("statut=professeurs") == {"Zoé", "Anne", "Marc"}  # filtre retiré : ignoré
+    assert names("statut=professeurs") == {"Zoé", "Anne", "Marc"}  # filtre retiré : ignoré, retour au filtre par défaut
     assert names("statut=archives") == {"Ancienne"}
     assert prof and gone
 
@@ -631,12 +641,13 @@ def test_suggestions_show_why_and_never_decide(family):
     assert shared.person is None and homonym.person is None
 
 
-def test_linking_screen(client, admin, family):
+def test_linking_from_the_account_page(client, admin, family):
     anne_account = make_account(email="anne@asso.test", first_name="Anne")
     anne_account.last_name = "Martin"
     db.session.commit()
-    page = client.get("/annuaire/rattachement").get_data(as_text=True)
-    assert "anne@asso.test" in page and "même email" in page and "même nom" in page
+    assert client.get("/annuaire/rattachement").status_code == 404  # la page a disparu
+    page = client.get(f"/comptes/{anne_account.id}").get_data(as_text=True)
+    assert 'id="fiche"' in page and "même email" in page and "même nom" in page
     client.post(f"/annuaire/rattachement/{anne_account.id}", data={"person_id": family["anne"].id})
     assert db.session.get(Person, family["anne"].id).account_id == anne_account.id
     entry = db.session.scalar(db.select(Activity).filter_by(action="account.link"))
@@ -646,7 +657,7 @@ def test_linking_screen(client, admin, family):
         f"/annuaire/rattachement/{other.id}", data={"person_id": family["anne"].id}, follow_redirects=True
     )
     assert "a déjà un compte" in response.get_data(as_text=True)
-    assert "anne@asso.test" not in client.get("/annuaire/rattachement").get_data(as_text=True)
+    assert 'id="fiche"' not in client.get(f"/comptes/{anne_account.id}").get_data(as_text=True)
     client.post(f"/annuaire/personnes/{family['anne'].id}/compte/detacher")
     assert db.session.get(Person, family["anne"].id).account is None
     assert db.session.get(Account, anne_account.id) is not None
@@ -699,7 +710,7 @@ def test_account_page_links_to_the_record(client, admin, family):
 
 
 def test_linking_needs_both_rights(client, manager, family):
-    assert client.get("/annuaire/rattachement").status_code == 403
+    assert client.post(f"/annuaire/personnes/{family['marc'].id}/connexion", data={"connexion": "1"}).status_code == 403
     assert client.post(f"/annuaire/personnes/{family['marc'].id}/compte").status_code == 403
     assert family["marc"].account is None
 
@@ -807,7 +818,6 @@ def test_messages_can_be_dismissed_and_stay_in_view(client, admin, family):
     [
         "/annuaire/personnes/99999999999999999999",
         "/annuaire/foyers/99999999999999999999",
-        "/annuaire?saison=99999999999999999999",
         "/professeurs/99999999999999999999",
         "/annuaire/personnes/nouvelle?foyer=99999999999999999999",
     ],
@@ -815,3 +825,65 @@ def test_messages_can_be_dismissed_and_stay_in_view(client, admin, family):
 def test_numbers_too_large_are_a_clean_404(client, admin, url):
     """PostgreSQL refuse un entier hors limites : l'appli répond « introuvable », jamais une erreur 500."""
     assert client.get(url).status_code == 404
+
+
+def test_an_unknown_season_is_ignored(client, admin):
+    """Saison inconnue ou hors limites dans l'adresse : la saison par défaut, sans erreur."""
+    assert client.get("/annuaire?saison=99999999999999999999").status_code == 200
+
+
+def test_accounts_without_a_record_filter(client, admin, family):
+    alone = make_account(email="seul@asso.test", first_name="Seul")
+    family["anne"].account = make_account(email="anne@asso.test", first_name="Anne")
+    db.session.commit()
+    page = client.get("/comptes?fiche=sans").get_data(as_text=True)
+    assert "seul@asso.test" in page and "anne@asso.test" not in page and alone
+
+
+def test_login_checkbox_creates_cuts_and_restores(client, admin, family):
+    marc = family["marc"]
+    page = client.get(f"/annuaire/personnes/{marc.id}").get_data(as_text=True)
+    assert 'name="connexion"' in page and "Peut se connecter" in page
+    response = client.post(f"/annuaire/personnes/{marc.id}/connexion", data={"connexion": "1"})
+    assert response.status_code == 200 and "/lien/" in response.get_data(as_text=True)  # invitation
+    account = db.session.get(Person, marc.id).account
+    assert account.active
+    client.post(f"/annuaire/personnes/{marc.id}/connexion", data={})  # décochée : coupé, pas supprimé
+    assert not db.session.get(Account, account.id).active
+    assert db.session.get(Person, marc.id).account_id == account.id
+    client.post(f"/annuaire/personnes/{marc.id}/connexion", data={"connexion": "1"})  # recochée : rétabli
+    assert db.session.get(Account, account.id).active
+
+
+def test_login_checkbox_is_disabled_with_the_reason(client, admin, family):
+    zoe = family["zoe"]
+    zoe.email = "zoe@asso.test"
+    db.session.commit()
+    page = client.get(f"/annuaire/personnes/{zoe.id}").get_data(as_text=True)
+    assert "disabled data-autosubmit" in page and "avant 16 ans" in page
+    client.post(f"/annuaire/personnes/{zoe.id}/connexion", data={"connexion": "1"})
+    assert db.session.get(Person, zoe.id).account is None
+
+
+def test_cannot_cut_ones_own_account_from_the_record(client, admin, family):
+    family["anne"].account = admin
+    db.session.commit()
+    client.post(f"/annuaire/personnes/{family['anne'].id}/connexion", data={})
+    assert db.session.get(Account, admin.id).active
+
+
+def test_attaching_an_account_from_the_record(client, admin, family):
+    shared = make_account(email="martin@famille.test", first_name="Anne")
+    shared.last_name = "Martin"
+    other = make_account(email="autre@asso.test", first_name="Zzz")
+    db.session.commit()
+    anne = family["anne"]
+    page = client.get(f"/annuaire/personnes/{anne.id}").get_data(as_text=True)
+    assert "martin@famille.test" in page and "même nom" in page and "autre@asso.test" not in page
+    response = client.post(
+        f"/annuaire/personnes/{anne.id}/compte/rattacher", data={"email": "inconnu@x.test"}, follow_redirects=True
+    )
+    assert "Aucun compte à cette adresse" in response.get_data(as_text=True)
+    client.post(f"/annuaire/personnes/{anne.id}/compte/rattacher", data={"email": "AUTRE@asso.test"})
+    assert db.session.get(Person, anne.id).account_id == other.id
+    assert db.session.scalar(db.select(Activity).filter_by(action="account.link")).person_id == anne.id

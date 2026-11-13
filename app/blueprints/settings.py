@@ -135,3 +135,25 @@ def revoke_sessions():
     db.session.commit()
     flash(f"{closed} session(s) fermée(s) : chacun devra se reconnecter. Vous restez connecté.", "success")
     return redirect(url_for(".index"))
+
+
+# ---------------------------------------------------------------------------
+# Adhérents : ce que les familles modifient elles-mêmes
+# ---------------------------------------------------------------------------
+
+
+@bp.route("/parametres/adherents", methods=["GET", "POST"])
+@require("settings.manage")
+def members():
+    from ..services import options
+
+    if request.method == "POST":
+        options.set_member_editable(request.form.getlist("fields"))
+        log(
+            "settings.members",
+            "Coordonnées modifiables par les familles : " + (", ".join(sorted(options.member_editable())) or "aucune"),
+        )
+        db.session.commit()
+        flash("Réglages enregistrés.", "success")
+        return redirect(url_for(".members"))
+    return render_template("settings/members.html", fields=options.MEMBER_FIELDS, editable=options.member_editable())

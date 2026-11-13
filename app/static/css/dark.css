@@ -47,3 +47,15 @@ html:root[data-palette="vert"], .swatch[data-palette="vert"] .swatch[data-palett
 html:root[data-palette="violet"], .swatch[data-palette="violet"] .swatch[data-palette="violet"] { --brand: #a58ae0; --brand-strong: #b7a0e8; --brand-soft: #241b38; }
 html:root[data-palette="terracotta"], .swatch[data-palette="terracotta"] .swatch[data-palette="terracotta"] { --brand: #e08a63; --brand-strong: #e9a07e; --brand-soft: #38200f; }
 html:root[data-palette="ardoise"], .swatch[data-palette="ardoise"] .swatch[data-palette="ardoise"] { --brand: #9aa8bb; --brand-strong: #afbbcb; --brand-soft: #1f242b; }
+
+/* Couleurs des cours dans les plannings */
+html:root[lang] .course-rouge { --c-bg: #3a1a19; --c-accent: #f0716c; --c-text: #ffd9d6; }
+html:root[lang] .course-orange { --c-bg: #3a2414; --c-accent: #f29a54; --c-text: #ffe2c9; }
+html:root[lang] .course-jaune { --c-bg: #352d0e; --c-accent: #e3c13d; --c-text: #fbefb8; }
+html:root[lang] .course-vert { --c-bg: #162d1a; --c-accent: #6cc47a; --c-text: #d3f2d8; }
+html:root[lang] .course-sarcelle { --c-bg: #0f2d2b; --c-accent: #4cc2ba; --c-text: #cdf3f0; }
+html:root[lang] .course-bleu { --c-bg: #13253f; --c-accent: #6aa5f2; --c-text: #d6e7ff; }
+html:root[lang] .course-indigo { --c-bg: #1e1f40; --c-accent: #8d91ef; --c-text: #e0e1ff; }
+html:root[lang] .course-violet { --c-bg: #2b1a3a; --c-accent: #b984e6; --c-text: #efdcff; }
+html:root[lang] .course-rose { --c-bg: #3a1828; --c-accent: #ec7fb2; --c-text: #ffd9ea; }
+html:root[lang] .course-brun { --c-bg: #2e241c; --c-accent: #c39a78; --c-text: #f1e1d3; }

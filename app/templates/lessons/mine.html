@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "lessons/_macros.html" import when, state, cancel_form %}
+{% block title %}Mes séances{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Mes séances</h1>
+    <p class="muted">Vos cours et vos remplacements, de la semaine passée aux huit prochaines.{% if limit %} Vous pouvez modifier une séance jusqu'à {{ (limit.total_seconds() // 3600) | int }} heure(s) avant son début.{% endif %}</p>
+  </div>
+  <div class="actions"><a href="{{ url_for('lessons.my_planning') }}" role="button" class="secondary">Mon planning</a><a href="{{ url_for('lessons.agenda_page') }}" role="button" class="secondary">Mon agenda</a></div>
+</div>
+{% macro rows(items, editable) %}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Séance</th><th>Cours</th><th>Salle</th><th>État</th><th></th></tr></thead>
+  <tbody>
+  {% for l in items %}{% set own = l.course.teacher == teacher %}
+  <tr>
+    <td data-label="Séance">{{ when(l) }}</td>
+    <td data-label="Cours">{{ l.course.title }}{% if not own %} <span class="badge">remplacement</span>{% endif %}</td>
+    <td data-label="Salle"><small>{{ l.room.label if l.room else "—" }}</small></td>
+    <td data-label="État">{{ state(l) }}</td>
+    <td data-label="" class="actions">
+      {% if editable and own and not l.cancelled and l.starts() > now and (not limit or l.starts() - now >= limit) %}
+      <a href="{{ url_for('lessons.edit', lesson_id=l.id, retour='mes-seances') }}">Modifier la séance</a>
+      {{ cancel_form(l, "mes-seances") }}
+      {% endif %}
+      {% if may_record(l) %}{% set done, expected = summary(l) %}<a href="{{ url_for('lessons.roll', lesson_id=l.id) }}"{% if not done %} role="button" class="small"{% endif %}>{{ "Corriger l'appel" if done else "Faire l'appel" }}</a>{% endif %}
+      {% if own %}<a href="{{ url_for('lessons.course', course_id=l.course_id) }}">Toutes les séances</a>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endmacro %}
+<h2>Aujourd'hui</h2>
+{% if today_rows %}{{ rows(today_rows, true) }}{% else %}<p class="muted">Pas de séance aujourd'hui.</p>{% endif %}
+<h2>À venir</h2>
+{% if upcoming %}{{ rows(upcoming, true) }}{% else %}<p class="muted">Aucune séance prévue.</p>{% endif %}
+{% if past %}<h2>La semaine passée</h2>{{ rows(past, false) }}{% endif %}
+{% endblock %}

@@ -478,7 +478,7 @@ def test_saved_manager_role_gets_the_fee_rights(migrated):
         "INSERT INTO role (key, name, permissions) VALUES ('gestionnaire', 'Gestionnaire', "
         "'[\"catalog.view\"]'), ('regie', 'Régie', '[\"activity.view\"]')",
     )
-    upgrade(MIGRATIONS)
+    upgrade(MIGRATIONS, revision="a0000005tarifs")
     (rows,) = run_sql(migrated, "SELECT key, permissions::text FROM role ORDER BY key")
     assert rows == [
         ("gestionnaire", '["catalog.view", "fee.view", "fee.edit", "fee.assess"]'),
@@ -487,3 +487,186 @@ def test_saved_manager_role_gets_the_fee_rights(migrated):
     downgrade(MIGRATIONS, revision="a0000004conservation")
     (rows,) = run_sql(migrated, "SELECT key, permissions::text FROM role ORDER BY key")
     assert rows == [("gestionnaire", '["catalog.view"]'), ("regie", '["activity.view"]')]
+
+
+def test_enrollment_dates_and_review_on_the_real_schema(migrated):
+    """Les inscriptions existantes prennent la date de leur enregistrement ; dates et transferts sont contrôlés."""
+    upgrade(MIGRATIONS, revision="a0000006types")
+    run_sql(
+        migrated,
+        *SEED,
+        *CATALOG,
+        "INSERT INTO household (id, uuid, name, country, created_at, updated_at) "
+        "VALUES (1, 'h1', 'Famille Martin', 'FR', now(), now())",
+        "INSERT INTO membership (id, person_id, season_id, status, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'active', now(), now())",
+        "INSERT INTO enrollment (id, membership_id, course_id, status, withdrawn_on, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'withdrawn', '2026-10-01', '2026-11-05 10:00', now())",
+        "INSERT INTO assessment (id, household_id, season_id, status, computed_total, computed_at, warnings, "
+        "created_at, updated_at) VALUES (1, 1, 1, 'proposed', 0, now(), '[]', now(), now())",
+        "INSERT INTO role (key, name, permissions) VALUES ('gestionnaire', 'Gestionnaire', '[\"fee.view\"]')",
+    )
+    upgrade(MIGRATIONS, revision="a0000007effectifs")
+    # Abandonnée avant d'avoir été enregistrée (saisie a posteriori) : la date d'entrée ne la dépasse pas.
+    assert run_sql(
+        migrated,
+        "SELECT enrolled_on::text, replaces_id FROM enrollment",
+        "SELECT review_reasons::text FROM assessment",
+        "SELECT permissions::text FROM role WHERE key = 'gestionnaire'",
+    ) == [[("2026-10-01", None)], [("[]",)], [('["fee.view", "enrollment.edit"]',)]]
+    run_sql(
+        migrated,
+        "INSERT INTO course (id, season_id, discipline_id, marked_full, created_at, updated_at) "
+        "VALUES (9, 1, 1, false, now(), now())",
+        "INSERT INTO enrollment (id, membership_id, course_id, status, replaces_id, created_at, updated_at) "
+        "VALUES (2, 1, 9, 'active', 1, now(), now())",
+    )
+    assert run_sql(migrated, "SELECT enrolled_on = CURRENT_DATE FROM enrollment WHERE id = 2") == [[(True,)]]
+    for statement in (
+        "UPDATE enrollment SET withdrawn_on = enrolled_on - 1 WHERE id = 2",
+        "UPDATE enrollment SET replaces_id = 2 WHERE id = 2",
+        "UPDATE enrollment SET enrolled_on = NULL WHERE id = 2",
+    ):
+        assert_fails(migrated, statement)
+    run_sql(migrated, "DELETE FROM enrollment WHERE id = 1")
+    assert run_sql(migrated, "SELECT replaces_id FROM enrollment WHERE id = 2") == [[(None,)]]
+    downgrade(MIGRATIONS, revision="a0000006types")
+    assert run_sql(migrated, "SELECT permissions::text FROM role WHERE key = 'gestionnaire'") == [[('["fee.view"]',)]]
+
+
+def test_individual_courses_on_the_real_schema(migrated):
+    """Aucun cours ne devient individuel d'office ; heure de passage et durée sont contrôlées."""
+    upgrade(MIGRATIONS, revision="a0000007effectifs")
+    run_sql(
+        migrated,
+        *SEED,
+        *CATALOG,
+        "UPDATE course SET capacity = NULL",
+        "INSERT INTO membership (id, person_id, season_id, status, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'active', now(), now())",
+        "INSERT INTO enrollment (id, membership_id, course_id, status, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'active', now(), now())",
+    )
+    upgrade(MIGRATIONS)
+    assert run_sql(migrated, "SELECT individual FROM course") == [[(False,)]]
+    run_sql(migrated, "UPDATE enrollment SET slot_minutes = 30", "UPDATE enrollment SET slot_starts_at = '17:00'")
+    for statement in (
+        "UPDATE enrollment SET slot_minutes = 0",
+        "UPDATE enrollment SET slot_minutes = NULL",  # une heure sans durée
+    ):
+        assert_fails(migrated, statement)
+    downgrade(MIGRATIONS, revision="a0000007effectifs")
+
+
+def test_waitlist_on_the_real_schema(migrated):
+    upgrade(MIGRATIONS)
+    run_sql(
+        migrated,
+        *SEED,
+        *CATALOG,
+        "INSERT INTO membership (id, person_id, season_id, status, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'active', now(), now())",
+        "INSERT INTO waitlist_entry (id, course_id, membership_id, position, status, created_at) "
+        "VALUES (1, 1, 1, 1, 'waiting', now())",
+    )
+    for statement in (
+        "INSERT INTO waitlist_entry (course_id, membership_id, position, status, created_at) "
+        "VALUES (1, 1, 2, 'waiting', now())",  # une entrée par élève et par cours
+        "UPDATE waitlist_entry SET status = 'perdu'",
+        "DELETE FROM course WHERE id = 1",  # il a une liste d'attente
+    ):
+        assert_fails(migrated, statement)
+    run_sql(migrated, "DELETE FROM membership WHERE id = 1")
+    assert run_sql(migrated, "SELECT count(*) FROM waitlist_entry") == [[(0,)]]
+    downgrade(MIGRATIONS, revision="a0000008individuel")
+    assert run_sql(migrated, "SELECT to_regclass('waitlist_entry') IS NULL") == [[(True,)]]
+
+
+def test_lessons_on_the_real_schema(migrated):
+    upgrade(MIGRATIONS, revision="a0000009attente")
+    run_sql(migrated, *SEED, *CATALOG, "INSERT INTO role (key, name, permissions) VALUES ('gestionnaire', 'G', '[]')")
+    upgrade(MIGRATIONS)
+    assert run_sql(migrated, "SELECT permissions::text FROM role WHERE key = 'gestionnaire'") == [
+        [('["lesson.manage"]',)]
+    ]
+    run_sql(
+        migrated,
+        "INSERT INTO season_break (id, season_id, label, starts_on, ends_on) VALUES (1, 1, 'Toussaint', '2026-10-17', '2026-11-01')",
+        "INSERT INTO lesson (id, course_id, scheduled_on, day, starts_at, ends_at, room_id, substitute_id, status, created_at) "
+        "VALUES (1, 1, '2026-10-07', '2026-10-07', '17:00', '18:00', 1, 1, 'planned', now())",
+        "UPDATE account SET calendar_token = 'abc' WHERE id = 1",
+    )
+    assert run_sql(migrated, "SELECT edited, revision FROM lesson") == [[(False, 0)]]
+    for statement in (
+        "INSERT INTO season_break (season_id, label, starts_on, ends_on) VALUES (1, 'x', '2026-10-02', '2026-10-01')",
+        "INSERT INTO lesson (course_id, scheduled_on, day, starts_at, ends_at, status, created_at) "
+        "VALUES (1, '2026-10-07', '2026-10-08', '17:00', '18:00', 'planned', now())",  # un créneau, une séance
+        "UPDATE lesson SET ends_at = '16:00'",
+        "UPDATE lesson SET status = 'perdue'",
+        "UPDATE account SET calendar_token = 'abc' WHERE id = 2",
+    ):
+        assert_fails(migrated, statement)
+    run_sql(
+        migrated,
+        "UPDATE course SET room_id = NULL",
+        "DELETE FROM room WHERE id = 1",
+        "DELETE FROM teacher_discipline",
+        "DELETE FROM teacher WHERE person_id = 1",
+    )
+    assert run_sql(migrated, "SELECT room_id, substitute_id FROM lesson") == [[(None, None)]]
+    run_sql(
+        migrated, "DELETE FROM teacher_discipline", "DELETE FROM course WHERE id = 1", "DELETE FROM season WHERE id = 1"
+    )
+    assert run_sql(migrated, "SELECT count(*) FROM lesson", "SELECT count(*) FROM season_break") == [[(0,)], [(0,)]]
+    downgrade(MIGRATIONS, revision="a0000009attente")
+    assert run_sql(migrated, "SELECT permissions::text FROM role WHERE key = 'gestionnaire'") == [[("[]",)]]
+
+
+def test_room_calendars_on_the_real_schema(migrated):
+    upgrade(MIGRATIONS)
+    run_sql(
+        migrated,
+        *SEED,
+        *CATALOG,
+        "UPDATE site SET external_id = 'b1'",
+        "UPDATE room SET calendar_id = 'a@resource.calendar.google.com', capacity = 12",
+        "INSERT INTO room_calendar_job (calendar_id, event_id, action, next_try_at, created_at) "
+        "VALUES ('a@resource.calendar.google.com', 'adherents1', 'put', now(), now())",
+    )
+    assert run_sql(migrated, "SELECT attempts FROM room_calendar_job") == [[(0,)]]
+    for statement in (
+        "INSERT INTO room (site_id, name, calendar_id) VALUES (1, 'B', 'a@resource.calendar.google.com')",
+        "INSERT INTO site (name, external_id) VALUES ('Autre', 'b1')",
+        "UPDATE room_calendar_job SET action = 'move'",
+    ):
+        assert_fails(migrated, statement)
+    downgrade(MIGRATIONS, revision="a0000010seances")
+    assert run_sql(migrated, "SELECT to_regclass('room_calendar_job') IS NULL") == [[(True,)]]
+
+
+def test_attendance_on_the_real_schema(migrated):
+    upgrade(MIGRATIONS)
+    run_sql(
+        migrated,
+        *SEED,
+        *CATALOG,
+        "INSERT INTO membership (id, person_id, season_id, status, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'active', now(), now())",
+        "INSERT INTO enrollment (id, membership_id, course_id, status, created_at, updated_at) "
+        "VALUES (1, 1, 1, 'active', now(), now())",
+        "INSERT INTO lesson (id, course_id, day, starts_at, ends_at, status, created_at) "
+        "VALUES (1, 1, '2026-10-07', '17:00', '18:00', 'planned', now())",
+        "INSERT INTO attendance (lesson_id, enrollment_id, status, recorded_by_id, recorded_at) "
+        "VALUES (1, 1, 'absent', 1, now())",
+    )
+    for statement in (
+        "INSERT INTO attendance (lesson_id, enrollment_id, status, recorded_at) VALUES (1, 1, 'present', now())",
+        "UPDATE attendance SET status = 'malade'",  # pas de motif
+    ):
+        assert_fails(migrated, statement)
+    run_sql(migrated, "DELETE FROM account WHERE id = 1")
+    assert run_sql(migrated, "SELECT recorded_by_id FROM attendance") == [[(None,)]]
+    run_sql(migrated, "DELETE FROM lesson WHERE id = 1")
+    assert run_sql(migrated, "SELECT count(*) FROM attendance") == [[(0,)]]
+    downgrade(MIGRATIONS, revision="a0000011salles")
+    assert run_sql(migrated, "SELECT to_regclass('attendance') IS NULL") == [[(True,)]]

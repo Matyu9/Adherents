@@ -98,6 +98,9 @@ def anonymize(person, now=None):
     person.phones.clear()
     person.external_refs.clear()
     person.consents.clear()
+    from .attendance import forget
+
+    forget(person)  # les présences ne survivent pas à la fiche
     db.session.execute(
         db.update(Activity)
         .where(Activity.person_id == person.id)

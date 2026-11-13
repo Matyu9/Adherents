@@ -3,6 +3,8 @@
 import re
 from datetime import datetime
 
+from flask import request, session
+
 from ..extensions import db, fold, fold_contains
 from ..models import (
     Account,
@@ -13,7 +15,6 @@ from ..models import (
     BankAccount,
     Consent,
     Dossier,
-    Enrollment,
     FeePick,
     Household,
     HouseholdMember,
@@ -44,7 +45,14 @@ PERSON_FIELDS = (
 )
 ADDRESS_FIELDS = ("address_recipient", "address_street", "postal_code", "city", "country")
 # Filtres de la liste des personnes.
-STATUSES = {"eleves": "Élèves de la saison", "anciens": "Anciens adhérents", "archives": "Archivées"}
+STATUSES = {
+    "saison": "Personnes de la saison",
+    "eleves": "Élèves de la saison",
+    "toutes": "Toutes les fiches",
+    "anciens": "Anciens adhérents",
+    "archives": "Archivées",
+}
+DEFAULT_STATUS = "saison"
 
 
 class DirectoryError(ValueError):
@@ -107,6 +115,41 @@ def current_season():
     return db.session.get(Season, int(setting.value)) if setting and setting.value.isdigit() else None
 
 
+SELECTED_SEASON_KEY = "saison"
+
+
+def sees_hidden_seasons(account):
+    """Les saisons en préparation se voient avec l'accès au catalogue ou à l'annuaire (l'administration)."""
+    from ..permissions import can
+
+    return can(account, "catalog.view") or can(account, "directory.view")
+
+
+def season_visible(season, account=None):
+    from flask_login import current_user
+
+    return not season.hidden or sees_hidden_seasons(account if account is not None else current_user)
+
+
+def selected_season():
+    """Saison affichée : celle demandée (?saison=), sinon la dernière choisie pendant la session, sinon la saison en
+    cours, sinon la plus récente. Le choix est retenu d'une page à l'autre (catalogue, tarifs, calendrier…).
+    Renvoie (saison, toutes les saisons)."""
+    all_seasons = [s for s in seasons() if season_visible(s)]
+    by_id = {s.id: s for s in all_seasons}
+    wanted = request.values.get("saison", type=int)
+    if wanted in by_id:
+        session[SELECTED_SEASON_KEY] = wanted
+        return by_id[wanted], all_seasons
+    current = current_season()
+    season = (
+        by_id.get(session.get(SELECTED_SEASON_KEY))
+        or (by_id.get(current.id) if current else None)
+        or (all_seasons[0] if all_seasons else None)
+    )
+    return season, all_seasons
+
+
 def set_current_season(season):
     setting = db.session.get(AppSetting, CURRENT_SEASON_KEY)
     if setting is None:
@@ -118,6 +161,18 @@ def set_current_season(season):
 def active_in(season):
     """Condition « la personne a une adhésion active sur cette saison »."""
     return Person.memberships.any(db.and_(Membership.season_id == season.id, Membership.status == Membership.ACTIVE))
+
+
+def in_season(season):
+    """Condition « la personne concerne cette saison » : elle y a une adhésion (même abandonnée), ou elle fait partie
+    d'un foyer dont quelqu'un y a une adhésion (ses responsables, par exemple)."""
+    member = Person.memberships.any(Membership.season_id == season.id)
+    household = Person.household_links.any(
+        HouseholdMember.household.has(
+            Household.members.any(HouseholdMember.person.has(Person.memberships.any(Membership.season_id == season.id)))
+        )
+    )
+    return db.or_(member, household)
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +205,8 @@ def person_query(text=None, status=None, season=None):
     if status == "archives":
         return query.where(Person.archived_at.is_not(None))
     query = query.where(Person.archived_at.is_(None), ~staff_only())
+    if status == "saison":
+        return query.where(in_season(season)) if season is not None else query
     if status == "eleves" and season is not None:
         query = query.where(active_in(season))
     elif status == "eleves":
@@ -395,17 +452,16 @@ def merge_persons(keep, drop, take=()):
             summary.append(f"adhésion {membership.season.label} en double : celle de la fiche gardée reste")
             kept = seasons_kept[membership.season_id]
             courses = {e.course_id for e in kept.enrollments}
-            for enrollment in list(membership.enrollments):  # ses cours passent sur l'adhésion gardée
+            # Ses cours et ses listes d'attente passent sur l'adhésion gardée, tels quels (dates, heure de passage).
+            for enrollment in list(membership.enrollments):
                 if enrollment.course_id not in courses:
                     membership.enrollments.remove(enrollment)
-                    kept.enrollments.append(
-                        Enrollment(
-                            course_id=enrollment.course_id,
-                            status=enrollment.status,
-                            withdrawn_on=enrollment.withdrawn_on,
-                            dossier_id=enrollment.dossier_id,
-                        )
-                    )
+                    kept.enrollments.append(enrollment)
+            waiting = {w.course_id for w in kept.waitlist}
+            for entry in list(membership.waitlist):
+                if entry.course_id not in waiting:
+                    membership.waitlist.remove(entry)
+                    kept.waitlist.append(entry)
         else:
             membership.person = keep
     db.session.execute(db.update(Consent).where(Consent.person_id == drop.id).values(person_id=keep.id))
@@ -572,6 +628,30 @@ def suggestions(account):
         if fold(person.first_name) == fold(account.first_name) and fold(person.last_name) == fold(account.last_name):
             reasons.append("même nom")
         result.append((person, reasons))
+    return sorted(result, key=lambda item: -len(item[1]))
+
+
+def account_suggestions(person):
+    """Comptes sans fiche qui pourraient être ceux de la personne (même email ou même nom), avec la raison."""
+    conditions = [
+        db.and_(
+            db.func.fold(Account.first_name) == fold(person.first_name),
+            db.func.fold(Account.last_name) == fold(person.last_name),
+        )
+    ]
+    if person.email:
+        conditions.append(Account.email == person.email.strip().lower())
+    candidates = db.session.scalars(
+        db.select(Account).where(~Account.person.has(), db.or_(*conditions)).order_by(Account.last_name)
+    ).all()
+    result = []
+    for account in candidates:
+        reasons = []
+        if same_email(person.email, account.email):
+            reasons.append("même email")
+        if fold(person.first_name) == fold(account.first_name) and fold(person.last_name) == fold(account.last_name):
+            reasons.append("même nom")
+        result.append((account, reasons))
     return sorted(result, key=lambda item: -len(item[1]))
 
 

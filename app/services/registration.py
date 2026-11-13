@@ -6,13 +6,15 @@ Ce que la famille saisit reste dans `Dossier.data` jusqu'à la validation : l'an
     {"household": {"name", "address_recipient", "address_street", "postal_code", "city", "country", "phone"},
      "guardians": [{"person_id", "civility", "first_name", "last_name", "email", "phone", "relationship"}],
      "students": [{"key", "person_id", "guardian", "enrolled", "first_name", "last_name", "birth_date", "sex",
-                   "category", "school_level", "school_class", "courses": [id…], "wishes",
+                   "category", "school_level", "school_class", "courses": [id…], "disciplines": [id…], "wishes",
                    "consents": {"<id>": bool}}],
      "consents": {"<id>": bool},
      "bank": {"holder_name", "bic"},
      "answered_at", "answered_by", "comment"}
 
 `guardian` (entier ou None) : l'élève est ce responsable lui-même (un adulte qui prend des cours).
+`disciplines` ne sert que pour une campagne « par discipline » (`Campaign.choice`) : la famille choisit une discipline et
+donne ses disponibilités dans `wishes`, et le secrétariat place l'élève dans un cours après la validation.
 """
 
 import contextlib
@@ -28,6 +30,7 @@ from ..models import (
     CampaignConsent,
     Consent,
     Course,
+    Discipline,
     Dossier,
     Enrollment,
     Household,
@@ -106,6 +109,35 @@ def enrolled_counts(season):
     )
 
 
+def offered_disciplines(campaign):
+    """Disciplines proposées aux familles pour une campagne « par discipline » : proposées cette saison et qui ont au
+    moins un cours. [(discipline, places restantes ou None, cours de la saison)]."""
+    from .catalog import disciplines
+
+    courses, counts = offered_courses(campaign)
+    season = campaign.season
+    result = []
+    for discipline in disciplines():
+        own = [c for c in courses if c.discipline_id == discipline.id]
+        if not own or not discipline.offered_in(season):
+            continue
+        settings = discipline.settings_for(season)
+        left = None
+        if settings is not None and settings.capacity:
+            taken = sum(counts.get(c.id, 0) for c in own) + _requested(season, discipline)
+            left = max(0, settings.capacity - taken)
+        result.append((discipline, left, own))
+    return result
+
+
+def _requested(season, discipline):
+    """Élèves validés qui attendent d'être placés dans cette discipline."""
+    rows = db.session.scalars(
+        db.select(Membership).where(Membership.season_id == season.id, Membership.placement.is_not(None))
+    ).all()
+    return sum(1 for m in rows if discipline.id in (m.placement or {}).get("disciplines", []))
+
+
 def offered_courses(campaign):
     """Cours proposés aux familles : ceux de la saison de la campagne, avec leur nombre d'inscrits."""
     from .catalog import sorted_courses
@@ -117,6 +149,23 @@ def offered_courses(campaign):
 # ---------------------------------------------------------------------------
 # Qui accède à quel dossier
 # ---------------------------------------------------------------------------
+
+
+def is_family(account):
+    """Le compte a une famille à suivre : responsable d'un foyer, adhérent lui-même ou auteur d'un dossier. Un
+    professeur qui n'est que professeur n'a ni « Ma famille » ni « Inscriptions »."""
+    from flask import g, has_request_context
+
+    if has_request_context() and getattr(g, "is_family_for", None) == account.id:
+        return g.is_family
+    person = getattr(account, "person", None)
+    result = bool(
+        (person is not None and (person.memberships or guarded_households(account)))
+        or db.session.scalar(db.select(Dossier.id).where(Dossier.account_id == account.id).limit(1))
+    )
+    if has_request_context():
+        g.is_family_for, g.is_family = account.id, result
+    return result
 
 
 def guarded_households(account):
@@ -257,11 +306,23 @@ def prefill(household, campaign):
                 "courses": _same_courses(last, campaign)
                 if last and not current
                 else [e.course_id for e in (current.enrollments if current else []) if e.status == Enrollment.ACTIVE],
+                "disciplines": _same_disciplines(source),
                 "wishes": None,
                 "consents": {},
             }
         )
     return data
+
+
+def _same_disciplines(membership):
+    """Disciplines suivies l'an dernier (ou cette saison), pour préremplir un dossier « par discipline »."""
+    if membership is None:
+        return []
+    found = []
+    for enrollment in membership.enrollments:
+        if enrollment.status == Enrollment.ACTIVE and enrollment.course.discipline_id not in found:
+            found.append(enrollment.course.discipline_id)
+    return found
 
 
 def _same_courses(membership, campaign):
@@ -321,6 +382,13 @@ def problems(dossier):
         name = student_name(s, data) or "un élève"
         if s.get("guardian") is None and (not s.get("first_name") or not s.get("last_name") or not s.get("birth_date")):
             found.append(f"Le nom ou la date de naissance de {name} manque.")
+        if dossier.campaign.choice == Campaign.DISCIPLINE:
+            proposed = {d.id for d, _left, _courses in offered_disciplines(dossier.campaign)}
+            if not s.get("disciplines"):
+                found.append(f"Choisissez au moins une discipline pour {name}.")
+            if any(d not in proposed for d in s.get("disciplines", [])):
+                found.append(f"Une discipline choisie pour {name} n'est plus proposée : choisissez-en une autre.")
+            continue
         if not s.get("courses"):
             found.append(f"Choisissez au moins un cours pour {name}.")
         if any(c not in offered for c in s.get("courses", [])):
@@ -426,6 +494,13 @@ def changes(dossier):
                 new, old = _shown(s.get(f)), _shown(getattr(person, f) if person else None)
                 if new != old and (new or old) and (person is not None or new):
                     found.append((name, LABELS[f], old, new))
+        if dossier.campaign.choice == Campaign.DISCIPLINE:
+            wanted = [db.session.get(Discipline, d) for d in s.get("disciplines", [])]
+            season = dossier.campaign.season
+            found.append((name, "Disciplines à placer", None, ", ".join(d.name_for(season) for d in wanted if d)))
+            if s.get("wishes"):
+                found.append((name, "Disponibilités", None, s["wishes"]))
+            continue
         courses = [db.session.get(Course, c) for c in s.get("courses", [])]
         found.append((name, "Cours", None, ", ".join(c.title for c in courses if c)))
     if dossier.iban_ciphertext is not None:
@@ -496,7 +571,9 @@ def validate(dossier, actor, now=None):
         _set_phone(person, g.get("phone"), "portable")
         guardians.append(person)
 
-    counts = enrolled_counts(season)
+    from .courses import CourseError, add_to_waitlist  # import ici : courses dépend de ce module
+
+    counts, added = enrolled_counts(season), []
     for s in enrolled_students(dossier):
         if s.get("guardian") is not None:
             person = guardians[s["guardian"]]
@@ -517,17 +594,33 @@ def validate(dossier, actor, now=None):
         _apply(membership, {f: s.get(f) for f in MEMBERSHIP_FIELDS})
         db.session.flush()
         held = {e.course_id: e for e in membership.enrollments}
-        for course_id in s.get("courses", []):
+        by_discipline = dossier.campaign.choice == Campaign.DISCIPLINE
+        if by_discipline:
+            wanted = [d for d in s.get("disciplines", []) if isinstance(d, int)]
+            membership.placement = {"disciplines": wanted, "note": s.get("wishes")} if wanted else None
+        for course_id in [] if by_discipline else s.get("courses", []):
             course = db.session.get(Course, course_id)
             if course is None or course.season_id != season.id:
                 continue
             if course_id in held:
-                held[course_id].status, held[course_id].withdrawn_on = Enrollment.ACTIVE, None
+                if not held[course_id].active:  # retour dans un cours quitté : il reprend à la validation
+                    held[course_id].status, held[course_id].withdrawn_on = Enrollment.ACTIVE, None
+                    held[course_id].enrolled_on = now.date()
+                    added.append((person, course))
                 continue
             if course.is_full(counts.get(course_id, 0)):
                 warnings.append(f"{course.title} était complet : {person.full_name} y est inscrit(e) quand même.")
-            membership.enrollments.append(Enrollment(course=course, dossier=dossier))
+            membership.enrollments.append(Enrollment(course=course, dossier=dossier, enrolled_on=now.date()))
             counts[course_id] = counts.get(course_id, 0) + 1
+            added.append((person, course))
+        for course_id in s.get("waitlist", []):
+            course = db.session.get(Course, course_id)
+            if course is None or course.season_id != season.id:
+                continue
+            try:
+                add_to_waitlist(membership, course, dossier=dossier)
+            except CourseError as exc:  # déjà inscrit ou déjà en attente : rien à faire
+                warnings.append(str(exc))
         for consent in dossier.campaign.consents:
             if consent.scope == CampaignConsent.STUDENT and str(consent.id) in s.get("consents", {}):
                 _record_consent(dossier, consent, s["consents"][str(consent.id)], season, person=person)
@@ -551,6 +644,10 @@ def validate(dossier, actor, now=None):
             db.session.add(account)
             if others := [a for a in bank.same_iban(iban) if a.household_id != household.id]:
                 warnings.append(f"Cet IBAN est aussi celui de {len(others)} autre(s) foyer(s).")
+    from .courses import flag_review
+
+    for person, course in added:  # une cotisation déjà calculée (second dossier du foyer) est à revoir
+        flag_review(person, season, f"{person.full_name} inscrit(e) à {course.title} par un dossier validé")
     dossier.data = {**data, "changes": snapshot}
     dossier.status = Dossier.VALIDATED
     dossier.validated_at = now
@@ -678,23 +775,30 @@ def remind(now=None):
 
 
 def students_of(teacher, season):
-    """[(cours, [(élève, [responsables])])] : les élèves inscrits aux cours du professeur pendant la saison."""
+    """[(cours, [(élève, [responsables], inscription)])] : les élèves inscrits aux cours du professeur pendant la
+    saison, par heure de passage pour un cours individuel."""
     from .catalog import sorted_courses
 
     result = []
     for course in sorted_courses(c for c in teacher.courses if c.season_id == season.id):
-        students = sorted(
-            (e.membership.person for e in course.enrollments if e.status == Enrollment.ACTIVE),
-            key=lambda p: (fold(p.last_name), fold(p.first_name)),
+        enrollments = sorted(
+            (e for e in course.enrollments if e.status == Enrollment.ACTIVE),
+            key=lambda e: (
+                course.individual and e.slot_starts_at is None,
+                e.slot_starts_at if course.individual and e.slot_starts_at else datetime.min.time(),
+                fold(e.membership.person.last_name),
+                fold(e.membership.person.first_name),
+            ),
         )
         rows = []
-        for student in students:
+        for enrollment in enrollments:
+            student = enrollment.membership.person
             guardians = [
                 link.person
                 for h in student.household_links
                 for link in h.household.guardians
                 if h.role == HouseholdMember.DEPENDENT and link.person is not student
             ]
-            rows.append((student, list({p.id: p for p in guardians}.values())))
+            rows.append((student, list({p.id: p for p in guardians}.values()), enrollment))
         result.append((course, rows))
     return result

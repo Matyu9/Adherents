@@ -36,18 +36,21 @@ Elle a deux missions :
 
 ### Pour les familles
 
-- **Mon espace** : le foyer, les adhésions et les cours de chaque membre, les dossiers d'inscription, les consentements donnés et le matériel prêté (lu dans l'Inventaire).
+- **Ma famille** : le foyer, les adhésions et les cours de chaque membre (avec l'heure de passage, la liste d'attente et les présences), les dossiers d'inscription, les consentements donnés et le matériel prêté (lu dans l'Inventaire).
+- **Agenda** : une adresse à ajouter à Google Agenda, Apple ou Outlook, avec les séances des enfants à jour.
 - **Inscription et réinscription** : un dossier pré-rempli depuis l'annuaire, à corriger et à envoyer. Les nouvelles familles passent par un formulaire public, avec vérification de leur adresse email.
 - **Un seul compte** pour toutes les applis de l'association, avec invitation, mot de passe oublié et double authentification.
 
 ### Pour les professeurs
 
-- **Mes élèves** : les élèves de ses cours et leurs responsables.
+- **Mes élèves** : les élèves de ses cours et leurs responsables, et l'heure de passage dans un cours individuel.
+- **Mes séances** : déplacer, annuler ou ajouter une séance, sans attendre le secrétariat ; faire l'appel ; ses séances dans son agenda.
 
 ### Pour le secrétariat
 
 - **Annuaire** : une seule fiche par personne, les foyers et leurs responsables, les saisons et les adhésions, la fusion des doublons, l'historique de chaque fiche.
 - **Catalogue** : disciplines et leurs types, niveaux, sites et salles, cours de chaque saison, copie d'une saison sur la suivante. Les chevauchements de salle ou de professeur sont signalés.
+- **Gestion des cours** : élèves de chaque cours, inscriptions, transferts et abandons en cours de saison, liste d'attente, cours individuels, calendrier et séances, remplaçants, plannings, absences répétées, réservation des salles dans Google Workspace (facultatif).
 - **Campagnes d'inscription** : revue de chaque dossier, champ par champ, puis validation ou renvoi à la famille ; relances hebdomadaires ; report des changements vers le logiciel de gestion.
 - **Tarifs et cotisations** : une grille d'éléments et de règles par saison, la situation de chaque foyer, des cotisations proposées, corrigées avec un motif puis validées, et un simulateur.
 - **Coordonnées bancaires** : IBAN chiffrés et suivi des mandats SEPA.
@@ -78,6 +81,7 @@ Le projet est en développement : aucune installation ne sert encore de vrais ad
 | Campagnes d'inscription | Dossiers des familles, revue et validation, relances, conservation des données |
 | Espace adhérent | Foyer, cours, dossiers, matériel prêté |
 | Tarifs et cotisations | Grille par saison, règles, calcul proposé puis validé, simulateur |
+| Gestion des cours | Effectifs, liste d'attente, cours individuels, séances, plannings, agendas, salles Google Workspace, présences |
 
 ### Ce qui reste
 

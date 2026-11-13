@@ -116,20 +116,22 @@ def test_old_dossiers_are_purged(history):
 
 
 def test_retention_screen(client, admin, history):
-    page = client.get("/annuaire/conservation").get_data(as_text=True)
+    page = client.get("/parametres/donnees-personnelles").get_data(as_text=True)
     assert "pas encore décidée" in page
-    client.post("/annuaire/conservation", data={"seasons": "3"})
+    client.post("/parametres/donnees-personnelles", data={"seasons": "3"})
     assert retention.seasons_kept() == 3
-    page = client.get("/annuaire/conservation").get_data(as_text=True)
+    page = client.get("/parametres/donnees-personnelles").get_data(as_text=True)
     assert "ANCIEN Paul" in page and "ANCIEN Léa" in page and "RÉCENT" not in page
-    client.post("/annuaire/conservation/anonymiser", data={"personne": [history["lea"].id, history["tom"].id]})
+    client.post(
+        "/parametres/donnees-personnelles/anonymiser", data={"personne": [history["lea"].id, history["tom"].id]}
+    )
     assert history["lea"].anonymized_at is not None
     assert history["tom"].anonymized_at is None  # pas candidat : ignoré
     assert (
         db.session.scalar(sa.select(Activity).filter_by(action="retention.anonymize")).message
         == "1 fiche(s) anonymisée(s)"
     )
-    client.post("/annuaire/conservation", data={"seasons": ""})
+    client.post("/parametres/donnees-personnelles", data={"seasons": ""})
     assert retention.seasons_kept() is None
 
 
@@ -139,4 +141,4 @@ def test_managers_cannot_anonymize(client, accounts, history):
     from .conftest import login
 
     login(client, accounts[Role.GESTIONNAIRE])
-    assert client.get("/annuaire/conservation").status_code == 403
+    assert client.get("/parametres/donnees-personnelles").status_code == 403

@@ -61,3 +61,42 @@ def test_admins_are_the_active_ones(accounts):
     make_account(Role.ADMIN, email="ancien@asso.test", active=False)
     assert [a.email for a in admins()] == ["admin@asso.test"]
     assert isinstance(admins()[0], Account)
+
+
+def test_a_notification_can_be_dismissed_by_its_owner_only(client, member, accounts):
+    mine = Notification(account_id=member.id, message="à supprimer")
+    other = Notification(account_id=accounts[Role.ADMIN].id, message="pas à moi")
+    db.session.add_all([mine, other])
+    db.session.commit()
+    assert client.post(f"/notifications/{other.id}/supprimer").status_code == 404
+    assert db.session.get(Notification, other.id).dismissed_at is None
+    assert client.post(f"/notifications/{mine.id}/supprimer").status_code == 302
+    html = client.get("/notifications").get_data(as_text=True)
+    assert "à supprimer" not in html and "bell-count" not in html
+    assert client.post(f"/notifications/{mine.id}/supprimer").status_code == 404  # déjà supprimée
+
+
+def test_dismiss_read_keeps_unread_and_others(client, member, accounts):
+    read = Notification(account_id=member.id, message="lue", read=True)
+    unread = Notification(account_id=member.id, message="pas lue")
+    other = Notification(account_id=accounts[Role.ADMIN].id, message="autre", read=True)
+    db.session.add_all([read, unread, other])
+    db.session.commit()
+    client.post("/notifications/supprimer-les-lues")
+    assert db.session.get(Notification, read.id).dismissed_at is not None
+    assert db.session.get(Notification, unread.id).dismissed_at is None
+    assert db.session.get(Notification, other.id).dismissed_at is None
+    html = client.get("/notifications").get_data(as_text=True)
+    assert "pas lue" in html and ">lue<" not in html
+
+
+def test_a_dismissed_reminder_is_not_sent_again(accounts):
+    """La notification supprimée reste en base : sa clé empêche la relance suivante de la recréer."""
+    account = accounts[Role.ADHERENT]
+    (first,) = notify([account], "Relance", dedup_key="relance-1")
+    db.session.commit()
+    from datetime import datetime
+
+    first.dismissed_at = datetime.now()
+    db.session.commit()
+    assert notify([account], "Relance", dedup_key="relance-1") == []

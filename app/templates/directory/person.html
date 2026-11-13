@@ -51,14 +51,19 @@
 {% if edit and not person.archived_at %}<p><a href="{{ url_for('directory.create_household', personne=person.id) }}">+ Créer un foyer dont {{ person.first_name }} est responsable</a></p>{% endif %}
 
 <h2 id="adhesions">Adhésions</h2>
+{% set enroll_edit = can(current_user, "enrollment.edit") %}
 {% if person.memberships %}
 <div class="overflow-auto"><table class="striped responsive">
-  <thead><tr><th>Saison</th><th>Statut</th><th>Catégorie</th><th>Scolarité</th><th></th></tr></thead>
+  <thead><tr><th>Saison</th><th>Statut</th><th>Cours</th><th>Catégorie</th><th>Scolarité</th><th></th></tr></thead>
   <tbody>
   {% for m in person.memberships %}
   <tr>
     <td data-label="Saison">{{ m.season.label }}{% if current and current.id == m.season_id %} <small class="muted">(en cours)</small>{% endif %}</td>
     <td data-label="Statut"><span class="badge{{ ' badge-ok' if m.status == 'active' }}">{{ m.STATUSES[m.status] }}</span>{% if m.withdrawn_on %} <small>le {{ m.withdrawn_on | date_fr }}</small>{% endif %}</td>
+    <td data-label="Cours"><small>{% for e in m.enrollments | sort(attribute="enrolled_on") %}
+      <span class="{{ '' if e.active else 'muted' }}">{% if can(current_user, "catalog.view") %}<a href="{{ url_for('catalog.course', course_id=e.course_id) }}">{{ e.course.title }}</a>{% else %}{{ e.course.title }}{% endif %}{% if not e.active %} (parti{% if e.withdrawn_on %} le {{ e.withdrawn_on | date_fr }}{% endif %}){% elif enroll_edit %} · <a href="{{ url_for('catalog.transfer', enrollment_id=e.id, retour='fiche') }}">changer</a>{% endif %}</span>{% if not loop.last %}<br>{% endif %}
+      {%- else %}—{% endfor %}
+      {% if enroll_edit and m.status == "active" %}<br><a href="{{ url_for('catalog.enroll_in_course', membership_id=m.id) }}">+ Inscrire à un cours</a>{% endif %}</small></td>
     <td data-label="Catégorie">{{ m.category or "—" }}</td>
     <td data-label="Scolarité">{{ [m.school_level, m.school_class] | select | join(" · ") or "—" }}</td>
     <td data-label="" class="actions">{% if edit %}<a href="{{ url_for('directory.edit_membership', membership_id=m.id) }}">Modifier</a>{% endif %}</td>
@@ -70,24 +75,48 @@
 {% if edit and person.memberships | length < season_count %}<p><a href="{{ url_for('directory.create_membership', person_id=person.id) }}">+ Ajouter une adhésion</a></p>
 {% elif edit and not season_count %}<p class="muted small">Pour ajouter une adhésion, <a href="{{ url_for('directory.seasons') }}">créez d'abord la saison</a>.</p>{% endif %}
 
-<h2 id="compte">Compte de connexion</h2>
-{% if person.account %}
-<p>{% if can(current_user, "account.manage") %}<a href="{{ url_for('accounts.detail', account_id=person.account.id) }}">{{ person.account.email }}</a>{% else %}{{ person.account.email }}{% endif %}
-  <span class="badge">{{ person.account.role_label }}</span></p>
-{% if can_account %}{{ post_button(url_for('directory.unlink_account', person_id=person.id), "Détacher ce compte", "link-button", "Détacher le compte de cette fiche ? Le compte existe toujours.") }}{% endif %}
+<h2 id="compte">Connexion</h2>
+{% set acc = person.account %}
+{% if can_account and (not acc or account_managed) %}
+{#- Une case suffit : cochée, le compte est créé et invité (ou rétabli) ; décochée, il est coupé, jamais supprimé. -#}
+<form method="post" action="{{ url_for('directory.set_login', person_id=person.id) }}" class="login-toggle" data-reset-on-cancel
+      data-confirm="{% if acc and acc.active %}Couper l'accès de {{ person.full_name }} ? La personne est déconnectée tout de suite ; le compte n'est pas supprimé.{% elif acc %}Rétablir l'accès de {{ person.full_name }} ?{% else %}Créer un compte pour {{ person.email }} et lui envoyer une invitation ?{% endif %}">
+  {{ csrf() }}
+  {% if not acc and needs_consent and not account_problem %}
+  <label class="form-check"><input type="checkbox" name="accord" value="1" required> Un responsable légal a donné son accord ({{ person.first_name }} a {{ person.age() }} ans)</label>
+  {% endif %}
+  <label class="form-check"><input type="checkbox" name="connexion" value="1"{% if acc and acc.active %} checked{% endif %}{% if not acc and account_problem %} disabled{% endif %} data-autosubmit> <strong>Peut se connecter</strong></label>
+  <noscript><button type="submit" class="secondary small">Enregistrer</button></noscript>
+</form>
+{% endif %}
+{% if acc %}
+<p>{% if can(current_user, "account.manage") %}<a href="{{ url_for('accounts.detail', account_id=acc.id) }}">{{ acc.email }}</a>{% else %}{{ acc.email }}{% endif %}
+  <span class="badge">{{ acc.role_label }}</span>{% if account_status %} <span class="badge{{ ' badge-ok' if account_status == 'actif' }}">{{ account_statuses[account_status] }}</span>{% endif %}</p>
+{% if can_account %}{{ post_button(url_for('directory.unlink_account', person_id=person.id), "Détacher ce compte de la fiche", "link-button small", "Détacher le compte de cette fiche ? Le compte existe toujours.") }}{% endif %}
+{% elif can_account %}
+  {% if account_problem %}<p class="muted small">{{ account_problem }}</p>{% else %}<p class="muted small">Cocher la case crée son compte ({{ person.email }}) et lui envoie une invitation.</p>{% endif %}
+  {% if account_suggestions %}
+  <p class="small">Comptes sans fiche qui pourraient être le sien :</p>
+  <ul class="plain-list">
+    {% for a, reasons in account_suggestions %}
+    <li>{{ a.full_name }} <small class="muted">{{ a.email }} · {{ a.role_label }}</small> {% for r in reasons %}<span class="badge">{{ r }}</span> {% endfor %}
+      <form method="post" action="{{ url_for('directory.attach_account', person_id=person.id) }}" class="inline-form">
+        {{ csrf() }}<input type="hidden" name="account_id" value="{{ a.id }}">
+        <button type="submit" class="secondary small">C'est son compte</button>
+      </form></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <details>
+    <summary class="small">Rattacher un autre compte existant</summary>
+    <form method="post" action="{{ url_for('directory.attach_account', person_id=person.id) }}" class="inline-form">
+      {{ csrf() }}
+      <input type="email" name="email" placeholder="Email du compte" aria-label="Email du compte" required>
+      <button type="submit" class="secondary small">Rattacher</button>
+    </form>
+  </details>
 {% else %}
 <p class="muted">Aucun compte.</p>
-{% if can_account %}
-  {% if account_problem %}<p class="muted small">{{ account_problem }}</p>
-  {% elif needs_consent %}
-  <form method="post" action="{{ url_for('directory.create_account', person_id=person.id) }}" data-confirm="Créer un compte pour {{ person.email }} et lui envoyer une invitation ?">
-    {{ csrf() }}
-    <label class="form-check"><input type="checkbox" name="accord" value="1" required> Un responsable légal a donné son accord ({{ person.first_name }} a {{ person.age() }} ans)</label>
-    <button type="submit" class="secondary small">Créer son compte et l'inviter</button>
-  </form>
-  {% else %}{{ post_button(url_for('directory.create_account', person_id=person.id), "Créer son compte et l'inviter", "secondary small", "Créer un compte pour " ~ person.email ~ " et lui envoyer une invitation ?") }}{% endif %}
-  <p class="small"><a href="{{ url_for('directory.link_accounts') }}">Rattacher un compte existant</a></p>
-{% endif %}
 {% endif %}
 
 {% if edit %}

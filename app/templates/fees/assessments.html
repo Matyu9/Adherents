@@ -13,6 +13,7 @@
     <option value="none" {{ "selected" if status == "none" }}>Pas encore calculée</option>
     <option value="proposed" {{ "selected" if status == "proposed" }}>Proposée</option>
     <option value="validated" {{ "selected" if status == "validated" }}>Validée</option>
+    <option value="review" {{ "selected" if status == "review" }}>À revoir</option>
   </select>
   <noscript><button type="submit">Filtrer</button></noscript>
 </form>
@@ -28,6 +29,7 @@
   {% for household, a in rows %}
   <tr>
     <td data-label="Foyer"><a href="{{ url_for('fees.household', household_id=household.id, saison=season.id) }}">{{ household.name }}</a>
+      {% if a and a.review_reasons %} <span class="badge health-warn" title="{{ a.review_reasons | join(' · ') }}">à revoir</span>{% endif %}
       {% if a and a.warnings %} <span class="badge health-warn">{{ a.warnings | length }} avertissement{{ "s" if a.warnings | length > 1 }}</span>{% endif %}</td>
     <td data-label="Statut">{% if not a %}<span class="muted">à calculer</span>{% elif a.status == "validated" %}<span class="badge badge-ok">validée</span>{% else %}<span class="badge">proposée</span>{% endif %}</td>
     <td data-label="Total" class="amount">{{ a.total | euros if a else "—" }}</td>

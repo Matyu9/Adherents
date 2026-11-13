@@ -4,6 +4,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from app.services import pricing
 from app.services.pricing import (
     FIELDS,
     Household,
@@ -689,3 +690,79 @@ def test_reduction_ne_fait_jamais_payer_plus(picks):
         + [rule("2e", effect={"kind": "percent", "value": "-50"}, conditions=[[cond("ligne.rang_eleve", "ge", 2)]])],
     ).total
     assert with_reduction <= without
+
+
+# ---------------------------------------------------------------------------
+# Critères ajoutés : catégorie et niveau, nombre de cours, dates, cours individuel et durée
+# ---------------------------------------------------------------------------
+
+
+def _new_criteria_order():
+    from datetime import date
+
+    items = {1: pricing.Item(1, "Cours", 30000, "Formules"), 2: pricing.Item(2, "Atelier", 10000, "Formules")}
+    students = (
+        pricing.Student(
+            1, "Léa", category="Scolaire", school_level="Collège", courses=2, enrolled_on=date(2026, 9, 10)
+        ),
+        pricing.Student(2, "Max", category="Adulte", courses=1, enrolled_on=date(2027, 1, 15)),
+    )
+    picks = (
+        (1, 1, {"individual": True, "minutes": 30, "enrolled_on": date(2026, 9, 10)}),
+        (1, 2, {"individual": False, "minutes": 60, "enrolled_on": date(2026, 9, 10)}),
+        (2, 1, {"individual": True, "minutes": 45, "enrolled_on": date(2027, 1, 15)}),
+    )
+    return pricing.Order(pricing.Household(), students, picks), items
+
+
+def _rule(field, op, value, effect=None):
+    return pricing.validate_rule(
+        {
+            "name": "r",
+            "effect": effect or {"kind": "percent", "value": "-50"},
+            "conditions": [[{"field": field, "op": op, "value": value}]],
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "field, op, value, expected",
+    [
+        ("eleve.categorie", "in", ["Scolaire"], [15000, 5000, 30000]),
+        ("eleve.niveau_scolaire", "not_in", ["Collège"], [30000, 10000, 15000]),
+        ("eleve.nb_cours", "ge", 2, [15000, 5000, 30000]),
+        ("eleve.date_inscription", "from", "2027-01-01", [30000, 10000, 15000]),
+        ("ligne.cours_individuel", "is", True, [15000, 10000, 15000]),
+        ("ligne.duree", "le", 30, [15000, 10000, 30000]),
+        ("ligne.date_inscription", "between", ["2026-09-01", "2026-09-30"], [15000, 5000, 30000]),
+        ("ligne.date_inscription", "before", "2026-09-10", [30000, 10000, 30000]),
+    ],
+)
+def test_new_criteria(field, op, value, expected):
+    order, items = _new_criteria_order()
+    result = pricing.compute(order, items, [_rule(field, op, value)])
+    assert [line.amount for line in result.lines] == expected
+
+
+def test_date_criteria_are_validated():
+    with pytest.raises(pricing.PricingError, match="date illisible"):
+        _rule("ligne.date_inscription", "before", "31/12/2026")
+    with pytest.raises(pricing.PricingError, match="deux dates"):
+        _rule("eleve.date_inscription", "between", "2026-09-01")
+    with pytest.raises(pricing.PricingError, match="inversées"):
+        _rule("eleve.date_inscription", "between", ["2026-12-01", "2026-09-01"])
+    with pytest.raises(pricing.PricingError, match="ne peut pas servir"):
+        pricing.validate_rule(
+            {
+                "name": "r",
+                "effect": {"kind": "total_amount", "value": -100},
+                "conditions": [[{"field": "ligne.duree", "op": "le", "value": 30}]],
+            }
+        )
+
+
+def test_old_two_part_picks_still_work():
+    items = {1: pricing.Item(1, "Cours", 30000)}
+    order = pricing.Order(pricing.Household(), (pricing.Student(1),), ((1, 1),))
+    rule = _rule("ligne.cours_individuel", "is", True)
+    assert pricing.compute(order, items, [rule]).total == 30000  # fait inconnu : la règle ne s'applique pas

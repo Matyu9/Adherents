@@ -81,7 +81,7 @@
     {{ send_form.hidden_tag() }}
     {{ field(send_form.comment, rows=2) }}
     <label class="form-check">{{ send_form.certify() }} {{ send_form.certify.label.text }}</label>
-    <button type="submit">Envoyer le dossier</button>
+    <button type="submit" data-enabled-by="certify">Envoyer le dossier</button>
   </form>
   {% endif %}
 </section>

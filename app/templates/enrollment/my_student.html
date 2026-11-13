@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}{{ student.full_name }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('enrollment.my_students', saison=season.id) }}">← Mes élèves</a></p>
+<div class="page-head">
+  <div>
+    <h1>{{ student.full_name }}</h1>
+    <p class="muted">{{ season.label }}{% if student.birth_date %} · {{ student.age() }} ans{% endif %}{% if membership.school_class %} · {{ membership.school_class }}{% endif %}{% if membership.status != membership.ACTIVE %} <span class="badge">abandon</span>{% endif %}</p>
+  </div>
+</div>
+<div class="detail-grid">
+  <section class="card">
+    <h2>Ses cours</h2>
+    <ul class="plain-list">
+      {% for e in all_courses %}{% set c = e.course %}
+      <li>{{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if e.slot_starts_at %} {{ e.slot_starts_at.strftime("%H:%M") }}-{{ e.slot_ends_at.strftime("%H:%M") }}{% elif c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}</small>{% endif %}
+        {% if c.teacher == teacher %}<span class="badge badge-ok">avec vous</span>{% elif c.teacher %}<small class="muted">avec {{ c.teacher.person.full_name }}</small>{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% if can_add and addable %}
+    <form method="post" action="{{ url_for('enrollment.add_my_student', person_id=student.id, saison=season.id) }}" class="inline-form" data-confirm="Inscrire {{ student.first_name }} à ce cours ? Le secrétariat sera prévenu.">
+      {{ csrf() }}
+      <select name="course_id" aria-label="Cours à ajouter" required>
+        {% for c in addable %}<option value="{{ c.id }}">{{ c.title }}{% if c.weekday is not none %} · {{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}{% endif %}{% endif %}</option>{% endfor %}
+      </select>
+      <button type="submit" class="secondary small">+ Ajouter à ce cours</button>
+    </form>
+    <p class="muted small">Seulement vos cours qui ont encore de la place. Pour un autre cours, voyez avec le secrétariat.</p>
+    {% endif %}
+  </section>
+  <section class="card">
+    <h2>Responsables</h2>
+    {% for g in guardians %}
+    <p><strong>{{ g.full_name }}</strong><br>
+      {% for p in g.phones %}<a href="tel:{{ p.number }}">{{ p.number | phone }}</a>{% if p.label %} <small class="muted">{{ p.label }}</small>{% endif %}<br>{% endfor %}
+      {% if g.email %}<a href="mailto:{{ g.email }}">{{ g.email }}</a>{% endif %}</p>
+    {% else %}
+    <p>{% if student.email %}<a href="mailto:{{ student.email }}">{{ student.email }}</a>{% endif %}{% for p in student.phones %}<br><a href="tel:{{ p.number }}">{{ p.number | phone }}</a>{% endfor %}{% if not student.email and not student.phones %}<span class="muted">Aucun contact.</span>{% endif %}</p>
+    {% endfor %}
+  </section>
+</div>
+<section class="card settings-block">
+  <h2>Présences à vos cours</h2>
+  {% for e in mine %}{% set rows = history[e.id] %}
+  <h3>{{ e.course.title }}</h3>
+  {% if rows %}
+  {% set missed = rows | selectattr("1.status", "in", ["absent", "excused", "late"]) | list %}{% set absent = missed | rejectattr("1.status", "equalto", "late") | list %}
+  <p class="small">{{ rows | length - absent | length }} présence{{ "s" if rows | length - absent | length > 1 }} sur {{ rows | length }} appel{{ "s" if rows | length > 1 }}.</p>
+  {% if missed %}<ul class="plain-list">{% for lesson, a in missed %}<li class="small">{{ lesson.day | date_fr }} : {{ a.label | lower }}</li>{% endfor %}</ul>{% endif %}
+  {% else %}<p class="muted small">Aucun appel encore.</p>{% endif %}
+  {% endfor %}
+</section>
+{% endblock %}

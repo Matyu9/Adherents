@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% from "catalog/_season_picker.html" import season_picker, tabs %}
+{% block title %}À placer {{ season.label }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>À placer {{ season.label }}</h1>
+    <p class="muted">Élèves inscrits par discipline (dossiers validés d'une campagne « par discipline »), en attente d'un cours. Inscrire un élève le retire de cette liste et marque la cotisation de son foyer « à revoir ».</p>
+  </div>
+  <div class="actions">{{ season_picker(seasons, season, "catalog.to_place") }}</div>
+</div>
+{{ tabs("placer", season) }}
+{% for discipline, people, own in rows %}
+<section class="card settings-block">
+  <h2>{{ discipline.name_for(season) }} <small class="muted">{{ people | length }} élève{{ "s" if people | length > 1 }}</small></h2>
+  {% if own %}
+  <p class="small muted">{% for c in own %}{{ c.title }}{% if c.weekday is not none %} ({{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}{% endif %}){% endif %} : {{ counts.get(c.id, 0) }}{% if c.capacity %} / {{ c.capacity }}{% endif %}{{ " · " if not loop.last }}{% endfor %}</p>
+  {% endif %}
+  <div class="overflow-auto"><table class="striped responsive">
+    <thead><tr><th>Élève</th><th>Âge</th><th>Disponibilités</th><th>Cours</th></tr></thead>
+    <tbody>
+    {% for m, note in people %}{% set p = m.person %}
+    <tr>
+      <td data-label="Élève">{% if can(current_user, "directory.view") %}<a href="{{ url_for('directory.person', person_id=p.id) }}">{{ p.sort_name }}</a>{% else %}{{ p.sort_name }}{% endif %}</td>
+      <td data-label="Âge"><small>{{ p.age() ~ " ans" if p.birth_date else "—" }}</small></td>
+      <td data-label="Disponibilités"><small>{{ note or "—" }}</small></td>
+      <td data-label="Cours">
+        {% if own %}
+        <form method="post" action="{{ url_for('catalog.place', membership_id=m.id) }}" class="inline-form">
+          {{ csrf() }}<input type="hidden" name="discipline_id" value="{{ discipline.id }}">
+          <select name="course_id" aria-label="Cours pour {{ p.full_name }}" required>
+            {% for c in own %}<option value="{{ c.id }}">{{ c.title }}{% if c.weekday is not none %} · {{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}{% endif %}{% endif %}{% if c.is_full(counts.get(c.id, 0)) %} (complet){% endif %}</option>{% endfor %}
+          </select>
+          <button type="submit" class="secondary small">Inscrire</button>
+        </form>
+        {% else %}<small class="muted">Aucun cours de cette discipline.</small>{% endif %}
+        <form method="post" action="{{ url_for('catalog.place', membership_id=m.id) }}" class="button-form" data-confirm="Retirer la demande de {{ p.full_name }} pour {{ discipline.name_for(season) }} ?">
+          {{ csrf() }}<input type="hidden" name="discipline_id" value="{{ discipline.id }}"><input type="hidden" name="action" value="retirer">
+          <button type="submit" class="link-button small">Retirer la demande</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% else %}
+<p class="empty">Personne à placer pour cette saison.</p>
+{% endfor %}
+{% endblock %}

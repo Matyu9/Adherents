@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "catalog/_season_picker.html" import season_picker %}
+{% block title %}Absences{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Absences répétées{% if season %} {{ season.label }}{% endif %}</h1>
+    <p class="muted">{% if threshold %}Élèves qui ont au moins {{ threshold }} absence{{ "s" if threshold > 1 }} non excusée{{ "s" if threshold > 1 }} sur la saison.{% else %}Aucun seuil n'est fixé : <a href="{{ url_for('lessons.calendar', saison=season.id if season) }}#presences">fixez-le dans le calendrier</a> pour signaler les élèves.{% endif %}</p>
+  </div>
+  {{ season_picker(seasons, season, "lessons.absences") }}
+</div>
+{% if rows %}
+<div class="overflow-auto"><table class="striped responsive">
+  <thead><tr><th>Élève</th><th>Absences</th><th>Excusées</th><th>Par cours</th></tr></thead>
+  <tbody>
+  {% for membership, absent, excused, per_course in rows %}
+  <tr>
+    <td data-label="Élève"><a href="{{ url_for('directory.person', person_id=membership.person_id) }}">{{ membership.person.sort_name }}</a></td>
+    <td data-label="Absences"><strong>{{ absent }}</strong></td>
+    <td data-label="Excusées">{{ excused }}</td>
+    <td data-label="Par cours"><small>{% for course, count in per_course %}{{ course.title }} : {{ count }}{{ ", " if not loop.last }}{% endfor %}</small></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% elif threshold %}<p class="empty">Aucun élève n'atteint le seuil.</p>{% endif %}
+{% endblock %}

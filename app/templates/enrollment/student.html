@@ -15,17 +15,64 @@
     <div class="grid"><div>{{ field(form.birth_date) }}</div><div>{{ field(form.sex) }}</div></div>
     {% endif %}
     <div class="grid"><div>{{ field(form.category) }}</div><div>{{ field(form.school_level) }}</div><div>{{ field(form.school_class) }}</div></div>
-    <fieldset>
+    {% if by_discipline %}
+    <fieldset class="offer">
+      <legend>Disciplines</legend>
+      <p class="muted small">Choisissez une ou plusieurs disciplines, puis indiquez vos disponibilités plus bas : le secrétariat vous proposera un cours.</p>
+      {% if form.disciplines.errors %}<small class="error">{{ form.disciplines.errors | join(" ") }}</small>{% endif %}
+      <div class="offer-grid">
+      {% for d, left, own in proposed %}{% set st = d.settings_for(season) %}
+      <label class="offer-card">
+        <input type="checkbox" name="disciplines" value="{{ d.id }}"{% if d.id in (form.disciplines.data or []) %} checked{% endif %}>
+        <span class="offer-body">
+          <strong class="offer-title">{{ d.name_for(season) }}</strong>
+          {% if st and st.description %}<span class="offer-text">{{ st.description }}</span>{% endif %}
+          <span class="offer-meta">
+            {% if st and (st.min_age or st.max_age) %}<span>{% if st.min_age %}dès {{ st.min_age }} ans{% endif %}{% if st.min_age and st.max_age %}, {% endif %}{% if st.max_age %}jusqu'à {{ st.max_age }} ans{% endif %}</span>{% endif %}
+            {% if left is not none %}<span class="badge{{ ' badge-ok' if left > 3 }}">{{ left }} place{{ "s" if left > 1 }}</span>{% endif %}
+            <span>{{ own | length }} créneau{{ "x" if own | length > 1 }}</span>
+          </span>
+          {% if age is not none and st and ((st.min_age and age < st.min_age) or (st.max_age and age > st.max_age)) %}<span class="offer-warning">Hors des âges conseillés pour {{ name }} ({{ age }} ans).</span>{% endif %}
+        </span>
+      </label>
+      {% else %}<p class="muted">Aucune discipline n'est encore proposée pour cette saison.</p>{% endfor %}
+      </div>
+    </fieldset>
+    {% else %}
+    <fieldset class="offer">
       <legend>Cours</legend>
       {% if form.courses.errors %}<small class="error">{{ form.courses.errors | join(" ") }}</small>{% endif %}
-      {% for c in courses %}
-      {% set disabled = c.id in full and c.id not in (student.courses or []) %}
-      <label><input type="checkbox" name="courses" value="{{ c.id }}"{% if c.id in (form.courses.data or []) %} checked{% endif %}{% if disabled %} disabled{% endif %}>
-        {{ c.title }}{% if c.weekday is not none %} <small class="muted">{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}</small>{% endif %}
-        {% if c.teacher %} <small class="muted">avec {{ c.teacher.person.full_name }}</small>{% endif %}
-        {% if disabled %} <span class="badge">complet</span>{% endif %}</label>
+      {% if form.waitlist.errors %}<small class="error">{{ form.waitlist.errors | join(" ") }}</small>{% endif %}
+      {% for discipline, st, group in groups %}
+      <section class="offer-group">
+        <h3>{{ discipline.name_for(season) }}</h3>
+        {% if st and st.description %}<p class="offer-text">{{ st.description }}</p>{% endif %}
+        <div class="offer-grid">
+        {% for c in group %}
+        {% set disabled = c.id in full and c.id not in (student.courses or []) %}
+        {% set left = (c.capacity - counts.get(c.id, 0)) if c.capacity else none %}
+        <div class="offer-card{{ ' is-full' if disabled }}">
+          <label class="offer-choice">
+            <input type="checkbox" name="courses" value="{{ c.id }}"{% if c.id in (form.courses.data or []) %} checked{% endif %}{% if disabled %} disabled{% endif %}>
+            <span class="offer-body">
+              <strong class="offer-title">{% if c.weekday is not none %}{{ c.weekday_name }}{% if c.starts_at %} {{ c.starts_at.strftime("%H:%M") }}-{{ c.ends_at.strftime("%H:%M") }}{% endif %}{% else %}Horaire à fixer{% endif %}</strong>
+              {% set detail = [c.level.name if c.level else none, c.group_label] | select | join(" · ") %}
+              {% if detail %}<span class="offer-text">{{ detail }}</span>{% endif %}
+              <span class="offer-meta">
+                {% if c.teacher %}<span>avec {{ c.teacher.person.full_name }}</span>{% endif %}
+                {% if c.room %}<span>{{ c.room.label }}</span>{% endif %}
+                {% if disabled %}<span class="badge">complet</span>{% elif left is not none and left <= 3 %}<span class="badge">{{ left }} place{{ "s" if left > 1 }}</span>{% endif %}
+              </span>
+            </span>
+          </label>
+          {% if disabled %}<label class="small waitlist-choice"><input type="checkbox" name="waitlist" value="{{ c.id }}"{% if c.id in (form.waitlist.data or []) %} checked{% endif %}> M'inscrire sur la liste d'attente de ce cours</label>{% endif %}
+        </div>
+        {% endfor %}
+        </div>
+      </section>
       {% else %}<p class="muted">Aucun cours n'est encore proposé pour cette saison.</p>{% endfor %}
     </fieldset>
+    {% endif %}
     {{ field(form.wishes, rows=2) }}
     {% for c in consents %}
     <fieldset class="settings-block">

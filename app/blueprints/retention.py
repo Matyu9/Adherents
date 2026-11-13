@@ -11,7 +11,7 @@ from ..permissions import require
 from ..services import retention
 from ..services.activity import log
 
-bp = Blueprint("retention", __name__, url_prefix="/annuaire/conservation")
+bp = Blueprint("retention", __name__, url_prefix="/parametres/donnees-personnelles")
 
 
 class DurationForm(FlaskForm):

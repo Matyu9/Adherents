@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "directory/_macros.html" import csrf %}
+{% block title %}Prévenir d'une absence{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('member.index') }}">← Ma famille</a></p>
+<div class="page-head">
+  <div>
+    <h1>Prévenir d'une absence</h1>
+    <p class="muted">Les séances des {{ days // 7 }} semaines à venir. Le professeur est prévenu, et l'absence est notée « excusée » à l'appel. Pas besoin d'en donner la raison.</p>
+  </div>
+</div>
+{% if rows %}
+<ul class="plain-list upcoming">
+  {% for lesson, e, notice in rows %}
+  <li>
+    <strong>{{ lesson.day | date_fr }}</strong> {{ lesson.starts_at.strftime("%H:%M") }} · {{ e.membership.person.first_name }} · {{ lesson.course.title }}
+    {% if notice %}
+    <span class="badge">absence prévenue</span>
+    <form method="post" action="{{ url_for('member.cancel_absence', notice_id=notice.id) }}" class="button-form">{{ csrf() }}<button type="submit" class="link-button small">Retirer</button></form>
+    {% else %}
+    <form method="post" action="{{ url_for('member.declare_absence') }}" class="button-form" data-confirm="Prévenir que {{ e.membership.person.first_name }} sera absent(e) le {{ lesson.day | date_fr }} ?">
+      {{ csrf() }}<input type="hidden" name="lesson_id" value="{{ lesson.id }}"><input type="hidden" name="enrollment_id" value="{{ e.id }}">
+      <button type="submit" class="secondary small">Sera absent(e)</button>
+    </form>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty">Aucune séance dans les semaines à venir.</p>
+{% endif %}
+{% endblock %}

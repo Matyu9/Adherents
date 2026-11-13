@@ -1,6 +1,6 @@
 """Mon compte : chacun gère son profil, son adresse, sa double authentification, son affichage et ses appareils."""
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
 from wtforms import EmailField, PasswordField, RadioField, StringField
@@ -249,6 +249,22 @@ def _totp_form_error(form):
         remaining=totp_service.remaining_recovery_codes(current_user),
         required=totp_service.required(current_user),
     )
+
+
+@bp.route("/vue-adherent", methods=["POST"])
+@login_required
+def member_view():
+    """Bascule la vue adhérent : tant qu'elle est active, le compte n'a que les droits d'un adhérent (menu et pages)."""
+    from ..models import MEMBER_VIEW_KEY
+    from ..permissions import has_staff_rights
+
+    if session.get(MEMBER_VIEW_KEY) == current_user.id:
+        session.pop(MEMBER_VIEW_KEY)
+        flash("Vous retrouvez vos droits habituels.", "success")
+    elif has_staff_rights(current_user):
+        session[MEMBER_VIEW_KEY] = current_user.id
+        flash("Vue adhérent : vous voyez l'appli comme un adhérent, avec ses seuls droits.", "success")
+    return redirect(url_for("dashboard.index"))
 
 
 @bp.route("/affichage", methods=["POST"])

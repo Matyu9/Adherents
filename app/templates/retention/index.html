@@ -1,11 +1,14 @@
 {% extends "base.html" %}
 {% from "partials/_form.html" import field %}
 {% from "directory/_macros.html" import csrf, post_button %}
+{% from "settings/_tabs.html" import tabs with context %}
 {% block title %}Conservation des données{% endblock %}
 {% block content %}
+<h1>Paramètres</h1>
+{{ tabs("donnees") }}
 <div class="page-head">
   <div>
-    <h1>Conservation des données</h1>
+    <h2>Conservation des données personnelles</h2>
     <p class="muted">Les anciens adhérents ne sont pas gardés indéfiniment. L'anonymisation efface ce qui identifie une personne ; ses adhésions et inscriptions passées restent, sans nom, pour les statistiques.</p>
   </div>
 </div>

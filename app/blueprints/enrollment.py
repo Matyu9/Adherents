@@ -357,11 +357,21 @@ class StudentForm(FlaskForm):
         option_widget=CheckboxInput(),
         validate_choice=False,
     )
+    disciplines = SelectMultipleField(
+        "Disciplines",
+        coerce=int,
+        widget=ListWidget(prefix_label=False),
+        option_widget=CheckboxInput(),
+        validate_choice=False,
+    )
     wishes = TextAreaField("Souhaits, contraintes d'horaire", validators=[Optional(), Length(max=2000)])
 
-    def __init__(self, *args, is_guardian=False, full=(), offered=(), already=(), **kwargs):
+    def __init__(self, *args, is_guardian=False, full=(), offered=(), already=(), by_discipline=False, proposed=(), **kwargs):
         super().__init__(*args, **kwargs)
         self._is_guardian, self._full, self._offered, self._already = is_guardian, set(full), set(offered), set(already)
+        self._by_discipline, self._proposed = by_discipline, set(proposed)
+        if by_discipline:
+            self.wishes.label.text = "Vos disponibilités (jours, heures), et vos souhaits"
 
     def validate(self, extra_validators=None):
         ok = super().validate(extra_validators)
@@ -372,6 +382,11 @@ class StudentForm(FlaskForm):
                 if not getattr(self, f).data:
                     getattr(self, f).errors.append("Obligatoire pour inscrire l'élève.")
                     ok = False
+        if self._by_discipline:
+            if set(self.disciplines.data or []) - self._proposed:
+                self.disciplines.errors.append("Une discipline choisie n'est pas proposée.")
+                ok = False
+            return ok
         chosen = set(self.courses.data or [])
         if chosen - self._offered:
             self.courses.errors.append("Un cours choisi n'est pas proposé.")
@@ -410,10 +425,18 @@ def student(dossier, student_key):
     courses, counts = registration.offered_courses(dossier.campaign)
     full = [c.id for c in courses if c.is_full(counts.get(c.id, 0))]
     is_guardian = s.get("guardian") is not None
+    by_discipline = dossier.campaign.choice == Campaign.DISCIPLINE
+    proposed = registration.offered_disciplines(dossier.campaign) if by_discipline else []
     form = StudentForm(
-        is_guardian=is_guardian, full=full, offered=[c.id for c in courses], already=s.get("courses", [])
+        is_guardian=is_guardian,
+        full=full,
+        offered=[c.id for c in courses],
+        already=s.get("courses", []),
+        by_discipline=by_discipline,
+        proposed=[d.id for d, _left, _courses in proposed],
     )
     form.courses.choices = [(c.id, c.title) for c in courses]
+    form.disciplines.choices = [(d.id, d.name) for d, _left, _courses in proposed]
     if request.method == "GET":
         form.enrolled.data = bool(s.get("enrolled"))
         for f in ("first_name", "last_name", "sex", "category", "school_level", "school_class", "wishes"):
@@ -421,14 +444,18 @@ def student(dossier, student_key):
         form.birth_date.data = datetime.fromisoformat(s["birth_date"]).date() if s.get("birth_date") else None
         form.courses.data = s.get("courses", [])
         form.waitlist.data = s.get("waitlist", [])
+        form.disciplines.data = s.get("disciplines", [])
     if form.validate_on_submit():
         s["enrolled"] = form.enrolled.data
         if not is_guardian:
             s.update({f: _blank(getattr(form, f).data) for f in ("first_name", "last_name", "sex")})
             s["birth_date"] = form.birth_date.data.isoformat() if form.birth_date.data else None
         s.update({f: _blank(getattr(form, f).data) for f in ("category", "school_level", "school_class", "wishes")})
-        s["courses"] = list(form.courses.data or [])
-        s["waitlist"] = [c for c in form.waitlist.data or [] if c not in s["courses"]]
+        if by_discipline:
+            s["disciplines"] = list(form.disciplines.data or [])
+        else:
+            s["courses"] = list(form.courses.data or [])
+            s["waitlist"] = [c for c in form.waitlist.data or [] if c not in s["courses"]]
         s["consents"] = {str(c.id): request.form.get(f"consent-{c.id}") == "y" for c in _student_consents(dossier)}
         registration.save(dossier, data)
         db.session.commit()
@@ -445,8 +472,33 @@ def student(dossier, student_key):
         courses=courses,
         counts=counts,
         full=set(full),
+        groups=_course_groups(courses, dossier.campaign.season),
+        by_discipline=by_discipline,
+        proposed=proposed,
+        age=_age_on(s, dossier.campaign.season),
+        season=dossier.campaign.season,
         consents=_student_consents(dossier),
     )
+
+
+def _course_groups(courses, season):
+    """Cours regroupés par discipline, dans l'ordre du catalogue : [(discipline, réglages de saison, [cours])]."""
+    groups = []
+    for course in courses:
+        if groups and groups[-1][0] == course.discipline:
+            groups[-1][2].append(course)
+        else:
+            groups.append((course.discipline, course.discipline.settings_for(season), [course]))
+    return groups
+
+
+def _age_on(student, season):
+    """Âge de l'élève au début de la saison, s'il est connu (pour signaler une discipline hors des âges admis)."""
+    if not student.get("birth_date"):
+        return None
+    born = datetime.fromisoformat(student["birth_date"]).date()
+    start = season.starts_on
+    return start.year - born.year - ((start.month, start.day) < (born.month, born.day))
 
 
 @bp.route("/dossier/<uuid>/eleves/nouveau", methods=["POST"])

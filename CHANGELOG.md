@@ -4,6 +4,11 @@ Les changements notables du projet sont consignés ici. Le format s'inspire de [
 
 ## Non publié
 
+### Changé : retours du tour complet, réinscriptions
+
+- **Cours proposés en cartes**, regroupés par discipline (description de la saison, jour et horaire, professeur, salle, places qui restent, complet et liste d'attente). Corrige l'affichage serré des cours dans le dossier.
+- **Campagne « par discipline »** (réglage de chaque campagne) : la famille choisit une ou plusieurs disciplines et donne ses disponibilités ; les âges conseillés et les places de la saison s'affichent. À la validation, l'élève devient adhérent sans cours, et apparaît dans **Catalogue → À placer**, où le secrétariat l'inscrit. Migration `a0000020choix`.
+
 ### Changé : retours du tour complet, disciplines par saison
 
 - **Catalogue → Disciplines de la saison** : chaque discipline garde une seule fiche, avec des réglages propres à chaque saison (nom, type, proposée ou non, description pour les familles, places, âges admis). L'historique garde le nom de l'époque, « Copier une saison » recopie ces réglages, et une discipline qui n'est pas proposée sort du choix des cours de la saison. Migration `a0000019disciplines`.

@@ -148,6 +148,8 @@ ACCESS = {
     "teachers.photo": LOGGED_IN,
     **{f"catalog.{name}": CAT_VIEW for name in ("index", "teachers", "references", "season_disciplines")},
     "catalog.season_discipline": CAT_EDIT,
+    "catalog.to_place": ENROLL,
+    "catalog.place": ENROLL,
     **{f"campaigns.{name}": REG_VIEW for name in ("index", "detail", "dossiers", "dossier")},
     **{
         f"campaigns.{name}": REG_MANAGE

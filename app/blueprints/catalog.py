@@ -1114,3 +1114,82 @@ def season_discipline(discipline_id):
         types=catalog.discipline_types(),
         error=error,
     )
+
+
+# ---------------------------------------------------------------------------
+# À placer : élèves validés « par discipline », à inscrire dans un cours
+# ---------------------------------------------------------------------------
+
+
+def _to_place(season):
+    """[(discipline, [(adhésion, note)], [cours de la discipline])] : les demandes encore sans cours de la discipline."""
+    from ..models import Membership
+
+    rows = db.session.scalars(
+        db.select(Membership).where(
+            Membership.season_id == season.id, Membership.placement.is_not(None), Membership.status == Membership.ACTIVE
+        )
+    ).all()
+    by_discipline = {}
+    for membership in rows:
+        placed = {e.course.discipline_id for e in membership.enrollments if e.active}
+        for discipline_id in (membership.placement or {}).get("disciplines", []):
+            if discipline_id not in placed:
+                by_discipline.setdefault(discipline_id, []).append((membership, membership.placement.get("note")))
+    result = []
+    for discipline in catalog.disciplines(include_archived=True):
+        if discipline.id in by_discipline:
+            own = catalog.sorted_courses(
+                db.session.scalars(
+                    db.select(Course).where(Course.season_id == season.id, Course.discipline_id == discipline.id)
+                )
+            )
+            people = sorted(by_discipline[discipline.id], key=lambda r: (r[0].person.last_name, r[0].person.first_name))
+            result.append((discipline, people, own))
+    return result
+
+
+@bp.route("/a-placer")
+@require("enrollment.edit")
+def to_place():
+    season, seasons = _selected_season()
+    if season is None:
+        return redirect(url_for(".index"))
+    return render_template(
+        "catalog/to_place.html",
+        season=season,
+        seasons=seasons,
+        rows=_to_place(season),
+        counts=registration.enrolled_counts(season),
+    )
+
+
+@bp.route("/a-placer/<int:membership_id>", methods=["POST"])
+@require("enrollment.edit")
+def place(membership_id):
+    from ..models import Membership
+
+    membership = db.session.get(Membership, membership_id) or abort(404)
+    season = membership.season
+    discipline_id = request.form.get("discipline_id", type=int)
+    if request.form.get("action") == "retirer":
+        wanted = [d for d in (membership.placement or {}).get("disciplines", []) if d != discipline_id]
+        membership.placement = {**(membership.placement or {}), "disciplines": wanted} if wanted else None
+        log("enrollment.placement", f"Demande retirée pour {membership.person.full_name}", person=membership.person)
+        db.session.commit()
+        flash("Demande retirée.", "success")
+        return redirect(url_for(".to_place", saison=season.id))
+    course = db.session.get(Course, request.form.get("course_id", type=int) or 0)
+    if course is None or course.season_id != season.id or course.discipline_id != discipline_id:
+        abort(400)
+    try:
+        _enrollment, warnings = courses.enroll(membership, course, max(date.today(), season.starts_on), user=current_user)
+    except courses.CourseError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        for message in warnings:
+            flash(message, "warning")
+        db.session.commit()
+        flash(f"{membership.person.full_name} est inscrit(e) à {course.title}.", "success")
+    return redirect(url_for(".to_place", saison=season.id))

@@ -71,7 +71,7 @@ Si, une fois connecté, **Ma famille** n'apparaît pas dans le menu, votre compt
 
 ### Inscrire ou réinscrire ses enfants
 
-Pendant une campagne d'inscription, le tableau de bord l'annonce, et une relance arrive chaque semaine tant que le dossier n'est pas envoyé.
+Pendant une campagne d'inscription, l'Accueil l'annonce, et une relance arrive chaque semaine tant que le dossier n'est pas envoyé.
 
 1. **Menu → Inscriptions**, puis **Commencer le dossier** (ou **Continuer**).
 2. Le dossier est **pré-rempli** avec ce que l'association sait de votre foyer. Les cours de l'an dernier sont déjà proposés pour la nouvelle saison : même discipline, même niveau. Vérifiez chaque partie.
@@ -82,7 +82,8 @@ Pendant une campagne d'inscription, le tableau de bord l'annonce, et une relance
 
 - cochez ou décochez **Inscrire cet élève cette saison** (un enfant qui ne revient pas reste dans la liste, décoché) ;
 - vérifiez son identité, sa catégorie et sa classe ;
-- choisissez ses **cours**. Un cours **complet** est grisé : indiquez votre souhait dans la case **Souhaits, contraintes d'horaire**, le secrétariat vous recontactera ;
+- choisissez ses **cours** : ils sont présentés en cartes, par discipline, avec le jour, l'horaire, le professeur et les places qui restent. Un cours **complet** est grisé : cochez la liste d'attente, ou indiquez votre souhait dans la case **Souhaits, contraintes d'horaire** ;
+- si l'association fait choisir **une discipline** plutôt qu'un horaire, cochez la ou les disciplines (avec leur description et les âges conseillés) et indiquez vos **disponibilités** : le secrétariat vous proposera un cours ;
 - répondez aux consentements demandés pour lui (droit à l'image…).
 
 Pour ajouter un enfant, ou vous inscrire vous-même, utilisez **+ Ajouter un élève** sous la liste.
@@ -258,6 +259,7 @@ Un cours complet accepte quand même l'élève, avec un avertissement.
 - **Saison** et **titre**, vu par les familles (« Réinscriptions 2027-2028 ») ;
 - **ouverture** et **clôture**, à la minute près : les familles ne peuvent modifier ou envoyer leur dossier qu'entre les deux ;
 - **Accueillir aussi les nouvelles familles** : ouvre un formulaire public. Son adresse s'affiche sur la page de la campagne, à diffuser ;
+- **Les familles choisissent** : un cours précis (jour et horaire), ou une discipline. Dans ce second cas, la famille donne ses disponibilités ; après la validation du dossier, l'élève apparaît dans **Catalogue → À placer**, où le secrétariat l'inscrit dans un cours de la discipline ;
 - **Message aux familles** : affiché en tête de chaque dossier (pièces à prévoir, dates…).
 
 Puis, sur la page de la campagne, **+ Ajouter un consentement** pour chaque engagement à demander :

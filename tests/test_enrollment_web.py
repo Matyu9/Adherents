@@ -512,3 +512,80 @@ def test_a_teacher_sees_his_students_and_their_guardians(client, opened, account
     assert other.get("/annuaire").status_code == 403  # et rien d'autre de l'annuaire
     # Un adhérent qui n'est pas professeur n'a pas cette page.
     assert client.get("/inscription/mes-eleves").status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Campagne « par discipline » : la famille choisit une discipline, le secrétariat place l'élève
+# ---------------------------------------------------------------------------
+
+
+def test_reinscription_par_discipline(client, parent, manager, opened, accounts):
+    from app.models import DisciplineSeason, Membership
+
+    from .conftest import enroll
+
+    campaign, new = opened["campaign"], opened["new"]
+    campaign.choice = Campaign.DISCIPLINE
+    fm = opened["fm_new"].discipline
+    db.session.add(DisciplineSeason(discipline=fm, season=new, description="Solfège et culture.", min_age=6, max_age=8))
+    db.session.commit()
+    dossier = start(client, opened)
+    student = dossier.data["students"][0]
+    assert opened["flute_new"].discipline_id in student["disciplines"]  # repris de l'an dernier
+    key = student["key"]
+    page = client.get(f"/inscription/dossier/{dossier.uuid}/eleves/{key}").get_data(as_text=True)
+    assert 'name="disciplines"' in page and 'name="courses"' not in page
+    assert "Solfège et culture." in page and "Vos disponibilités" in page
+    assert "Hors des âges conseillés" in page  # Zoé a 11 ans
+    image = campaign.consents[0]
+    client.post(
+        f"/inscription/dossier/{dossier.uuid}/eleves/{key}",
+        data={
+            "enrolled": "y",
+            "first_name": "Zoé",
+            "last_name": "Martin",
+            "birth_date": "2015-05-06",
+            "disciplines": [fm.id],
+            "wishes": "Le mercredi après-midi",
+            f"consent-{image.id}": "y",
+        },
+    )
+    db.session.refresh(dossier)
+    assert dossier.data["students"][0]["disciplines"] == [fm.id]
+    fill_and_send(client, opened, dossier)
+    db.session.refresh(dossier)
+    assert dossier.status == Dossier.SUBMITTED
+    review = manager.get(f"/campagnes/dossiers/{dossier.id}").get_data(as_text=True)
+    assert "Disciplines à placer" in review and "Le mercredi après-midi" in review
+    manager.post(f"/campagnes/dossiers/{dossier.id}/valider")
+    zoe = opened["zoe"]
+    membership = db.session.scalar(sa.select(Membership).filter_by(person_id=zoe.id, season_id=new.id))
+    assert membership.placement == {"disciplines": [fm.id], "note": "Le mercredi après-midi"}
+    assert not [e for e in membership.enrollments if e.active]  # pas encore de cours
+    assert db.session.scalar(sa.select(Consent).filter_by(label="Droit à l'image", person_id=zoe.id)).granted
+    # Le secrétariat place Zoé.
+    staff = manager
+    page = staff.get(f"/catalogue/a-placer?saison={new.id}").get_data(as_text=True)
+    assert "MARTIN Zoé" in page and "Le mercredi après-midi" in page
+    staff.post(f"/catalogue/a-placer/{membership.id}", data={"discipline_id": fm.id, "course_id": opened["fm_new"].id})
+    assert [e.course for e in membership.enrollments if e.active] == [opened["fm_new"]]
+    assert "Personne à placer" in staff.get(f"/catalogue/a-placer?saison={new.id}").get_data(as_text=True)
+
+
+def test_une_discipline_non_proposee_est_refusee(client, parent, opened):
+    campaign = opened["campaign"]
+    campaign.choice = Campaign.DISCIPLINE
+    db.session.commit()
+    dossier = start(client, opened)
+    key = dossier.data["students"][0]["key"]
+    page = client.post(
+        f"/inscription/dossier/{dossier.uuid}/eleves/{key}",
+        data={"enrolled": "y", "first_name": "Zoé", "last_name": "Martin", "birth_date": "2015-05-06", "disciplines": [99999]},
+    ).get_data(as_text=True)
+    assert "pas proposée" in page
+
+
+def test_le_mode_de_choix_se_regle_sur_la_campagne(manager, opened):
+    campaign = opened["campaign"]
+    page = manager.get(f"/campagnes/{campaign.id}/modifier").get_data(as_text=True)
+    assert "Les familles choisissent" in page and 'value="discipline"' in page

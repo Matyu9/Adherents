@@ -134,6 +134,13 @@ def create_app(config_class=Config):
             with contextlib.suppress(OSError):
                 values["v"] = int((Path(app.static_folder) / values["filename"]).stat().st_mtime)
 
+    # Aussi pour les macros importées sans contexte (onglets, sélecteurs de saison).
+    from flask_login import current_user as _current_user
+
+    app.jinja_env.globals.update(
+        can=can, has_staff_rights=has_staff_rights, is_family=is_family, current_user=_current_user
+    )
+
     @app.context_processor
     def inject_globals():
         brand = branding.current()

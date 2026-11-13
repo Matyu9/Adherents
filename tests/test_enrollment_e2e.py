@@ -90,6 +90,12 @@ def test_a_mother_registers_her_son_and_the_office_validates(session):
     assert "Léon Lefèvre" in content and "Piano e2e" in content and "Pensez au certificat." in content
     shot(page, "inscription-dossier")
 
+    dossier_url = page.url
+    page.goto(page.locator("a[href*='/eleves/']").first.get_attribute("href"))
+    assert page.locator(".offer-card").count() >= 1  # les cours proposés, en cartes par discipline
+    shot(page, "inscription-eleve")
+    page.goto(dossier_url)
+
     page.click("text=Modifier >> nth=0")  # le foyer
     page.fill("#g1_phone", "07 00 00 00 01")
     page.click("main form[method=post] button[type=submit]")

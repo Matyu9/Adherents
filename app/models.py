@@ -677,6 +677,9 @@ class Membership(TimestampMixin, db.Model):
     school_class = db.Column(db.String(40))
     # Étiquettes de l'élève pour les tarifs de la saison (« personnel », « boursier »…), voir docs/tarifs.md.
     fee_tags = db.Column(db.JSON, nullable=False, default=list, server_default="[]")
+    # Disciplines demandées dans un dossier « par discipline », à placer dans un cours par le secrétariat :
+    # {"disciplines": [id…], "note": "disponibilités"}. Vide : rien à placer.
+    placement = db.Column(db.JSON)
 
     person = db.relationship("Person", back_populates="memberships")
     season = db.relationship("Season")
@@ -1108,6 +1111,10 @@ class Campaign(TimestampMixin, db.Model):
     opens_at = db.Column(db.DateTime, nullable=False)
     closes_at = db.Column(db.DateTime, nullable=False)
     allow_new = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())  # formulaire public
+    # Ce que les familles choisissent : un cours précis (horaire) ou une discipline, que le secrétariat place ensuite.
+    COURSE, DISCIPLINE = "cours", "discipline"
+    CHOICES = {COURSE: "Un cours précis (jour et horaire)", DISCIPLINE: "Une discipline : le secrétariat place l'élève"}
+    choice = db.Column(db.String(12), nullable=False, default=COURSE, server_default=COURSE)
     instructions = db.Column(db.Text)  # affichées en tête du dossier
 
     season = db.relationship("Season")
